@@ -160,7 +160,6 @@ MonoBehaviour:
     _value: 25
     _color: {r: 1, g: 1, b: 1, a: 1}
     _spawnWeight: 1
-    _requiresEjection: 1
     _allowRepeatEjection: 1
     _maxConcurrent: 0
     _stopAfterCatch: 0

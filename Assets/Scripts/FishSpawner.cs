@@ -10,8 +10,6 @@ using Newtonsoft.Json.Linq;
 // 던진 물고기로 맞추면 돈을 받고 물고기를 도감에 등록한다.
 public class FishSpawner : MonoBehaviour
 {
-    private const string SEA_KEY_PREFIX = "SkipStoneV2.Sea.";
-
     [Header("참조")]
     [SerializeField]
     private PlayerController _player;
@@ -43,12 +41,14 @@ public class FishSpawner : MonoBehaviour
     private ScreenFishCapture _screenCapture;
     private ScreenFishCapture _catalogCapture;
     private Mesh _wallCatalogMesh;
+    private Mesh _wallSpawnMesh;
     private Mesh _iceCatalogMesh;
     private ProceduralObstacleSpawner _obstacles;
-    private readonly HashSet<string> _seaTypes = new HashSet<string>();
-    private readonly HashSet<string> _pendingSeaTypes = new HashSet<string>();
+    private SeaSpawnRegistry _seaSpawnRegistry;
     private FishUnlockGraph _unlockGraph;
     private readonly Dictionary<string, float> _spawnWeights = new Dictionary<string, float>();
+    private readonly Dictionary<string, Mesh> _seaSpawnMeshes = new Dictionary<string, Mesh>();
+    private readonly Dictionary<string, Mesh> _pendingSeaSpawnMeshes = new Dictionary<string, Mesh>();
 
     [Header("출현")]
     [Tooltip("물고기가 튀어 오르는 간격 범위(초)")]
@@ -81,6 +81,7 @@ public class FishSpawner : MonoBehaviour
     [SerializeField]
     private Color _catchFlashColor = new Color(1f, 0.85f, 0.3f, 0.3f);
     private readonly List<Fish> _activeFish = new List<Fish>();
+    private readonly List<Fish> _cutPieces = new List<Fish>();
     private float _nextSpawnTime;
     public event Action<FishType> OnFishCaught;
     public event Action OnClearing;
@@ -100,6 +101,7 @@ public class FishSpawner : MonoBehaviour
     private float _fishRippleScale = 2.5f;
 
     public Rigidbody PlayerBody => _playerBody;
+    public float WaterY => _waterY;
     public IReadOnlyList<Fish> FishPrefabs => _selectablePrefabs;
     public IReadOnlyList<FishType> FishTypes => _fishTypes;
     public Fish WallFish => _wallFish;
@@ -115,7 +117,8 @@ public class FishSpawner : MonoBehaviour
     public FishCatalogState GetCatalogState(FishType type)
     {
         FishCatalogState state = _unlockGraph.GetCatalogState(type);
-        if (state == FishCatalogState.Undiscovered && type.RequiresEjection && _seaTypes.Contains(type.Id))
+        if (state == FishCatalogState.Undiscovered && _seaSpawnRegistry.RequiresRegistration(type.Id)
+            && _seaSpawnRegistry.IsUnlocked(type.Id))
             return FishCatalogState.Discovered;
         return state;
     }
@@ -124,6 +127,9 @@ public class FishSpawner : MonoBehaviour
     {
         _fishPrefabs = Array.FindAll(_fishPrefabs, prefab => prefab.Type.Id != "arrow");
         JObject catalogEntries = JObject.Parse(Resources.Load<TextAsset>("FishCatalog").text);
+        _seaSpawnRegistry = GetComponent<SeaSpawnRegistry>();
+        if (_seaSpawnRegistry == null) _seaSpawnRegistry = gameObject.AddComponent<SeaSpawnRegistry>();
+        _seaSpawnRegistry.Initialize(catalogEntries);
         foreach (JProperty entry in catalogEntries.Properties())
         {
             _spawnWeights.Add(entry.Name, entry.Value.Value<float>("spawnWeight"));
@@ -136,6 +142,7 @@ public class FishSpawner : MonoBehaviour
         if (_screenCapture == null) _screenCapture = gameObject.AddComponent<ScreenFishCapture>();
         Fish screenFish = _screenCapture.Initialize(_progress, FishType.CreateScreen());
         _catalogCapture = gameObject.AddComponent<ScreenFishCapture>();
+        _catalogCapture.PanelSize = _screenCapture.PanelSize;
         Fish catalogFish = _catalogCapture.Initialize(_progress, FishType.CreateCatalog());
         int count = _fishPrefabs.Length;
         Array.Resize(ref _fishPrefabs, count + 2);
@@ -147,10 +154,6 @@ public class FishSpawner : MonoBehaviour
         for (int i = 0; i < _selectablePrefabs.Length; i++)
         {
             _fishTypes[i] = _selectablePrefabs[i].Type;
-            if (PlayerPrefs.GetInt(SEA_KEY_PREFIX + _fishTypes[i].Id, 0) > 0)
-            {
-                _seaTypes.Add(_fishTypes[i].Id);
-            }
         }
         _unlockGraph = new FishUnlockGraph(_progress);
         RegisterCatalogPrefabs();
@@ -162,6 +165,8 @@ public class FishSpawner : MonoBehaviour
         if (_wallFish != null) Destroy(_wallFish.gameObject);
         if (_wallCatalogMesh != null) Destroy(_wallCatalogMesh);
         if (_iceCatalogMesh != null) Destroy(_iceCatalogMesh);
+        foreach (Mesh mesh in _seaSpawnMeshes.Values) Destroy(mesh);
+        foreach (Mesh mesh in _pendingSeaSpawnMeshes.Values) Destroy(mesh);
     }
 
     /// <summary>
@@ -171,6 +176,7 @@ public class FishSpawner : MonoBehaviour
     private void InitializeWalls()
     {
         MeshFilter wall = Resources.Load<GameObject>("Prefabs/Wall").GetComponent<MeshFilter>();
+        _wallSpawnMesh = wall.sharedMesh;
 
         GameObject template = new GameObject("Wall Fish Catalog");
         template.SetActive(false);
@@ -182,6 +188,8 @@ public class FishSpawner : MonoBehaviour
         template.AddComponent<Rigidbody>().isKinematic = true;
         _wallFish = template.AddComponent<Fish>();
         _wallFish.InitializeWall(this, FishType.CreateWall(), null);
+        Mesh wallSeaMesh = _progress.LoadSeaMesh(_wallFish.Type);
+        if (wallSeaMesh != null) _seaSpawnMeshes.Add(_wallFish.Type.Id, wallSeaMesh);
         int count = _fishPrefabs.Length;
         Array.Resize(ref _fishPrefabs, count + 1);
         _fishPrefabs[count] = _wallFish;
@@ -198,6 +206,8 @@ public class FishSpawner : MonoBehaviour
         iceTemplate.AddComponent<Rigidbody>().isKinematic = true;
         _iceFish = iceTemplate.AddComponent<Fish>();
         _iceFish.InitializeWall(this, iceType, null);
+        Mesh iceSeaMesh = _progress.LoadSeaMesh(iceType);
+        if (iceSeaMesh != null) _seaSpawnMeshes.Add(iceType.Id, iceSeaMesh);
         Array.Resize(ref _fishPrefabs, _fishPrefabs.Length + 1);
         _fishPrefabs[_fishPrefabs.Length - 1] = _iceFish;
     }
@@ -227,7 +237,7 @@ public class FishSpawner : MonoBehaviour
 
     /// <summary>
     /// 재시작 시 떠 있는 물고기를 없애고 입수 종류를 다음 판 출현에 반영한 뒤 맵 물고기의 재등장을 알린다.
-    /// 입력값은 없으며, 활성 목록과 대기 기록, 출현 가능 종류와 시간을 갱신하고 OnCleared를 보낸다.
+    /// 입력값은 없으며, 활성 목록과 입수 모양, 출현 가능 종류와 시간을 갱신하고 OnCleared를 보낸다.
     /// </summary>
     public void Clear()
     {
@@ -238,8 +248,20 @@ public class FishSpawner : MonoBehaviour
             Destroy(fish.gameObject);
         }
         _activeFish.Clear();
-        _seaTypes.UnionWith(_pendingSeaTypes);
-        _pendingSeaTypes.Clear();
+        foreach (Fish piece in _cutPieces)
+        {
+            if (piece == null) continue;
+            piece.gameObject.SetActive(false);
+            Destroy(piece.gameObject);
+        }
+        _cutPieces.Clear();
+        foreach (KeyValuePair<string, Mesh> entry in _pendingSeaSpawnMeshes)
+        {
+            if (_seaSpawnMeshes.TryGetValue(entry.Key, out Mesh previous)) Destroy(previous);
+            _seaSpawnMeshes[entry.Key] = entry.Value;
+        }
+        _pendingSeaSpawnMeshes.Clear();
+        _seaSpawnRegistry.CommitPending();
         _unlockGraph.RestoreUnlocks(_fishPrefabs);
         _nextSpawnTime = Time.time;
         OnCleared?.Invoke();
@@ -255,15 +277,19 @@ public class FishSpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// 물고기가 입수하면 물보라를 만들고 사출물의 바다 등록을 저장한 뒤 없앤다.
-    /// fish와 _fishRippleScale을 사용하며, 다음 판 출현 기록과 PlayerPrefs, 활성 목록을 변경한다.
+    /// 물고기가 입수하면 대상 종류의 다음 run 출현과 벽 또는 유빙의 마지막 입수 모양을 예약한다.
+    /// fish의 메시와 스케일을 별도로 저장하며 획득 모양은 유지하고 물보라를 만든 뒤 개체를 없앤다.
     /// </summary>
     public void HandleFishLanded(Fish fish)
     {
-        if (fish.IsEjected)
+        if (fish.Type.Id == "wall" || fish.Type.Id == "ice")
         {
-            QueueSeaUnlock(fish.Type);
+            Mesh mesh = _progress.SaveSeaMesh(fish.Type, fish.GetComponent<MeshFilter>().sharedMesh,
+                fish.transform.lossyScale, fish.IsCutPiece);
+            if (_pendingSeaSpawnMeshes.TryGetValue(fish.Type.Id, out Mesh previous)) Destroy(previous);
+            _pendingSeaSpawnMeshes[fish.Type.Id] = mesh;
         }
+        _seaSpawnRegistry.RegisterWaterEntry(fish.Type.Id, fish.IsCutPiece, _progress.GetFishCount(fish.Type));
         Vector3 point = fish.transform.position;
         point.y = _waterY;
         _effect.PlaySplash(point, 0.3f, _fishRippleScale);
@@ -276,6 +302,12 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void HandleFishCaught(Fish fish)
     {
+        if (!CanAcquire(fish.Type))
+        {
+            fish.gameObject.SetActive(false);
+            Remove(fish);
+            return;
+        }
         if (fish.Type.Id == "wall")
         {
             Mesh previous = _wallCatalogMesh;
@@ -292,19 +324,12 @@ public class FishSpawner : MonoBehaviour
         }
         _progress.AddFish(fish.Type);
         _effect.PlaySplash(fish.transform.position, 0.6f);
-        _effect.PlayImpact(0.8f, _catchFlashColor);
+        _effect.PlayImpact(0.8f, _catchFlashColor, 0.5f);
         OnFishCaught?.Invoke(fish.Type);
         Remove(fish);
-        if (fish.TryGetComponent<FisherQteController>(out _))
-        {
-            for (int i = _activeFish.Count - 1; i >= 0; i--)
-            {
-                Fish active = _activeFish[i];
-                if (active.Type.Id != fish.Type.Id) continue;
-                active.gameObject.SetActive(false);
-                Remove(active);
-            }
-        }
+        if (fish.Type.StopAfterCatch || _seaSpawnRegistry.RequiresCutToRearm(fish.Type.Id)
+            || fish.TryGetComponent<FisherQteController>(out _))
+            RemoveActiveFish(fish.Type);
     }
 
     /// <summary>
@@ -313,10 +338,13 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void HandlePlacedFishCaught(FishType type, Vector3 point)
     {
+        if (!CanAcquire(type)) return;
         _progress.AddFish(type);
         _effect.PlaySplash(point, 0.6f);
-        _effect.PlayImpact(0.8f, _catchFlashColor);
+        _effect.PlayImpact(0.8f, _catchFlashColor, 0.5f);
         OnFishCaught?.Invoke(type);
+        if (type.StopAfterCatch || _seaSpawnRegistry.RequiresCutToRearm(type.Id))
+            RemoveActiveFish(type);
     }
 
     /// <summary>
@@ -359,7 +387,7 @@ public class FishSpawner : MonoBehaviour
 
     /// <summary>
     /// prefab을 종류 ID 기준으로 출현 및 투척 선택 목록에 한 번만 등록한다.
-    /// 기존 선택 교체 결과를 유지하며 새 종류의 저장된 바다 해금 상태를 복원한다.
+    /// 기존 선택 교체 결과를 유지하며 새 종류의 프리팹과 선택 목록을 확장한다.
     /// </summary>
     public void RegisterPrefab(Fish prefab)
     {
@@ -375,8 +403,6 @@ public class FishSpawner : MonoBehaviour
         _selectablePrefabs[_selectablePrefabs.Length - 1] = prefab;
         Array.Resize(ref _fishTypes, _fishTypes.Length + 1);
         _fishTypes[_fishTypes.Length - 1] = prefab.Type;
-        if (PlayerPrefs.GetInt(SEA_KEY_PREFIX + prefab.Type.Id, 0) > 0)
-            _seaTypes.Add(prefab.Type.Id);
     }
 
     /// <summary>
@@ -385,9 +411,7 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void QueueSeaUnlock(FishType type)
     {
-        if (_seaTypes.Contains(type.Id) || !_pendingSeaTypes.Add(type.Id)) return;
-        PlayerPrefs.SetInt(SEA_KEY_PREFIX + type.Id, 1);
-        PlayerPrefs.Save();
+        _seaSpawnRegistry.Queue(type.Id);
     }
 
     /// <summary>
@@ -429,9 +453,16 @@ public class FishSpawner : MonoBehaviour
         float delay = Mathf.Max(0f, lead - timeToApex);
 
         Fish fish = Instantiate(prefab);
+        if (prefab == _wallFish || prefab == _iceFish)
+        {
+            Mesh sourceMesh = _seaSpawnMeshes.TryGetValue(prefab.Type.Id, out Mesh seaMesh)
+                ? seaMesh : prefab == _wallFish ? _wallSpawnMesh : _obstacles.IceMesh;
+            fish.PrepareMeshSpawn(sourceMesh);
+        }
         FishAbility ability = fish.GetComponent<FishAbility>();
         if (ability != null) ability.OnWaterSpawn();
         fish.Launch(this, start, cross + Vector3.up * upSpeed, delay, _waterY);
+        fish.gameObject.SetActive(true);
         _activeFish.Add(fish);
     }
 
@@ -518,9 +549,14 @@ public class FishSpawner : MonoBehaviour
     private bool CanSpawn(FishType type)
     {
         if (type.Id == "arrow") return false;
-        if (!_unlockGraph.AllowsNaturalSpawn(type)) return false;
+        if (!_unlockGraph.ContainsFish(type.Id)) return false;
+        if (_seaSpawnRegistry.RequiresRegistration(type.Id))
+        {
+            if (!_seaSpawnRegistry.IsUnlocked(type.Id)) return false;
+        }
+        else if (!_unlockGraph.AllowsNaturalSpawn(type)) return false;
+        if (type.Id == "ice" && _player.Distance <= _obstacles.IceStartDistance) return false;
         if (_obstacles != null && type.Id == "blackhole") return false;
-        if (type.RequiresEjection && !_seaTypes.Contains(type.Id)) return false;
         if (type.SpawnOnlyInRain && (_environment == null || !_environment.IsRaining)) return false;
         if (type.SpawnOnlyAtNight && (_environment == null || !_environment.IsNight)) return false;
         if (type.RequiredPlayerFish != null
@@ -534,7 +570,7 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     private bool CanCreate(FishType type)
     {
-        if (type.StopAfterCatch && _progress.IsFishRegistered(type)) return false;
+        if (!CanAcquire(type)) return false;
         if (type.MaxConcurrent <= 0) return true;
         int count = 0;
         foreach (Fish fish in _activeFish)
@@ -542,6 +578,31 @@ public class FishSpawner : MonoBehaviour
             if (fish.Type.Id == type.Id) count++;
         }
         return count < type.MaxConcurrent;
+    }
+
+    /// <summary>
+    /// type의 누적 획득 수로 영구 중단과 절단 입수당 한 번 획득 정책을 확인한다.
+    /// 이번 run의 등록 한도를 사용하며 자연 출현과 사출 또는 포획을 허용할지 반환한다.
+    /// </summary>
+    private bool CanAcquire(FishType type)
+    {
+        int count = _progress.GetFishCount(type);
+        return (!type.StopAfterCatch || count == 0) && _seaSpawnRegistry.AllowsCapture(type.Id, count);
+    }
+
+    /// <summary>
+    /// type과 같은 종류의 활성 개체를 포획 후 즉시 비활성화하고 모두 제거한다.
+    /// 활성 목록을 뒤에서 순회하며 중복 포획 및 이전 개체의 재입수를 막는다.
+    /// </summary>
+    private void RemoveActiveFish(FishType type)
+    {
+        for (int i = _activeFish.Count - 1; i >= 0; i--)
+        {
+            Fish fish = _activeFish[i];
+            if (fish.Type.Id != type.Id) continue;
+            fish.gameObject.SetActive(false);
+            Remove(fish);
+        }
     }
 
     /// <summary>
@@ -554,8 +615,7 @@ public class FishSpawner : MonoBehaviour
         if (!CanCreate(type)) return false;
         if (!type.AllowRepeatEjection)
         {
-            if (_seaTypes.Contains(type.Id) || _pendingSeaTypes.Contains(type.Id)
-                || _progress.IsFishRegistered(type)) return false;
+            if (_seaSpawnRegistry.HasRegistration(type.Id) || _progress.IsFishRegistered(type)) return false;
             foreach (Fish active in _activeFish)
             {
                 if (active.Type.Id == type.Id && active.IsEjected) return false;
@@ -578,6 +638,16 @@ public class FishSpawner : MonoBehaviour
     private void Remove(Fish fish)
     {
         _activeFish.Remove(fish);
+        _cutPieces.Remove(fish);
         Destroy(fish.gameObject);
+    }
+
+    /// <summary>
+    /// fish를 원본 장애물과 독립된 절단 조각 목록에 등록한다.
+    /// 입수까지 낙하를 유지하고 run 종료 시 정리하며 자연 스폰 개체 수에는 포함하지 않는다.
+    /// </summary>
+    public void RegisterCutPiece(Fish fish)
+    {
+        _cutPieces.Add(fish);
     }
 }

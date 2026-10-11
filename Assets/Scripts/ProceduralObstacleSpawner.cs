@@ -43,6 +43,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
     private readonly Stack<CuttableWall> _icePool = new Stack<CuttableWall>();
     public Mesh IceMesh { get; private set; }
     public Material IceMaterial { get; private set; }
+    public float IceStartDistance => _iceStartDistance;
 
     void Update()
     {

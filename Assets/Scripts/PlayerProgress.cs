@@ -8,6 +8,7 @@ public class PlayerProgress : MonoBehaviour
     private const string FISH_KEY_PREFIX = "SkipStoneV2.Fish.";
     private const string WALL_MESH_KEY = "SkipStoneV2.WallMesh";
     private const string ICE_MESH_KEY = "SkipStoneV2.IceMesh";
+    private const string SEA_MESH_KEY_PREFIX = "SkipStoneV2.SeaMesh.";
 
     public float PowerMultiplier => 1.4f;
     public float SpinMultiplier => 2f;
@@ -44,12 +45,12 @@ public class PlayerProgress : MonoBehaviour
     }
 
     /// <summary>
-    /// mesh와 scale을 사용해 마지막으로 접촉한 Wall 조각의 모양을 영구 저장한다.
-    /// 저장된 크기 보정 데이터를 새 메시로 반환하며 다음 선택과 재실행에서 같은 모양을 사용한다.
+    /// mesh와 scale을 사용해 마지막으로 획득한 Wall의 모양을 재보정 없이 영구 저장한다.
+    /// 독립된 메시를 반환하며 다음 선택과 재실행에서 획득한 형상을 그대로 사용한다.
     /// </summary>
     public Mesh SaveWallMesh(Mesh mesh, Vector3 scale)
     {
-        WallFishMeshData data = new WallFishMeshData(mesh, scale);
+        WallFishMeshData data = new WallFishMeshData(mesh, scale, false);
         PlayerPrefs.SetString(WALL_MESH_KEY, JsonUtility.ToJson(data));
         PlayerPrefs.Save();
         return data.ToMesh();
@@ -67,11 +68,11 @@ public class PlayerProgress : MonoBehaviour
 
     /// <summary>
     /// mesh와 scale을 사용해 마지막으로 먹은 유빙 조각의 투척용 모양을 저장한다.
-    /// 벽과 독립된 저장 키를 갱신하고 크기를 보정한 새 메시를 반환한다.
+    /// 벽과 독립된 저장 키를 갱신하고 재보정 없이 획득한 형상을 가진 새 메시를 반환한다.
     /// </summary>
     public Mesh SaveIceMesh(Mesh mesh, Vector3 scale)
     {
-        WallFishMeshData data = new WallFishMeshData(mesh, scale);
+        WallFishMeshData data = new WallFishMeshData(mesh, scale, false);
         PlayerPrefs.SetString(ICE_MESH_KEY, JsonUtility.ToJson(data));
         PlayerPrefs.Save();
         return data.ToMesh();
@@ -85,6 +86,29 @@ public class PlayerProgress : MonoBehaviour
     {
         if (!PlayerPrefs.HasKey(ICE_MESH_KEY)) return null;
         return JsonUtility.FromJson<WallFishMeshData>(PlayerPrefs.GetString(ICE_MESH_KEY)).ToMesh();
+    }
+
+    /// <summary>
+    /// type의 마지막 입수 모양을 mesh와 scale로 저장하고 독립된 스폰용 메시를 반환한다.
+    /// prepareForThrow로 최초 절단 조각만 보정하며 획득 및 투척용 저장 모양은 변경하지 않는다.
+    /// </summary>
+    public Mesh SaveSeaMesh(FishType type, Mesh mesh, Vector3 scale, bool prepareForThrow)
+    {
+        WallFishMeshData data = new WallFishMeshData(mesh, scale, prepareForThrow);
+        PlayerPrefs.SetString(SEA_MESH_KEY_PREFIX + type.Id, JsonUtility.ToJson(data));
+        PlayerPrefs.Save();
+        return data.ToMesh();
+    }
+
+    /// <summary>
+    /// type의 마지막 입수 메시 데이터를 읽어 새 run에 사용할 독립된 메시를 반환한다.
+    /// 아직 입수 모양을 저장하지 않았으면 null을 반환하며 획득 기록은 변경하지 않는다.
+    /// </summary>
+    public Mesh LoadSeaMesh(FishType type)
+    {
+        string key = SEA_MESH_KEY_PREFIX + type.Id;
+        if (!PlayerPrefs.HasKey(key)) return null;
+        return JsonUtility.FromJson<WallFishMeshData>(PlayerPrefs.GetString(key)).ToMesh();
     }
 
 }
