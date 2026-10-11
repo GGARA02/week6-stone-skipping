@@ -8,7 +8,7 @@ using TMPro;
 
 public class CreditScrollPanel : MonoBehaviour
 {
-    private const string DEFAULT_TITLE = "Special Thanks";
+    private const string DEFAULT_TITLE = "특별한 감사들";
     private const float UI_TITLE_SPACING = 70f;
     private const float WORLD_TITLE_SPACING = 150f;
 

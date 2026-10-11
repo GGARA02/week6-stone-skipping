@@ -247,7 +247,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: 'QTE wins: 0'
+  m_Text: '빠른 시간 사건 승리들: 0'
 --- !u!1 &4247540050868357719
 GameObject:
   m_ObjectHideFlags: 0
@@ -434,7 +434,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: Ready?
+  m_Text: 준비된?
 --- !u!114 &8429429899656173842
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -886,7 +886,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: PRESS SPACE IN THE CENTER
+  m_Text: 중앙에서 SPACE를 누르는
 --- !u!1 &7595634410468363814
 GameObject:
   m_ObjectHideFlags: 0

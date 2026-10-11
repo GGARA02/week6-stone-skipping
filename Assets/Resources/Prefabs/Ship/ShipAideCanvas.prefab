@@ -475,7 +475,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: ONLINE
+  m_text: 연결된
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: cff7f16a9714cf54eb0ef62679623185, type: 2}
   m_sharedMaterial: {fileID: 4034347376970795275, guid: cff7f16a9714cf54eb0ef62679623185, type: 2}
@@ -914,7 +914,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: OFFLINE
+  m_text: 연결 끊어진
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: cff7f16a9714cf54eb0ef62679623185, type: 2}
   m_sharedMaterial: {fileID: 4034347376970795275, guid: cff7f16a9714cf54eb0ef62679623185, type: 2}

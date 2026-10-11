@@ -927,13 +927,13 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 시작 위치에서 가장 멀리 간 수평 거리를 갱신한다.
-    /// Rigidbody 위치를 사용하며, Distance를 변경한다.
+    /// 시작 위치에서 +Z 방향으로 가장 멀리 간 거리를 갱신한다.
+    /// Rigidbody 위치와 시작 위치의 Z 좌표를 사용하며, Distance를 변경한다.
     /// </summary>
     private void UpdateDistance()
     {
-        Vector3 offset = Horizontal(_playerRB.position - _startPosition);
-        Distance = Mathf.Max(Distance, offset.magnitude);
+        float forwardDistance = _playerRB.position.z - _startPosition.z;
+        Distance = Mathf.Max(Distance, forwardDistance);
     }
 
     /// <summary>
