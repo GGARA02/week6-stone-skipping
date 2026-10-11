@@ -165,6 +165,8 @@ public class FishSpawner : MonoBehaviour
         Fish screenFish = _screenCapture.Initialize(_progress, FishType.CreateScreen());
         _catalogCapture = gameObject.AddComponent<ScreenFishCapture>();
         _catalogCapture.PanelSize = _screenCapture.PanelSize;
+        _catalogCapture.CatalogDebrisSize = _screenCapture.CatalogDebrisSize;
+        _catalogCapture.CatalogScatterCount = _screenCapture.CatalogScatterCount;
         Fish catalogFish = _catalogCapture.Initialize(_progress, FishType.CreateCatalog());
         // 메뉴 fish는 씬 목록에 넣은 패널 프리팹을 캡처 이미지를 보여 주는 템플릿으로 바꿔 쓴다.
         int menuIndex = Array.FindIndex(_fishPrefabs, prefab => prefab.Type.Id == "menu");

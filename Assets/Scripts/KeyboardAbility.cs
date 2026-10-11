@@ -61,7 +61,7 @@ public class KeyboardAbility : FishAbility
     private Vector2Int _waterBurstCount = new Vector2Int(2, 5);
     [Tooltip("벽에 부딪힐 때 떨어져 나가는 키캡 수 범위")]
     [SerializeField]
-    private Vector2Int _wallBurstCount = new Vector2Int(6, 12);
+    private Vector2Int _wallBurstCount = new Vector2Int(12, 20);
     [Tooltip("떨어져 나가는 속도 범위")]
     [SerializeField]
     private Vector2 _burstSpeedRange = new Vector2(10f, 20f);

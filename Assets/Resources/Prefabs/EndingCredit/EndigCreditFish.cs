@@ -14,6 +14,14 @@ public class EndigCreditFish : FishAbility
     [Tooltip("이름 표시에 사용할 프리팹 (미할당 시 3D TextMeshPro로 자동 생성)")]
     [SerializeField] private GameObject _namePrefab;
 
+    [Header("수량 설정")]
+    [Tooltip("SPACE 판정 성공 시 소환할 이름 개수")]
+    private const int JUDGESCATTERCOUNT = 1;
+    [Tooltip("장애물(벽) 충돌 시 소환할 이름 개수")]
+    private int _collisionScatterCount = 5;
+    [Tooltip("장애물 충돌 시 사방 흩뿌리기 속도 배율")]
+    [SerializeField] private float _collisionScatterMultiplier = 1.6f;
+
     [Header("흩뿌리기 설정")]
     [Tooltip("3D 텍스트 크기")]
     [SerializeField] private float _fontSize;
@@ -22,21 +30,9 @@ public class EndigCreditFish : FishAbility
     [Tooltip("위쪽으로 솟구치는 기본 속도")]
     [SerializeField] private float _upwardSpeed = 7f;
     [Tooltip("사방으로 흩뿌려지는 무작위 속도")]
-    [SerializeField] private float _scatterSpeed = 5f;
+    [SerializeField] private float _scatterSpeed = 10f;
     [Tooltip("소환된 이름 유지 시간(초)")]
     private float _lifeTime = 1.5F;
-
-    void Awake()
-    {
-        if (_contributor == null)
-        {
-            _contributor = Resources.Load<ContributorList>("Data/Contributors");
-        }
-        if (_fontAsset == null)
-        {
-            _fontAsset = Resources.Load<TMP_FontAsset>("Fonts & Materials/NotoSerifKR-SemiBold SDF");
-        }
-    }
 
     /// <summary>
     /// 던진 상태에서 SPACE 판정에 성공했을 때 기여자 목록에서 무작위 이름을 선택해 월드에 흩뿌린다.
@@ -44,60 +40,71 @@ public class EndigCreditFish : FishAbility
     /// </summary>
     public override void OnJudgeSuccess(ThrowContext context, SkipJudge judge)
     {
-        ScatterRandomContributorName(context, judge);
-    }
-
-    /// <summary>
-    /// 기여자 목록에서 무작위 이름을 하나 골라 투척체 위치에서 공중으로 흩뿌린다.
-    /// context와 judge를 사용하며, 3D 텍스트 오브젝트를 생성하고 위쪽 및 사방 속도를 부여한다.
-    /// </summary>
-    private void ScatterRandomContributorName(ThrowContext context, SkipJudge judge)
-    {
-        if (_contributor == null || _contributor.contributorList == null || _contributor.contributorList.Count == 0)
-        {
-            return;
-        }
-
-        string rawEntry = _contributor.contributorList[UnityEngine.Random.Range(0, _contributor.contributorList.Count)];
-        if (string.IsNullOrWhiteSpace(rawEntry))
-        {
-            return;
-        }
-
-        // 별도 처리 없이 문장 전체를 그대로 출력한다.
-        string contributorName = rawEntry.Trim();
-
-        // 하이픈 뒤 이름만 개별 추출하던 기존 로직
-        /*
-        int dashIndex = contributorName.IndexOf('-');
-        if (dashIndex >= 0)
-        {
-            string namesPart = contributorName.Substring(dashIndex + 1).Trim();
-            string[] names = namesPart.Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-            if (names.Length > 0)
-            {
-                contributorName = names[UnityEngine.Random.Range(0, names.Length)];
-            }
-        }
-        */
+        Color color = judge == SkipJudge.Perfect
+            ? new Color(1f, 0.85f, 0.3f, 1f)
+            : Color.white;
 
         Vector3 spawnPosition = context.Player != null
             ? context.Player.transform.position + Vector3.up * 0.5f
             : transform.position + Vector3.up * 0.5f;
 
         Vector3 playerVelocity = context.Player != null ? context.Player.Velocity : Vector3.zero;
-        Vector3 randomSpread = UnityEngine.Random.insideUnitSphere * _scatterSpeed;
-        randomSpread.y = Mathf.Abs(randomSpread.y);
 
-        Vector3 launchVelocity = playerVelocity * _inheritVelocityRate
-            + Vector3.up * _upwardSpeed
-            + randomSpread;
+        ScatterContributorNames(JUDGESCATTERCOUNT, spawnPosition, playerVelocity, color, false);
+    }
 
-        Color textColor = judge == SkipJudge.Perfect
-            ? new Color(1f, 0.85f, 0.3f, 1f)
-            : Color.white;
+    /// <summary>
+    /// 장애물(벽)과 충돌했을 때 충돌 지점에서 대량의 기여자 이름을 사방으로 흩뿌린다.
+    /// context와 collision을 사용하며, 충돌 지점과 반사 효과를 적용해 이름 오브젝트를 대량 생성한다.
+    /// </summary>
+    public override void OnObstacleCollision(ThrowContext context, Collision collision)
+    {
+        base.OnObstacleCollision(context, collision);
 
-        SpawnScatteredName(contributorName.Trim(), spawnPosition, launchVelocity, textColor);
+        Vector3 hitPoint = collision.contacts.Length > 0
+            ? collision.contacts[0].point
+            : transform.position;
+
+        Vector3 playerVelocity = context.Player != null ? context.Player.Velocity : Vector3.zero;
+        Color collisionColor = new Color(1f, 0.55f, 0.2f, 1f);
+
+        ScatterContributorNames(_collisionScatterCount, hitPoint, playerVelocity * 0.2f, collisionColor, true);
+    }
+
+    /// <summary>
+    /// 지정된 수량만큼 기여자 이름을 무작위로 선택하여 지정된 위치에서 공중으로 흩뿌린다.
+    /// count, spawnPosition, baseVelocity, color, isExplosion을 사용하며, 각 이름 오브젝트를 생성한다.
+    /// </summary>
+    public void ScatterContributorNames(int count, Vector3 spawnPosition, Vector3 baseVelocity, Color color, bool isExplosion)
+    {
+        if (_contributor == null || _contributor.contributorList == null || _contributor.contributorList.Count == 0)
+        {
+            return;
+        }
+
+        float scatterSpeed = isExplosion ? _scatterSpeed * _collisionScatterMultiplier : _scatterSpeed;
+        float upwardSpeed = isExplosion ? _upwardSpeed * 1.2f : _upwardSpeed;
+
+        for (int i = 0; i < count; i++)
+        {
+            string rawEntry = _contributor.contributorList[UnityEngine.Random.Range(0, _contributor.contributorList.Count)];
+            if (string.IsNullOrWhiteSpace(rawEntry))
+            {
+                continue;
+            }
+
+            // 별도 처리 없이 문장 전체를 그대로 출력한다.
+            string contributorName = rawEntry.Trim();
+
+            Vector3 randomSpread = UnityEngine.Random.insideUnitSphere * scatterSpeed;
+            randomSpread.y = Mathf.Abs(randomSpread.y);
+
+            Vector3 launchVelocity = baseVelocity * _inheritVelocityRate
+                + Vector3.up * upwardSpeed
+                + randomSpread;
+
+            SpawnScatteredName(contributorName, spawnPosition, launchVelocity, color);
+        }
     }
 
     /// <summary>
@@ -124,7 +131,7 @@ public class EndigCreditFish : FishAbility
             tmp.fontSize = _fontSize;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = color;
-            tmp.enableWordWrapping = false;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
             tmp.overflowMode = TextOverflowModes.Overflow;
             if (_fontAsset != null)
             {

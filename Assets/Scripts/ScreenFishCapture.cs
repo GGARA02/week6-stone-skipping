@@ -30,6 +30,12 @@ public class ScreenFishCapture : MonoBehaviour
     [SerializeField, Range(0f, 0.3f)] private float _twistStrength = 0.045f;
     [SerializeField, Range(1f, 6f)] private float _finalCollapseSpeed = 3.5f;
 
+    [Header("Catalog Settings")]
+    [Tooltip("도감 충돌 시 분출될 물고기들의 정규화 목표 크기 (가로 X, 두께 Y, 세로 Z)")]
+    [SerializeField] private Vector3 _catalogDebrisSize = new Vector3(5f, 5f, 5f);
+    [Tooltip("도감 장애물(벽) 충돌 시 분출할 물고기 개수")]
+    [SerializeField] private int _catalogScatterCount = 12;
+
     [Header("캡처 상태")]
     private PlayerProgress _progress;
     private Fish _template;
@@ -50,6 +56,16 @@ public class ScreenFishCapture : MonoBehaviour
     {
         get => _panelSize;
         set => _panelSize = value;
+    }
+    public Vector3 CatalogDebrisSize
+    {
+        get => _catalogDebrisSize;
+        set => _catalogDebrisSize = value;
+    }
+    public int CatalogScatterCount
+    {
+        get => _catalogScatterCount;
+        set => _catalogScatterCount = value;
     }
     public event Action OnUnlocked;
 
@@ -95,6 +111,11 @@ public class ScreenFishCapture : MonoBehaviour
         panel.AddComponent<Rigidbody>().isKinematic = true;
         _template = panel.AddComponent<Fish>();
         _template.InitializeScreen(type);
+        if (type.Id == "catalog")
+        {
+            CatalogAbility catalogAbility = panel.AddComponent<CatalogAbility>();
+            catalogAbility.Configure(_catalogDebrisSize, _catalogScatterCount);
+        }
         LoadSavedImage(type);
         return _template;
     }
