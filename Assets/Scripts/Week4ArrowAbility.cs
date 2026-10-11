@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 // Week4 화살의 특수 동작. 던질 거리로 고른 동안에는 위아래로 천천히 흔들리고,
@@ -29,6 +30,9 @@ public class Week4ArrowAbility : FishAbility
     [Tooltip("미끄러지는 동안 끄는 파티클")]
     [SerializeField]
     private ParticleSystem _particle;
+    [Tooltip("충돌 처리용 코루틴")]
+    private Coroutine _crashParticleCoroutine;
+    private const int CRASHPARTICLECOUNT = 6;
 
     [Header("상태")]
     private bool _held;
@@ -80,5 +84,35 @@ public class Week4ArrowAbility : FishAbility
     {
         Week4ArrowGainEffect effect = Instantiate(_gainEffectPrefab, transform.position, Quaternion.identity);
         effect.SetTarget(transform);
+    }
+
+
+    /// <summary>
+    /// 장애물(벽)과 충돌했을 때 코루틴을 통해 연속적으로 불씨 파티클을 생성한다.
+    /// context와 collision을 사용하며, _crashParticleCoroutine을 시작한다.
+    /// </summary>
+    public override void OnObstacleCollision(ThrowContext context, Collision collision)
+    {
+        if (_crashParticleCoroutine != null)
+            StopCoroutine(_crashParticleCoroutine);
+        _crashParticleCoroutine = StartCoroutine(SpreadParticles());
+    }
+
+    /// <summary>
+    /// 짧은 시간 간격을 두고 불씨 파티클을 순차적으로 생성하여 화살로 흡수되게 한다.
+    /// _gainEffectPrefab과 CRASHPARTICLECOUNT를 사용하며, 불씨 파티클 인스턴스를 생성한다.
+    /// </summary>
+    private IEnumerator SpreadParticles()
+    {
+        for (int i = 0; i < CRASHPARTICLECOUNT; i++)
+        {
+            if (_gainEffectPrefab != null)
+            {
+                Week4ArrowGainEffect effect = Instantiate(_gainEffectPrefab, transform.position, Quaternion.identity);
+                effect.SetTarget(transform);
+            }
+            yield return new WaitForSeconds(0.05f);
+        }
+        _crashParticleCoroutine = null;
     }
 }
