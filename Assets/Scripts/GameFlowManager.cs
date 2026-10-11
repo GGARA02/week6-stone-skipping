@@ -125,6 +125,16 @@ public class GameFlowManager : MonoBehaviour
     private float _lastRestartHintInputTime;
     private GUIStyle _restartHintStyle;
 
+    [Header("블랙홀 방향 안내")]
+    [SerializeField] private BlackHoleEnding _blackHoleTarget;
+    [SerializeField] private GameObject _blackHoleArrowPrefab;
+    [SerializeField, Range(0f, 180f)] private float _blackHoleArrowMinAngle = 45f;
+    [SerializeField, Min(5f)] private float _blackHoleArrowDuration = 5f;
+    [SerializeField, Min(0f)] private float _blackHoleArrowHeight = 2f;
+    [SerializeField, Min(0.01f)] private float _blackHoleArrowScale = 1.2f;
+    private Transform _blackHoleArrow;
+    private float _blackHoleArrowEndTime = float.NegativeInfinity;
+
     [Header("화면 투척 전환")]
     [SerializeField, Min(0.1f)] private float _panelShrinkDuration = 0.65f;
     private bool _screenThrowPending;
@@ -138,6 +148,10 @@ public class GameFlowManager : MonoBehaviour
 
         _input = Managers.Input;
         _rumble = GetComponent<Rumble>();
+        if (_blackHoleTarget == null) _blackHoleTarget = FindFirstObjectByType<BlackHoleEnding>(FindObjectsInactive.Include);
+        if (_blackHoleArrowPrefab == null) _blackHoleArrowPrefab = Resources.Load<GameObject>("Prefabs/BlackHoleDirectionArrow");
+        _blackHoleArrow = Instantiate(_blackHoleArrowPrefab, transform).transform;
+        _blackHoleArrow.gameObject.SetActive(false);
 
         _playerController.Initialize(_fishSpawner);
         _playerController.OnSkip += HandleSkip;
@@ -290,6 +304,7 @@ public class GameFlowManager : MonoBehaviour
 
     void LateUpdate()
     {
+        UpdateBlackHoleArrow();
         if (_showHud && _state == State.GameOver)
         {
             foreach (FishType fish in _newFish)
@@ -402,6 +417,61 @@ public class GameFlowManager : MonoBehaviour
                 $"씨앗 {_playerController.FishSeed}";
             ShadowLabel(new Rect(width - 420f * s, 16f * s, 400f * s, 140f * s), debug, _debugStyle, new Color(1f, 1f, 1f, 0.8f));
         }
+    }
+
+    /// <summary>
+    /// 투척 중 플레이어 속도와 블랙홀 방향의 각도가 설정값 이상이면 안내 시간을 갱신한다.
+    /// 현재 속도, 위치와 최소 각도를 사용하며 프리팹 표시를 갱신하고 마지막 조건 충족부터 최소 5초 유지한다.
+    /// </summary>
+    private void UpdateBlackHoleArrow()
+    {
+        if (_state != State.Flying || !_playerController.IsThrown || _playerController.IsGameOver
+            || _endingCinemaRunning || _blackHoleTarget == null)
+        {
+            _blackHoleArrowEndTime = float.NegativeInfinity;
+            _blackHoleArrow.gameObject.SetActive(false);
+            return;
+        }
+
+        Vector3 direction = _blackHoleTarget.transform.position - _playerController.transform.position;
+        if (Vector3.Angle(_playerController.Velocity, direction) >= _blackHoleArrowMinAngle)
+        {
+            _blackHoleArrowEndTime = Time.time + Mathf.Max(5f, _blackHoleArrowDuration);
+        }
+        UpdateBlackHoleArrowTransform();
+    }
+
+    /// <summary>
+    /// 플레이어 위의 화살표 프리팹을 현재 화면에서 보이는 블랙홀 방향으로 회전한다.
+    /// 카메라 투영과 높이·크기 설정을 사용하며 프리팹의 위치, 회전, 크기와 활성 상태를 변경한다.
+    /// </summary>
+    private void UpdateBlackHoleArrowTransform()
+    {
+        Camera camera = Camera.main;
+        bool visible = Time.time < _blackHoleArrowEndTime && _showHud && !_pauseOpen && !_catalogOpen
+            && !_screenThrowPending && !(_fishSpawner.ScreenCapture.IsCapturing && _fishSpawner.ScreenCapture.HasFrame)
+            && camera != null;
+        _blackHoleArrow.gameObject.SetActive(visible);
+        if (!visible) return;
+
+        Vector3 playerScreen = camera.WorldToScreenPoint(_playerController.transform.position);
+        if (playerScreen.z <= 0f)
+        {
+            _blackHoleArrow.gameObject.SetActive(false);
+            return;
+        }
+        Vector3 targetScreen = camera.WorldToScreenPoint(_blackHoleTarget.transform.position);
+        Vector2 direction = new Vector2(targetScreen.x - playerScreen.x, targetScreen.y - playerScreen.y);
+        if (targetScreen.z <= 0f) direction = -direction;
+        if (direction.sqrMagnitude < 0.0001f)
+        {
+            direction = targetScreen.z > playerScreen.z ? Vector2.up : Vector2.down;
+        }
+
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+        _blackHoleArrow.SetPositionAndRotation(_playerController.transform.position + Vector3.up * _blackHoleArrowHeight,
+            camera.transform.rotation * Quaternion.Euler(0f, 0f, angle));
+        _blackHoleArrow.localScale = _blackHoleArrowPrefab.transform.localScale * _blackHoleArrowScale;
     }
 
     /// <summary>
