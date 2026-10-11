@@ -34,7 +34,7 @@ public class Car : EjectFishAbility
         _lastJudge = judge;
 
         // 소환할 도둑 수를 4~5마리 범위에서 랜덤으로 정한다.
-        int count = Random.Range(4, 6);
+        int count = Random.Range(3, 4);
         SpawnDoduk(count);
     }
 
@@ -43,7 +43,7 @@ public class Car : EjectFishAbility
         base.OnObstacleCollision(context, collision);
         _context = context;
         _lastJudge = SkipJudge.Good; // 사출 통과를 위한 판정 등급 부여                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
-        int crashCount = Random.Range(12, 16);
+        int crashCount = Random.Range(10, 12);
         SpawnDoduk(crashCount);
     }
 

@@ -7,13 +7,22 @@ public class CrabAbility : FishAbility
     [Tooltip("SPACE 판정 성공 시 재생할 게거품 파티클 시스템")]
     [SerializeField]
     private ParticleSystem _crabBubble;
+    [Header("방출량 설정")]
+    [Tooltip("판정에 따른 파티클 수")]
+    [SerializeField] private int _judgeBubbleCount = 20;
+    [Tooltip("충돌에 따른 파티클 수")]
+    [SerializeField] private int _collisionBubbleCount = 80;
 
-    /// <summary>
-    /// 던진 상태에서 SPACE 판정에 성공했을 때 게거품 파티클을 재생한다.
-    /// _crabBubble을 사용하며, 파티클 재생 상태를 변경한다.
-    /// </summary>
+    /// 기존 Partivle System의 Play 방식에서 파티클 N개를 생성하라고 직접 명령을 내리는 방식으로 변경
+
     public override void OnJudgeSuccess(ThrowContext context, SkipJudge judge)
     {
-        _crabBubble.Play();
+        //_crabBubble.Play();
+        _crabBubble.Emit(_judgeBubbleCount);
+    }
+
+    public override void OnObstacleCollision(ThrowContext context, Collision collision)
+    {
+        _crabBubble.Emit(_collisionBubbleCount);
     }
 }
