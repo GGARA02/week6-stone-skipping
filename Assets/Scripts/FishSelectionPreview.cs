@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 
 /// <summary>
 /// 생성 메시와 물고기 프리팹의 메시와 머티리얼로 선택 미리보기 텍스처를 보관한다.
-/// 게임 동작, 충돌체와 애니메이션은 생성하지 않는다.
+/// 게임 동작, 충돌체와 애니메이션은 생성하지 않는다. 물처럼 셰이더가 움직이는 항목만 모델을 남겨 다시 그린다.
 /// </summary>
 public sealed class FishSelectionPreview : IDisposable
 {
@@ -15,6 +15,7 @@ public sealed class FishSelectionPreview : IDisposable
     private const int TEXTURE_HEIGHT = 128;
 
     private readonly Dictionary<Fish, RenderTexture> _textures = new Dictionary<Fish, RenderTexture>();
+    private readonly Dictionary<Fish, AnimatedModel> _animatedModels = new Dictionary<Fish, AnimatedModel>();
     private readonly GameObject _root;
     private readonly Camera _camera;
     private readonly Material _material;
@@ -69,6 +70,7 @@ public sealed class FishSelectionPreview : IDisposable
     /// </summary>
     public void InvalidateTexture(Fish prefab)
     {
+        if (_animatedModels.Remove(prefab, out AnimatedModel animated)) UnityEngine.Object.Destroy(animated.Model);
         if (!_textures.Remove(prefab, out RenderTexture texture)) return;
         texture.Release();
         UnityEngine.Object.Destroy(texture);
@@ -77,8 +79,9 @@ public sealed class FishSelectionPreview : IDisposable
     /// <summary>
     /// prefab의 메시, 원본 머티리얼과 변환 계층을 사용해 투척 자세의 미리보기를 렌더링한다.
     /// OnGUI 밖에서 호출하며, prefab별 투명 배경 RenderTexture를 캐시에 저장한다.
+    /// animated이고 원본 머티리얼을 쓰면 모델과 카메라 구도를 _animatedModels에 남겨 RefreshAnimatedTextures로 다시 그린다.
     /// </summary>
-    public void PrepareTexture(Fish prefab)
+    public void PrepareTexture(Fish prefab, bool animated = false)
     {
         if (_textures.ContainsKey(prefab)) return;
 
@@ -104,7 +107,32 @@ public sealed class FishSelectionPreview : IDisposable
             AddMesh(CopyTransform(renderer.transform, transforms), renderer.sharedMesh, renderer.sharedMaterials);
         }
 
-        _textures.Add(prefab, RenderModel(model));
+        // 회색 미획득 미리보기는 움직일 것이 없으므로 원본 머티리얼일 때만 모델을 남긴다.
+        bool keepModel = animated && _useOriginalMaterials;
+        _textures.Add(prefab, RenderModel(model, keepModel));
+        if (keepModel)
+        {
+            _animatedModels.Add(prefab, new AnimatedModel(model, _camera.transform.position, _camera.orthographicSize));
+        }
+    }
+
+    /// <summary>
+    /// 남겨 둔 움직이는 모델을 저장한 카메라 구도로 각자의 RenderTexture에 다시 렌더링한다.
+    /// _animatedModels와 _textures를 사용하며, 미리보기 카메라 위치와 크기, 해당 RenderTexture 내용을 변경한다.
+    /// </summary>
+    public void RefreshAnimatedTextures()
+    {
+        foreach (KeyValuePair<Fish, AnimatedModel> pair in _animatedModels)
+        {
+            AnimatedModel animated = pair.Value;
+            animated.Model.SetActive(true);
+            _camera.transform.position = animated.CameraPosition;
+            _camera.orthographicSize = animated.OrthographicSize;
+            _camera.targetTexture = _textures[pair.Key];
+            _camera.Render();
+            _camera.targetTexture = null;
+            animated.Model.SetActive(false);
+        }
     }
 
     /// <summary>
@@ -143,9 +171,9 @@ public sealed class FishSelectionPreview : IDisposable
 
     /// <summary>
     /// model의 메시 경계로 크기와 카메라를 맞춰 미리보기를 렌더링한다.
-    /// 렌더링 전용 모델을 제거하고 투명 배경 RenderTexture를 반환한다.
+    /// keepModel이면 렌더링 전용 모델을 끄기만 하고, 아니면 제거한 뒤 투명 배경 RenderTexture를 반환한다.
     /// </summary>
-    private RenderTexture RenderModel(GameObject model)
+    private RenderTexture RenderModel(GameObject model, bool keepModel = false)
     {
         model.transform.localRotation = Quaternion.Euler(12f, 65f, 0f);
         Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
@@ -168,7 +196,7 @@ public sealed class FishSelectionPreview : IDisposable
         _camera.Render();
         _camera.targetTexture = null;
         model.SetActive(false);
-        UnityEngine.Object.Destroy(model);
+        if (!keepModel) UnityEngine.Object.Destroy(model);
         return texture;
     }
 
@@ -201,6 +229,8 @@ public sealed class FishSelectionPreview : IDisposable
             UnityEngine.Object.Destroy(texture);
         }
         _textures.Clear();
+        // 남겨 둔 모델은 _root 아래에 있어 _root와 함께 제거된다.
+        _animatedModels.Clear();
         if (DefaultFishTexture != null)
         {
             DefaultFishTexture.Release();
@@ -209,5 +239,24 @@ public sealed class FishSelectionPreview : IDisposable
         }
         UnityEngine.Object.Destroy(_material);
         UnityEngine.Object.Destroy(_root);
+    }
+
+    // 다시 그릴 미리보기 모델과 처음 렌더링할 때 맞춘 카메라 구도.
+    private sealed class AnimatedModel
+    {
+        public GameObject Model { get; }
+        public Vector3 CameraPosition { get; }
+        public float OrthographicSize { get; }
+
+        /// <summary>
+        /// model과 cameraPosition, orthographicSize를 받아 다시 그릴 때 쓸 모델과 카메라 구도를 저장한다.
+        /// 저장한 값은 바꾸지 않는다.
+        /// </summary>
+        public AnimatedModel(GameObject model, Vector3 cameraPosition, float orthographicSize)
+        {
+            Model = model;
+            CameraPosition = cameraPosition;
+            OrthographicSize = orthographicSize;
+        }
     }
 }

@@ -15149,6 +15149,7 @@ GameObject:
   - component: {fileID: 403970198}
   - component: {fileID: 403970200}
   - component: {fileID: 403970202}
+  - component: {fileID: 403970203}
   m_Layer: 0
   m_Name: GameFlowManager
   m_TagString: Untagged
@@ -15340,6 +15341,27 @@ MonoBehaviour:
   _wallHeightRange: {x: 16, y: 32}
   _iceWidthRange: {x: 12, y: 24}
   _iceHeightRange: {x: 12, y: 20}
+--- !u!114 &403970203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 403970194}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 760ba2da837ea6d44a8f9d0e29685964, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScreenFishCapture
+  _panelSize: {x: 9.7, y: 0.08, z: 5.4562497}
+  _duration: 1.7
+  _suctionStrength: 2.4
+  _suctionRadius: 0.65
+  _falloff: 1.8
+  _stretchStrength: 1.6
+  _wrinkleStrength: 0.065
+  _twistStrength: 0.045
+  _finalCollapseSpeed: 3.5
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0

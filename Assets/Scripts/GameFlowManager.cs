@@ -59,6 +59,8 @@ public class GameFlowManager : MonoBehaviour
     private int _goodCount;
     private int _missCount;
     private bool _screenCaptureTriggered;
+    // 게임을 켠 뒤 한 번이라도 던졌는지. 던지기 전 재시작은 날씨를 다시 뽑지 않는다.
+    private bool _hasThrown;
     private bool _catalogOpen;
     private bool _catalogCapturePending;
     private FishType _catalogSelectedFish;
@@ -141,7 +143,8 @@ public class GameFlowManager : MonoBehaviour
         _bestSkips = PlayerPrefs.GetInt(BEST_SKIPS_KEY, 0);
         _bestDistance = PlayerPrefs.GetFloat(BEST_DISTANCE_KEY, 0f);
         _state = State.Ready;
-        if (_environmentController != null) _environmentController.Roll(SelectedFish());
+        // 게임을 켠 첫 판은 맑은 낮으로 시작한다.
+        if (_environmentController != null) _environmentController.Roll(SelectedFish(), false);
         _fishSelectionPreview = new FishSelectionPreview();
         _ownedFishSelectionPreview = new FishSelectionPreview(true);
         _ownedFishSelectionPreview.PrepareDefaultFishTexture(_fishGenerator.GetComponent<MeshFilter>().sharedMesh,
@@ -258,7 +261,7 @@ public class GameFlowManager : MonoBehaviour
             {
                 if (fish.Id == "screen" || fish.Id == "catalog") continue;
                 Fish prefab = _fishSpawner.GetFishPrefab(fish);
-                if (prefab != null) _ownedFishSelectionPreview.PrepareTexture(prefab);
+                if (prefab != null) _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block");
             }
             return;
         }
@@ -272,9 +275,11 @@ public class GameFlowManager : MonoBehaviour
                     || (_catalogOpen && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)))
             {
                 FishSelectionPreview previews = _progress.IsFishRegistered(fish) ? _ownedFishSelectionPreview : _fishSelectionPreview;
-                previews.PrepareTexture(_fishSpawner.FishPrefabs[i]);
+                previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block");
             }
         }
+        // 물 블록 미리보기는 선택 창과 도감이 보이는 동안 매 프레임 다시 그려 물결이 흐르게 한다.
+        _ownedFishSelectionPreview.RefreshAnimatedTextures();
     }
 
     void OnGUI()
@@ -345,7 +350,7 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 선택한 던질 거리(기본 물고기 또는 도감에 등록된 물고기)를 최대 강화 기준 능력치로 던진다.
-    /// _projectileIndex와 진행 상황을 사용하며, _state를 변경한다.
+    /// _projectileIndex와 진행 상황을 사용하며, _state와 _hasThrown을 변경한다.
     /// </summary>
     private void Throw()
     {
@@ -354,13 +359,14 @@ public class GameFlowManager : MonoBehaviour
             ? fish.ToThrowModifiers(_progress.PowerMultiplier, _progress.SpinMultiplier)
             : ThrowModifiers.ForFish(_progress.PowerMultiplier, _progress.SpinMultiplier);
         _state = State.Flying;
+        _hasThrown = true;
         _screenCaptureTriggered = false;
         _playerController.Throw(modifiers);
     }
 
     /// <summary>
     /// 열린 도감 프레임의 캡처와 등록을 기다린 뒤 화면을 투척 크기로 축소하고 던진다.
-    /// 입력값 없이 캡처 중 입력을 막고 도감, 커서, 투척 외형과 게임 상태를 변경한다.
+    /// 입력값 없이 캡처 중 입력을 막고 도감, 커서, 투척 외형, 환경과 게임 상태를 변경한다.
     /// </summary>
     private IEnumerator CaptureCatalogAndThrow()
     {
@@ -380,6 +386,7 @@ public class GameFlowManager : MonoBehaviour
             _catalogOpen = false;
             LockCursor(true);
             ApplyProjectileShape();
+            if (_environmentController != null) _environmentController.ChangeFishInstant(SelectedFish());
             yield return ShrinkPanelAndThrow(screenshot);
         }
         finally
@@ -462,6 +469,7 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 새 던질 거리를 만들고 물고기와 카메라를 던지기 전 상태로 되돌린 뒤 이번 판 날씨를 새로 정한다.
+    /// 한 번도 던지지 않았으면(_hasThrown이 false) 날씨를 뽑지 않고 맑은 낮을 유지한다.
     /// clearNewFish가 true면 이번 판 신규 획득 목록을 비운다.
     /// 입력값은 없으며, 물고기, 던질 거리 메시, 물고기 상태, 카메라, _state, 날씨를 변경한다.
     /// </summary>
@@ -512,7 +520,7 @@ public class GameFlowManager : MonoBehaviour
         _goodCount = 0;
         _missCount = 0;
         _state = State.Ready;
-        if (_environmentController != null) _environmentController.Roll(SelectedFish());
+        if (_environmentController != null) _environmentController.Roll(SelectedFish(), _hasThrown);
         LockCursor(true);
     }
 
@@ -750,8 +758,8 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 던지기 전 안내와 지금 던질 거리를 그린다.
-    /// 화면 크기와 scale을 사용하며, 화면에 라벨을 그린다.
+    /// 던지기 전 안내와 지금 던질 거리를 그린다. 한 번이라도 던졌으면 재시작으로 날씨를 다시 뽑는 안내도 그린다.
+    /// 화면 크기와 scale, _hasThrown을 사용하며, 화면에 라벨을 그린다.
     /// </summary>
     private void DrawReady(float width, float height, float scale)
     {
@@ -762,7 +770,11 @@ public class GameFlowManager : MonoBehaviour
                 : "ARROWS tilt    A/D curve    {Jump} when it hits the water    {Restart} new fish"), _centerSubStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 112f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.GamePadConnected ? "{Cancel} menu" : "ESC menu"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
-
+        if (_hasThrown)
+        {
+            ShadowLabel(new Rect(0f, height * 0.18f + 144f * scale, width, 40f * scale),
+                _input.ReplaceBindingName("{Restart}   날씨 · 시간 · 장소 재설정"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
+        }
         ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 40f * scale),
             _input.ReplaceBindingName("<  {Previous}   THROW   {Next}  >    {Catalog} 도감"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         DrawFishPreviews(width, height, scale);
