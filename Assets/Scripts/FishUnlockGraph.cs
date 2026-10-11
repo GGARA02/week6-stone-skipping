@@ -65,6 +65,15 @@ public sealed class FishUnlockGraph
     }
 
     /// <summary>
+    /// fishId가 나머지 도감을 모두 모아야 발견되는 도감 완성 보상인지 반환한다.
+    /// 발견 조건 JSON을 사용하며 그래프 상태는 변경하지 않는다.
+    /// </summary>
+    public bool RequiresCatalogCompletion(string fishId)
+    {
+        return _discoveryConditions.RequiresCatalogCompletion(fishId);
+    }
+
+    /// <summary>
     /// 현재 이동 거리 distance를 발견 조건에 전달해 거리 기준 초과를 저장한다.
     /// 도감 공개용 진행 기록만 변경하며 이번 판의 자연 출현 목록은 유지한다.
     /// </summary>
