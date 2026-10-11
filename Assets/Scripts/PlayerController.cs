@@ -968,14 +968,16 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 물리와 조작을 즉시 정지하고 한 번만 게임오버 이벤트를 보낸다.
-    /// reason을 사용하며 비행·접촉 상태와 Rigidbody 충돌을 끄고 정산 이유를 전달한다.
+    /// 기존 속도와 회전을 유지하면서 조작을 차단하고 한 번만 게임오버 이벤트를 보낸다.
+    /// reason을 사용하며 게임오버 상태와 대기 입력을 변경하고 정산 이유를 전달한다.
     /// </summary>
     public void GameOver(GameOverReason reason)
     {
         if (_isGameOver) return;
-        StopImmediately();
-        _playerRB.detectCollisions = false;
+        _isGameOver = true;
+        _jumpPending = false;
+        _slidePushCount = 0;
+        _steer = 0f;
         OnGameOver?.Invoke(reason);
     }
 
