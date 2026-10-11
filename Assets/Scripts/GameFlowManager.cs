@@ -120,6 +120,8 @@ public class GameFlowManager : MonoBehaviour
     [Header("화면 투척 전환")]
     [SerializeField, Min(0.1f)] private float _panelShrinkDuration = 0.65f;
     private bool _screenThrowPending;
+    private RenderTexture _menuPopupFrame;
+    private Rect _menuPopupRect;
 
     [Header("엔딩 크레딧 UI")]
     [SerializeField] private EndingCreditUI _endingCredit;
@@ -311,6 +313,8 @@ public class GameFlowManager : MonoBehaviour
         if (_pauseOpen)
         {
             EnsureStyles();
+            // 메뉴 투척을 요청한 프레임에는 화면과 별도로 배경 없는 팝업을 렌더 텍스처에 그린다.
+            if (_menuPopupFrame != null && Event.current.type == EventType.Repaint) RenderMenuPopup(_styleScale);
             DrawPauseMenu(Screen.width, Screen.height, _styleScale);
             return;
         }
@@ -432,6 +436,47 @@ public class GameFlowManager : MonoBehaviour
             _catalogCapturePending = false;
             _screenThrowPending = false;
             if (screenshot != null) Destroy(screenshot);
+        }
+    }
+
+    /// <summary>
+    /// 열린 일시정지 메뉴를 배경 없는 팝업 이미지로 그려 메뉴 fish에 등록하고, 화면 축소 없이 바로 menu 종류로 던진다.
+    /// 입력값 없이 캡처 중 입력을 막고 메뉴와 커서, 투척 외형, 환경과 게임 상태를 변경한다.
+    /// </summary>
+    private IEnumerator ThrowMenuPopup()
+    {
+        _catalogCapturePending = true;
+        _screenThrowPending = true;
+        _menuPopupFrame = RenderTexture.GetTemporary(Screen.width, Screen.height, 0, RenderTextureFormat.ARGB32);
+        try
+        {
+            // 이번 프레임 OnGUI가 팝업을 렌더 텍스처에 그린 뒤 잘라 낸다.
+            yield return new WaitForEndOfFrame();
+            _fishSpawner.MenuCapture.SavePopup(_menuPopupFrame, _menuPopupRect);
+            RenderTexture.ReleaseTemporary(_menuPopupFrame);
+            _menuPopupFrame = null;
+            for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
+            {
+                if (_fishSpawner.FishTypes[i].Id != "menu") continue;
+                _projectileIndex = i;
+                break;
+            }
+            _pauseOpen = false;
+            _resetConfirmOpen = false;
+            LockCursor(true);
+            ApplyProjectileShape();
+            if (_environmentController != null) _environmentController.ChangeFishInstant(SelectedFish());
+            Throw();
+        }
+        finally
+        {
+            if (_menuPopupFrame != null)
+            {
+                RenderTexture.ReleaseTemporary(_menuPopupFrame);
+                _menuPopupFrame = null;
+            }
+            _catalogCapturePending = false;
+            _screenThrowPending = false;
         }
     }
 
@@ -1098,7 +1143,7 @@ public class GameFlowManager : MonoBehaviour
         // 키보드 Space는 언제나 메뉴 화면을 fish로 던진다. 게임패드 A는 Submit과 같은 버튼이라 RESUME을 고른 상태에서만 던지고, 그 밖에는 아래 Submit으로 버튼을 누른다.
         if (_input.JumpPressed && (!_input.IsUsingGamepad || (!_resetConfirmOpen && _pauseSelection == 0)))
         {
-            StartCoroutine(CapturePanelAndThrow(_fishSpawner.MenuCapture, "menu"));
+            StartCoroutine(ThrowMenuPopup());
             return;
         }
 
@@ -1160,9 +1205,11 @@ public class GameFlowManager : MonoBehaviour
         GUI.color = original;
 
         string cancelName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel}" : "ESC");
+        // RESUME은 메뉴를 던지는 키를 보여 준다. 키보드는 SPACE, 게임패드는 Jump와 같은 아래쪽 버튼 이름을 쓴다.
+        string throwName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Jump}" : "SPACE");
         string[] labels = _resetConfirmOpen
             ? new[] { "삭제", $"취소 ({cancelName})" }
-            : new[] { $"RESUME ({cancelName})", "모든 세이브 데이터 삭제", "EXIT" };
+            : new[] { $"재개하는 ({throwName})", "모든 세이브 데이터 삭제", "나가는" };
         float buttonWidth = 520f * scale;
         float buttonHeight = 60f * scale;
         float left = (width - buttonWidth) * 0.5f;
@@ -1177,7 +1224,7 @@ public class GameFlowManager : MonoBehaviour
         }
         else
         {
-            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale), "PAUSED", _centerStyle, Color.white);
+            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale), "일시정지된", _centerStyle, Color.white);
         }
 
         for (int i = 0; i < labels.Length; i++)
@@ -1203,6 +1250,64 @@ public class GameFlowManager : MonoBehaviour
             _input.ReplaceBindingName(_input.IsUsingGamepad
                 ? "D-PAD select    {Jump} confirm    {Cancel} close"
                 : "ARROWS select    ENTER confirm    ESC close"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+    }
+
+    /// <summary>
+    /// 일시정지 메뉴의 제목과 버튼만 배경 없이 _menuPopupFrame에 화면과 같은 위치로 그린다.
+    /// scale, _resetConfirmOpen, _pauseSelection을 사용하며, _menuPopupFrame 내용과 팝업 영역 _menuPopupRect를 변경한다.
+    /// </summary>
+    private void RenderMenuPopup(float scale)
+    {
+        float width = Screen.width;
+        float height = Screen.height;
+        string cancelName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel}" : "ESC");
+        string throwName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Jump}" : "SPACE");
+        string[] labels = _resetConfirmOpen
+            ? new[] { "삭제", $"취소 ({cancelName})" }
+            : new[] { $"재개하는 ({throwName})", "모든 세이브 데이터 삭제", "나가는" };
+        float buttonWidth = 520f * scale;
+        float buttonHeight = 60f * scale;
+        float left = (width - buttonWidth) * 0.5f;
+        float top = height * 0.4f;
+        float step = buttonHeight + 20f * scale;
+        float padding = 40f * scale;
+        // 제목부터 마지막 버튼까지 감싸고, ReadPixels로 자를 수 있게 정수 픽셀로 맞춘다.
+        Rect popup = Rect.MinMaxRect(
+            Mathf.Floor(left - padding), Mathf.Floor(top - 140f * scale - padding * 0.5f),
+            Mathf.Ceil(left + buttonWidth + padding), Mathf.Ceil(top + step * (labels.Length - 1) + buttonHeight + padding));
+        _menuPopupRect = popup;
+
+        Color original = GUI.color;
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture.active = _menuPopupFrame;
+        GL.PushMatrix();
+        try
+        {
+            GL.LoadPixelMatrix(0f, width, height, 0f);
+            GL.Clear(true, true, Color.clear);
+            GUI.color = Color.white;
+            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale),
+                _resetConfirmOpen ? "세이브 데이터 삭제" : "일시정지된", _centerStyle, Color.white);
+            for (int i = 0; i < labels.Length; i++)
+            {
+                Rect rect = new Rect(left, top + step * i, buttonWidth, buttonHeight);
+                if (i == _pauseSelection)
+                {
+                    GUI.color = new Color(1f, 0.92f, 0.7f);
+                    GUI.DrawTexture(new Rect(rect.x - 4f * scale, rect.y - 4f * scale, rect.width + 8f * scale, rect.height + 8f * scale),
+                        Texture2D.whiteTexture);
+                    GUI.color = Color.white;
+                }
+                // 마우스 위치에 따라 눌린 모양이 담기지 않도록 기본 상태로만 그린다.
+                _buttonStyle.Draw(rect, new GUIContent(labels[i]), false, false, false, false);
+            }
+        }
+        finally
+        {
+            GUI.color = original;
+            GL.PopMatrix();
+            RenderTexture.active = previous;
+        }
     }
 
     /// <summary>

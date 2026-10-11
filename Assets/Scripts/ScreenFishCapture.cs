@@ -137,7 +137,47 @@ public class ScreenFishCapture : MonoBehaviour
         _material = new Material(panel.sharedMaterial);
         panel.sharedMaterial = _material;
         LoadSavedImage(_template.Type);
+        if (Image != null) FitTemplateToImage();
         return _template;
+    }
+
+    /// <summary>
+    /// source에 그려진 팝업에서 GUI 좌표 area 영역을 투명도까지 잘라 패널 이미지로 쓰고 도감에 등록한다.
+    /// source와 area를 사용하며, Image, 패널 머티리얼, 템플릿 가로 크기와 종류별 저장 PNG를 변경한다.
+    /// </summary>
+    public void SavePopup(RenderTexture source, Rect area)
+    {
+        Texture2D image = new Texture2D((int)area.width, (int)area.height, TextureFormat.RGBA32, false);
+        RenderTexture previous = RenderTexture.active;
+        try
+        {
+            RenderTexture.active = source;
+            // GUI 좌표는 위에서부터, ReadPixels는 아래에서부터 세므로 세로 위치를 뒤집는다.
+            image.ReadPixels(new Rect(area.x, source.height - area.yMax, area.width, area.height), 0, 0);
+            image.Apply();
+        }
+        finally
+        {
+            RenderTexture.active = previous;
+        }
+        if (Image != null) Destroy(Image);
+        Image = image;
+        _material.mainTexture = Image;
+        FitTemplateToImage();
+        File.WriteAllBytes(_imagePath, Image.EncodeToPNG());
+        _progress.AddFish(_template.Type);
+    }
+
+    /// <summary>
+    /// 패널 메시의 가로세로 비율이 Image 비율과 같아지도록 템플릿의 가로 크기를 바꾼다.
+    /// Image 크기와 패널 메시 범위를 사용하며, 템플릿의 localScale.x를 변경한다.
+    /// </summary>
+    private void FitTemplateToImage()
+    {
+        Bounds bounds = _template.GetComponentInChildren<MeshFilter>(true).sharedMesh.bounds;
+        Vector3 scale = _template.transform.localScale;
+        scale.x = scale.z * ((float)Image.width / Image.height) / (bounds.size.x / bounds.size.z);
+        _template.transform.localScale = scale;
     }
 
     /// <summary>
