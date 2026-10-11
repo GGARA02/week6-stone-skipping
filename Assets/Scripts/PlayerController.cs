@@ -329,7 +329,7 @@ public class PlayerController : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        if (!_isThrown || Time.timeScale == 0f) return;
+        if (!enabled || !_isThrown || Time.timeScale == 0f) return;
 
         FishAbility ability = _fish.CurrentAbility;
         if (ability != null)

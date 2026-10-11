@@ -69,6 +69,7 @@ public class GameFlowManager : MonoBehaviour
     private readonly List<FishType> _newFish = new List<FishType>();
     private bool _endingCinemaRunning;
     private GameObject _endingAlienInstance;
+    private Coroutine _endingCinemaCoroutine;
 
     [Header("HUD")]
     [SerializeField]
@@ -169,6 +170,9 @@ public class GameFlowManager : MonoBehaviour
 
     void Update()
     {
+        // 엔딩 시네마 연출 중에는 플레이어 및 게임 흐름 키 입력을 전면 차단한다.
+        if (_endingCinemaRunning) return;
+
         if (_screenThrowPending || _catalogCapturePending || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f) return;
         Keyboard keyboard = Keyboard.current;
         Gamepad gamepad = Gamepad.current;
@@ -466,13 +470,22 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 새 던질 거리를 만들고 물고기와 카메라를 던지기 전 상태로 되돌린 뒤 이번 판 날씨를 새로 정한다.
+    /// clearNewFish가 true면 이번 판 신규 획득 목록을 비운다.
     /// 입력값은 없으며, 물고기, 던질 거리 메시, 물고기 상태, 카메라, _state, 날씨를 변경한다.
     /// </summary>
-    private void Restart()
+    private void Restart(bool clearNewFish = true)
     {
-        _newFish.Clear();
+        if (clearNewFish)
+        {
+            _newFish.Clear();
+        }
         _resultScroll = Vector2.zero;
         _catalogOpen = false;
+        if (_endingCinemaCoroutine != null)
+        {
+            StopCoroutine(_endingCinemaCoroutine);
+            _endingCinemaCoroutine = null;
+        }
         if (_endingAlienInstance != null)
         {
             Destroy(_endingAlienInstance);
@@ -481,6 +494,19 @@ public class GameFlowManager : MonoBehaviour
         _endingCinemaRunning = false;
         _fishSpawner.Clear();
         ApplyProjectileShape();
+        if (_cameraController != null)
+        {
+            _cameraController.enabled = true;
+        }
+        if (_playerController != null)
+        {
+            _playerController.enabled = true;
+            Rigidbody rb = _playerController.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+            }
+        }
         _playerController.ResetToStart();
         _cameraController.SnapBehindTarget();
         _popupTime = -10f;
@@ -801,7 +827,7 @@ public class GameFlowManager : MonoBehaviour
             if (texture != null) GUI.DrawTexture(image, texture, ScaleMode.ScaleToFit, true);
             else ShadowLabel(image, "?", _centerStyle, new Color(1f, 1f, 1f, 0.5f));
             ShadowLabel(new Rect(cell.x, cell.y + 142f * scale, cell.width, 60f * scale),
-                fish.DisplayName, _previewStyle, new Color(1f, 0.92f, 0.7f));
+                GetCatalogDisplayName(fish), _previewStyle, new Color(1f, 0.92f, 0.7f));
         }
         GUI.EndScrollView();
         float buttonWidth = 620f * scale;
@@ -1094,6 +1120,7 @@ public class GameFlowManager : MonoBehaviour
         if (_playerController != null)
         {
             _playerController.gameObject.SetActive(true);
+            _playerController.enabled = true;
             Rigidbody rb = _playerController.GetComponent<Rigidbody>();
             if (rb != null)
             {
@@ -1101,7 +1128,7 @@ public class GameFlowManager : MonoBehaviour
             }
         }
         _showHud = true;
-        Restart();
+        Restart(clearNewFish: false);
     }
 
     /// <summary>
@@ -1138,6 +1165,10 @@ public class GameFlowManager : MonoBehaviour
                     _progress.AddFish(fish);
                     PlayerPrefs.SetInt(FISH_KEY_PREFIX + CREDIT_FISH_ID, 1);
                     PlayerPrefs.Save();
+                    if (!_newFish.Contains(fish))
+                    {
+                        _newFish.Add(fish);
+                    }
                     return;
                 }
             }
@@ -1157,6 +1188,10 @@ public class GameFlowManager : MonoBehaviour
         {
             if (fish.Id != "blackhole") continue;
             _fishSpawner.HandlePlacedFishCaught(fish, _playerController.transform.position);
+            if (!_newFish.Contains(fish))
+            {
+                _newFish.Add(fish);
+            }
             break;
         }
 
@@ -1165,6 +1200,7 @@ public class GameFlowManager : MonoBehaviour
 
         if (_playerController != null)
         {
+            _playerController.enabled = false;
             Rigidbody rb = _playerController.GetComponent<Rigidbody>();
             if (rb != null)
             {
@@ -1174,7 +1210,7 @@ public class GameFlowManager : MonoBehaviour
             }
         }
 
-        StartCoroutine(PlayEndingCinemaRoutine());
+        _endingCinemaCoroutine = StartCoroutine(PlayEndingCinemaRoutine());
     }
 
     /// <summary>
@@ -1324,6 +1360,7 @@ public class GameFlowManager : MonoBehaviour
         yield return new WaitForSeconds(1.5f);
 
         // 8. 엔딩 크레딧 오픈
+        _endingCinemaCoroutine = null;
         _endingCinemaRunning = false;
         StartEndingCredit();
     }
@@ -1350,11 +1387,19 @@ public class GameFlowManager : MonoBehaviour
         if (monsterType != null && _progress != null)
         {
             _progress.AddFish(monsterType);
+            if (!_newFish.Contains(monsterType))
+            {
+                _newFish.Add(monsterType);
+            }
         }
         else
         {
             PlayerPrefs.SetInt(FISH_KEY_PREFIX + MONSTER_FISH_ID, 1);
             PlayerPrefs.Save();
+            if (monsterType != null && !_newFish.Contains(monsterType))
+            {
+                _newFish.Add(monsterType);
+            }
         }
     }
 }
