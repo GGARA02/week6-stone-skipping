@@ -79,9 +79,6 @@ public class FishType
     private int _value = 10;
     [SerializeField]
     private Color _color = new Color(0.35f, 0.5f, 0.62f);
-    [Tooltip("출현 확률 가중치")]
-    [SerializeField]
-    private float _spawnWeight = 1f;
 
     [Header("사출물 출현 정책")]
     [Tooltip("사출 후 입수한 다음 판부터 자연 출현한다")]
@@ -144,7 +141,6 @@ public class FishType
     public string DisplayName => _displayName;
     public int Value => _value;
     public Color Color => _color;
-    public float SpawnWeight => _spawnWeight;
     public bool IsRevealed => _isRevealed;
     public bool RequiresEjection => _requiresEjection;
     public bool AllowRepeatEjection => _allowRepeatEjection;
@@ -177,7 +173,6 @@ public class FishType
             _id = "wall",
             _displayName = "Wall",
             _value = 0,
-            _spawnWeight = 0f,
             _isRevealed = false,
             _liftMultiplier = 1f,
         };
@@ -195,7 +190,6 @@ public class FishType
             _displayName = "ICE FLOE",
             _value = 0,
             _color = new Color(0.65f, 0.9f, 1f),
-            _spawnWeight = 0f,
             _isRevealed = false,
             _liftMultiplier = 1f,
         };
@@ -212,7 +206,6 @@ public class FishType
             _id = "screen",
             _displayName = "SCREEN",
             _value = 0,
-            _spawnWeight = 0f,
             _isRevealed = false,
             _height = 3.2f,
             _length = 1.8f,

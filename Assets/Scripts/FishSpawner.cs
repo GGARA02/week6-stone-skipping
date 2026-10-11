@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
+using Newtonsoft.Json.Linq;
+
 // 던진 물고기가 날아가는 동안, 곧 지나갈 자리 근처 수면에서 물고기가 튀어 오르게 한다.
 // 던진 물고기로 맞추면 돈을 받고 물고기를 도감에 등록한다.
 public class FishSpawner : MonoBehaviour
@@ -46,6 +48,7 @@ public class FishSpawner : MonoBehaviour
     private readonly HashSet<string> _seaTypes = new HashSet<string>();
     private readonly HashSet<string> _pendingSeaTypes = new HashSet<string>();
     private FishUnlockGraph _unlockGraph;
+    private readonly Dictionary<string, float> _spawnWeights = new Dictionary<string, float>();
 
     [Header("출현")]
     [Tooltip("물고기가 튀어 오르는 간격 범위(초)")]
@@ -119,6 +122,11 @@ public class FishSpawner : MonoBehaviour
 
     void Awake()
     {
+        JObject catalogEntries = JObject.Parse(Resources.Load<TextAsset>("FishCatalog").text);
+        foreach (JProperty entry in catalogEntries.Properties())
+        {
+            _spawnWeights.Add(entry.Name, entry.Value.Value<float>("spawnWeight"));
+        }
         _playerBody = _player.GetComponent<Rigidbody>();
         _waterY = _water.GetComponent<Collider>().bounds.max.y;
         _cameraTransform = Camera.main.transform;
@@ -446,22 +454,24 @@ public class FishSpawner : MonoBehaviour
 
     /// <summary>
     /// 출현 가중치에 따라 물고기 프리팹을 고른다.
-    /// 종류별 출현 정책과 SpawnWeight를 사용하며, 고른 프리팹 또는 후보가 없으면 null을 반환한다.
+    /// 종류별 출현 정책과 FishCatalog의 spawnWeight를 사용하며, 고른 프리팹 또는 후보가 없으면 null을 반환한다.
     /// </summary>
     private Fish PickPrefab()
     {
         float total = 0f;
         foreach (Fish prefab in _fishPrefabs)
         {
-            if (CanSpawn(prefab.Type)) total += Mathf.Max(0f, prefab.Type.SpawnWeight);
+            if (CanSpawn(prefab.Type)) total += Mathf.Max(0f, _spawnWeights[prefab.Type.Id]);
         }
 
         if (total <= 0f) return null;
         float pick = UnityEngine.Random.Range(0f, total);
         foreach (Fish prefab in _fishPrefabs)
         {
-            if (!CanSpawn(prefab.Type) || prefab.Type.SpawnWeight <= 0f) continue;
-            pick -= prefab.Type.SpawnWeight;
+            if (!CanSpawn(prefab.Type)) continue;
+            float weight = _spawnWeights[prefab.Type.Id];
+            if (weight <= 0f) continue;
+            pick -= weight;
             if (pick < 0f) return prefab;
         }
         return _fishPrefabs[0];
