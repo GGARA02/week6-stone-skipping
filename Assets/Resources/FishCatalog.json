@@ -228,12 +228,6 @@
     "description": "블랙홀 너머로 날아온 물수제비를 우주의 선물이라 믿은 외계인입니다. 던져질 때마다 혹시 고향 쪽으로 날아가지 않을까 기대합니다.",
     "unlockHint": "여정의 끝까지 가보세요."
   },
-  "alkagi": {
-    "spawnWeight": 0,
-    "displayName": "ALKAGI",
-    "description": "한때 눈에서 레이저를 쏘던 ALKAGI입니다. 납작하게 눌리고 나니 위협은 사라지고 물수제비에 딱 맞는 몸매만 남았습니다.",
-    "unlockHint": "에너지 보존 법칙에 반하는 이야기지만, 레이저는 사실 그렇게 뜨겁지 않습니다. 눈 감고 딱 한 번만 맞아볼까요?"
-  },
   "screen": {
     "spawnWeight": 0,
     "displayName": "게임 화면",
@@ -257,5 +251,11 @@
     "displayName": "메뉴",
     "description": "잠깐 쉬려고 열어 둔 메뉴를 찍어 둔 패널입니다. 계속하기 버튼을 누르는 대신 메뉴째로 던져 버렸습니다.",
     "unlockHint": "계속하려면 꼭 버튼을 눌러야 할까요?"
+  },
+  "alkagi": {
+    "spawnWeight": 0,
+    "displayName": "ALKAGI",
+    "description": "한때 눈에서 레이저를 쏘던 ALKAGI입니다. 납작하게 눌리고 나니 위협은 사라지고 물수제비에 딱 맞는 몸매만 남았습니다.",
+    "unlockHint": "에너지 보존 법칙에 반하는 이야기지만, 레이저는 사실 그렇게 뜨겁지 않습니다. 눈 감고 딱 한 번만 맞아볼까요?"
   }
 }

@@ -124,7 +124,7 @@ public class FishSpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// type의 도감 상태를 연결 해금, 즉시 발견 조건, 습득 기록과 바다 출현 등록으로 반환한다.
+    /// type의 도감 상태를 연결 해금, 즉시 발견 조건, 습득 기록, 바다 출현 등록과 도감 완성 여부로 반환한다.
     /// 발견과 실제 자연 출현 허용을 구분하며 습득 기록은 변경하지 않는다.
     /// </summary>
     public FishCatalogState GetCatalogState(FishType type)
@@ -133,7 +133,31 @@ public class FishSpawner : MonoBehaviour
         if (state == FishCatalogState.Undiscovered && _seaSpawnRegistry.RequiresRegistration(type.Id)
             && _seaSpawnRegistry.IsUnlocked(type.Id))
             return FishCatalogState.Discovered;
+        if (state == FishCatalogState.Undiscovered && _unlockGraph.RequiresCatalogCompletion(type.Id) && HasCompletedCatalog())
+            return FishCatalogState.Discovered;
         return state;
+    }
+
+    /// <summary>
+    /// 도감 완성 보상 종류를 뺀 나머지 도감 종류를 모두 획득했는지 반환한다.
+    /// 현재 도감 종류 목록과 획득 기록을 사용하며 상태는 변경하지 않는다.
+    /// </summary>
+    public bool HasCompletedCatalog()
+    {
+        foreach (FishType type in _fishTypes)
+        {
+            if (!_unlockGraph.RequiresCatalogCompletion(type.Id) && !_progress.IsFishRegistered(type)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// type이 아직 공개되지 않은 도감 완성 보상이라 도감 목록에서 빼야 하는지 반환한다.
+    /// type의 발견 조건과 도감 상태를 사용하며 상태는 변경하지 않는다.
+    /// </summary>
+    public bool IsHiddenInCatalog(FishType type)
+    {
+        return _unlockGraph.RequiresCatalogCompletion(type.Id) && GetCatalogState(type) == FishCatalogState.Undiscovered;
     }
 
     /// <summary>

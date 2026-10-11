@@ -56,6 +56,9 @@
     },
     "blackhole": {
       "always": true
+    },
+    "alkagi": {
+      "afterCompletingCatalog": true
     }
   },
   "connections": {
@@ -148,9 +151,7 @@
       "kinghopak"
     ],
     "blackhole": [],
-    "monster": [
-      "alkagi"
-    ],
+    "monster": [],
     "alkagi": [],
     "screen": [],
     "catalog": [],

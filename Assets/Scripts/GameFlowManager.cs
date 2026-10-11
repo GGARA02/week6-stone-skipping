@@ -660,7 +660,7 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// JSON 순서로 전체 도감, 획득 목록과 미발견을 제외한 선택 목록을 구성한다.
+    /// JSON 순서로 숨김 항목을 뺀 도감, 획득 목록과 미발견을 제외한 선택 목록을 구성한다.
     /// 등록된 종류와 도감 상태를 사용해 _catalogOptions, _ownedOptions와 _selectionOptions를 갱신한다.
     /// </summary>
     private void RefreshOwnedOptions()
@@ -671,6 +671,8 @@ public class GameFlowManager : MonoBehaviour
         _catalogOptions.Add(DEFAULT_FISH_INDEX);
         for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
         {
+            // 도감 완성 보상은 나머지를 다 모으기 전까지 도감에 칸도 만들지 않는다.
+            if (_fishSpawner.IsHiddenInCatalog(_fishSpawner.FishTypes[i])) continue;
             _catalogOptions.Add(i);
         }
         _catalogOptions.Sort((left, right) =>
@@ -1079,7 +1081,7 @@ public class GameFlowManager : MonoBehaviour
         GUI.color = original;
         ShadowLabel(new Rect(0f, 24f * scale, width, 80f * scale), "도감", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, 108f * scale, width, 40f * scale),
-            $"보유  {_ownedOptions.Count} / {_fishSpawner.FishTypes.Count + 1}    " + _input.ReplaceBindingName(_input.IsUsingGamepad
+            $"보유  {_ownedOptions.Count} / {_catalogOptions.Count}    " + _input.ReplaceBindingName(_input.IsUsingGamepad
                 ? "{Navigate} 선택    {Catalog} / {Cancel} 닫기    {Jump} 투척" : "WASD 선택    {Catalog} / ESC 닫기    {Jump} 투척"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         Rect viewport = new Rect(width * 0.08f, 170f * scale, width * 0.84f, height - 430f * scale);
         bool pointerInViewport = viewport.Contains(Event.current.mousePosition);
