@@ -195,7 +195,7 @@ Light:
   serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 0.57254905, b: 0, a: 1}
-  m_Intensity: 20
+  m_Intensity: 1000
   m_Range: 30
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -5285,7 +5285,6 @@ MonoBehaviour:
     _displayName: WEEK4 ARROW
     _value: 50
     _color: {r: 1, g: 1, b: 1, a: 1}
-    _spawnWeight: 0.2
     _requiresEjection: 0
     _allowRepeatEjection: 1
     _maxConcurrent: 0
@@ -5312,6 +5311,7 @@ MonoBehaviour:
       _onlyInRain: 0
       _onlyAtNight: 1
       _requiredPlayerFish: {fileID: 0}
+      _fallsFromSky: 0
   _body: {fileID: 7720000000000000002}
 --- !u!114 &114000002
 MonoBehaviour:
