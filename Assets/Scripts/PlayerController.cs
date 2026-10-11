@@ -244,6 +244,13 @@ public class PlayerController : MonoBehaviour
 
         if (!Managers.Input.JumpPressed) return;
 
+        // 판정 대기나 MISS 쿨타임과 관계없이 누를 때마다 알려 레이저, 공격, 절단이 언제나 나가게 한다.
+        FishAbility ability = _fish.CurrentAbility;
+        if (ability != null)
+        {
+            ability.OnSpacePressed(AbilityContext());
+        }
+
         // 미끄러지는 동안은 타이밍 판정 대신 누른 횟수만큼 밀어준다.
         if (_isSliding)
         {

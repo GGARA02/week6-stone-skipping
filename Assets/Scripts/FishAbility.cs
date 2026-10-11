@@ -52,6 +52,14 @@ public abstract class FishAbility : MonoBehaviour
     }
 
     /// <summary>
+    /// 던진 상태에서 판정 대기나 MISS 쿨타임과 관계없이 SPACE를 누를 때마다 특수 동작을 한다. 기본 동작은 없다.
+    /// context를 사용하며, 변경하는 상태는 하위 클래스가 정한다.
+    /// </summary>
+    public virtual void OnSpacePressed(ThrowContext context)
+    {
+    }
+
+    /// <summary>
     /// 던진 상태에서 SPACE 판정에 실패(MISS)했을 때 특수 동작을 한다. 기본 동작은 없다.
     /// context를 사용하며, 변경하는 상태는 하위 클래스가 정한다.
     /// </summary>

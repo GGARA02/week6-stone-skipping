@@ -285,18 +285,6 @@ public class FishMeshGenerator : MonoBehaviour
         Destroy(oldRender);
         _meshRenderer.enabled = false;
         BuildPrefabGeometry();
-
-        if (_fishType.Id == "kinghopak")
-        {
-            PlayerController player = GetComponentInParent<PlayerController>();
-            foreach (Transform tip in _fishInstance.GetComponentsInChildren<Transform>())
-            {
-                if (tip.name == "mixamorig:LeftHand" || tip.name == "mixamorig:RightHand")
-                {
-                    tip.gameObject.AddComponent<WallCuttingTip>().Initialize(player);
-                }
-            }
-        }
     }
 
     /// <summary>
