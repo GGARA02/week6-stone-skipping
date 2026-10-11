@@ -57,7 +57,7 @@
     "spawnWeight": 0,
     "displayName": "공크소울",
     "description": "BALK SOUL입니다. 이 바다도 결국 또 하나의 고난도 지역일 뿐이라며, 오늘도 묵묵히 튕겨 나갑니다.",
-    "unlockHint": "물수제비 중 바다에서 모습을 드러내는 BALK SOUL을 맞혀 보세요."
+    "unlockHint": "공으로 퍼펙트를 3회 성공하세요."
   },
   "baguette": {
     "spawnWeight": 1,
@@ -87,7 +87,7 @@
     "spawnWeight": 0,
     "displayName": "ALKAGI",
     "description": "한때 눈에서 레이저를 쏘던 ALKAGI입니다. 납작하게 눌리고 나니 위협은 사라지고 물수제비에 딱 맞는 몸매만 남았습니다.",
-    "unlockHint": "수면에서 나타나는 알까기 돌을 맞혀 보세요."
+    "unlockHint": "에너지 보존 법칙에 반하는 이야기지만, 레이저는 사실 그렇게 뜨겁지 않습니다."
   },
   "deer": {
     "spawnWeight": 0.3,
@@ -99,31 +99,31 @@
     "spawnWeight": 0.3,
     "displayName": "외계인",
     "description": "블랙홀 너머로 날아온 물수제비를 우주의 선물이라 믿은 외계인입니다. 던져질 때마다 혹시 고향 쪽으로 날아가지 않을까 기대합니다.",
-    "unlockHint": "물수제비 중 나타나는 몬스터를 맞혀 보세요."
+    "unlockHint": "여정의 끝까지 가보세요."
   },
   "umbrella": {
     "spawnWeight": 5,
     "displayName": "우산짱",
     "description": "비에 젖은 고양이를 찾아 집을 나선 우산 소녀입니다. 고양이는 진작 처마 밑에서 잘 자고 있었다는 사실을 아직 모릅니다.",
-    "unlockHint": "수면에서 나타나는 우산을 맞혀 보세요."
+    "unlockHint": "비오는 날 하늘을 바라보세요."
   },
   "volcano": {
     "spawnWeight": 0.1,
     "displayName": "화산",
     "description": "작은 화산입니다. 용암 대신 공을 뿜는 화산은 이 녀석뿐입니다.",
-    "unlockHint": "물수제비 중 바다에서 나타나는 화산을 맞혀 보세요."
+    "unlockHint": "울릉도 동남쪽 뱃길따라 200리~"
   },
   "whale_dark": {
     "spawnWeight": 0.05,
     "displayName": "개씹어두운고래",
     "description": "한때 밤하늘을 누비며 온 도시를 정전시키던 빌딩 고래입니다. 지금은 물 위를 튈 때마다 박수를 받으니, 악당 인생 처음으로 환영받는 중입니다.",
-    "unlockHint": "수면에서 나타나는 어두운 색의 고래를 맞혀 보세요."
+    "unlockHint": "빛으로 밤바다를 날아보세요."
   },
   "whale_white": {
     "spawnWeight": 0.05,
     "displayName": "개씹밝은고래",
     "description": "원래는 어두운 고래의 라이벌로 하늘을 날 예정이었습니다. 기획 회의에서 잘려 나간 뒤로, 이렇게라도 날 수 있어 만족하고 있습니다.",
-    "unlockHint": "수면에서 나타나는 밝은 색의 고래를 맞혀 보세요."
+    "unlockHint": "빛으로 밤바다를 날아보세요."
   },
   "arrow": {
     "spawnWeight": 0.2,
@@ -135,19 +135,19 @@
     "spawnWeight": 0.2,
     "displayName": "빛",
     "description": "도시의 빛을 하나씩 머금으며 아침을 찾아오던 불씨입니다. 지금은 바다를 건너는 중인데, 아침은 원래 알아서 온다는 사실을 아직 모릅니다.",
-    "unlockHint": "물수제비 중 나타나는 WEEK4 ARROW를 맞혀 보세요."
+    "unlockHint": "밤에 바다에서 나타나는 빛을 맞혀 보세요."
   },
   "board": {
     "spawnWeight": 0.2,
     "displayName": "지침서 게시판",
     "description": "1. 「정시가 되면 새로운 명령서가 발급됩니다.」\n8. 「게시판은 던지는 물건이 아닙니다.」\n9. 「물론 던질 수는 있습니다. 하지만 게시판은 던지는 물건이 아닙니다.」",
-    "unlockHint": "수면에서 나타나는 판자를 맞혀 보세요."
+    "unlockHint": "밤에 바다에서 나타나는 게시판을 맞혀 보세요."
   },
   "bonfire": {
     "spawnWeight": 0.2,
     "displayName": "화톳불",
     "description": "화톳불입니다. 물에 닿으면 꺼질 법도 한데 제대로 튕기면 오히려 불이 붙으니, 근성이 앞서는 불입니다.",
-    "unlockHint": "물수제비 중 나타나는 모닥불을 맞혀 보세요."
+    "unlockHint": "밤에 바다에서 나타나는 화톳불을 맞혀 보세요."
   },
   "car": {
     "spawnWeight": 1,
@@ -165,7 +165,7 @@
     "spawnWeight": 0.05,
     "displayName": "블랙홀",
     "description": "모든 것을 삼키는 블랙홀입니다. 그 너머 어딘가의 외계인에게 물수제비를 배달해 준 장본인이기도 합니다.",
-    "unlockHint": "물수제비 중 바다에서 나타나는 블랙홀을 맞혀 보세요."
+    "unlockHint": "여정의 끝까지 가보세요."
   },
   "crab": {
     "spawnWeight": 1,
@@ -177,13 +177,13 @@
     "spawnWeight": 0,
     "displayName": "쇄빙선",
     "description": "선체를 늘리고, 또 늘리던 쇄빙선입니다. 숫자가 커지는 맛에 살던 배라 물수제비 횟수가 오를 때마다 남몰래 뿌듯해합니다.",
-    "unlockHint": "물수제비 중 바다에서 나타나는 배를 맞혀 보세요."
+    "unlockHint": "유빙 근처에 정박한 쇄빙선을 맞혀 보세요."
   },
   "aide": {
     "spawnWeight": 2,
     "displayName": "부관짱",
     "description": "다정한 조언으로 함장님을 보좌하던 부관입니다. 함장님은 그녀를 날려 보내는 게 아니라 넓은 세상을 보여 주는 거라고 굳게 믿고 있습니다.",
-    "unlockHint": "배를 GOOD 이상으로 튕겨 보좌관을 사출하고 바다에 내려놓아 보세요."
+    "unlockHint": "배를 침몰시키세요."
   },
   "w02ball": {
     "spawnWeight": 1,
@@ -213,25 +213,25 @@
     "spawnWeight": 0,
     "displayName": "벽",
     "description": "물수제비 앞을 가로막다 잘려 나간 벽의 조각입니다. 길을 막던 시절은 끝났고, 이제는 그 길 위로 던져지는 신세입니다.",
-    "unlockHint": "장애물을 잘라낸 뒤 떨어져 나온 조각을 맞혀 보세요."
+    "unlockHint": "장애물을 잘라내세요."
   },
   "ice": {
     "spawnWeight": 0,
     "displayName": "유빙",
     "description": "먼 바다의 유빙에서 떨어져 나온 조각입니다. 빙산의 일각이라는 말이 있지만, 이 조각은 일각의 일각입니다.",
-    "unlockHint": "500m 너머 바다의 유빙을 잘라낸 뒤 조각을 맞혀 보세요."
+    "unlockHint": "유빙을 잘라내세요."
   },
   "screen": {
     "spawnWeight": 0,
     "displayName": "게임 화면",
     "description": "어느 한순간을 그대로 담은 게임 화면입니다. 화면 속의 당신도 그때 무언가를 던지고 있었을 겁니다.",
-    "unlockHint": "모든 것을 삼키는 물수제비가 화면까지 삼키는 순간을 지켜보세요."
+    "unlockHint": "블랙홀을 튕겨보세요."
   },
   "catalog": {
     "spawnWeight": 0,
     "displayName": "도감",
     "description": "도감을 찍어 둔 패널입니다. 그 안에도 도감이 있고, 그 도감 안에도 아마 도감이 있을 겁니다.",
-    "unlockHint": "이 기록도 물 위에 띄울 수 있을까요?"
+    "unlockHint": "도감은 왜 날리면 안되는 걸까요?"
   },
   "boost": {
     "spawnWeight": 0,
@@ -243,7 +243,7 @@
     "spawnWeight": 0,
     "displayName": "엔딩크레딧",
     "description": "이 게임을 만드는 데 도움을 준 사람들의 이름이 담긴 크레딧입니다. 도와주신 분들을 물 위로 던지는 것이 이 게임 나름의 감사 표현입니다.",
-    "unlockHint": "여정의 끝에서 감사 인사가 담긴 크레딧을 확인해 보세요."
+    "unlockHint": "여정의 끝에서 감사 인사가 담긴 크레딧을 스킵하세요."
   },
   "keyboard": {
     "spawnWeight": 0.2,
