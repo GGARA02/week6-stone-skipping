@@ -8,11 +8,11 @@ using TMPro;
 
 public class EndingCreditUI : MonoBehaviour
 {
-    private const float DISPLAYDURATION = 5f;
+    private const float DISPLAYDURATION = 16f;
     private const float PULSE_SPEED = 4f;
     private const float MIN_SCALE = 0.92f;
     private const float MAX_SCALE = 1.12f;
-    private const string SKIP_PROMPT_TEXT = "<b><color=#FFD700>[ SPACE ]</color></b> <color=#FFFFFF>SKIP >></color>";
+    private const string SKIP_PROMPT_TEXT = "<b></color>";
 
     [Header("Settings")]
     private float _timer;

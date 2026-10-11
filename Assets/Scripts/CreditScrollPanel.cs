@@ -32,6 +32,12 @@ public class CreditScrollPanel : MonoBehaviour
     [Header("Mask Settings")]
     [Tooltip("부모 패널에 RectMask2D를 자동 적용하여 보드 크기 밖으로 나가는 글자를 자를지 여부")]
     [SerializeField] private bool _autoApplyRectMask2D = true;
+    [Tooltip("2D UI 모드에서 하단 스킵 문구와 겹치지 않도록 마스크를 띄울 여백(px)")]
+    private float _maskPaddingBottom = 80f;
+    [Tooltip("2D UI 모드에서 상단 경계와 여백을 둘 마스크 여백(px)")]
+    private float _maskPaddingTop = 50f;
+    [Tooltip("마스크 상하단 경계면의 부드러운 페이드아웃 효과 크기(px)")]
+    private int _maskSoftnessY = 30;
 
     [Header("Scroll Settings")]
     [Tooltip("위로 스크롤되는 속도 (px/초)")]
@@ -68,16 +74,24 @@ public class CreditScrollPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// 부모 패널에 RectMask2D가 없으면 자동으로 추가하여 보드 영역 바깥의 글자를 마스킹한다.
-    /// _creditPanel의 부모를 탐색하며, 필요 시 RectMask2D 컴포넌트를 추가한다.
+    /// 부모 패널에 RectMask2D를 적용하고 2D UI 모드 시 상하단 패딩 및 소프트니스 페이드를 설정한다.
+    /// _autoApplyRectMask2D와 _is3DMode를 사용하며, RectMask2D 컴포넌트의 padding과 softness를 변경한다.
     /// </summary>
     private void EnsureRectMask()
     {
         if (!_autoApplyRectMask2D || _creditPanel == null || _creditPanel.parent == null) return;
 
-        if (_creditPanel.parent.GetComponent<RectMask2D>() == null && _creditPanel.parent.GetComponent<Mask>() == null)
+        RectMask2D mask = _creditPanel.parent.GetComponent<RectMask2D>();
+        if (mask == null && _creditPanel.parent.GetComponent<Mask>() == null)
         {
-            _creditPanel.parent.gameObject.AddComponent<RectMask2D>();
+            mask = _creditPanel.parent.gameObject.AddComponent<RectMask2D>();
+        }
+
+        if (mask != null && !_is3DMode)
+        {
+            // 하단 스킵 문구와 상단 화면 경계에 여백을 두고 경계면을 부드럽게 페이드 처리한다.
+            mask.padding = new Vector4(0f, _maskPaddingBottom, 0f, _maskPaddingTop);
+            mask.softness = new Vector2Int(0, _maskSoftnessY);
         }
     }
 
