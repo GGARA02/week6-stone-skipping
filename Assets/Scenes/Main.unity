@@ -15180,8 +15180,13 @@ MonoBehaviour:
   _spaceHintLeadTime: 0.6
   _popupHeight: 0.13
   _spaceHintHeight: 0.8
+  _noteRadius: 64
+  _approachStartScale: 3
+  _noteHitDuration: 0.25
   _panelShrinkDuration: 0.65
   _endingCredit: {fileID: 1774445642}
+  _maintainCinemaDuringCredits: 1
+  _cinemaTransitionDuration: 0.6
 --- !u!4 &403970196
 Transform:
   m_ObjectHideFlags: 0
@@ -15265,7 +15270,6 @@ MonoBehaviour:
   - {fileID: 4406606958086518676, guid: d89718ec1c130504cb79b4b50b3dd48b, type: 3}
   - {fileID: 3391119206814665011, guid: 8a156d76d7eb0c240884e7f28c0f4537, type: 3}
   - {fileID: 114000001, guid: 09dad68268504264eb033956a041d508, type: 3}
-  - {fileID: 114000001, guid: 50d48c18fc731d64783fe1d33febb46e, type: 3}
   - {fileID: -338053525794902233, guid: 0c8de91f24b68ee4796e1fc5906cba8c, type: 3}
   - {fileID: 652048137601599212, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
   - {fileID: 4482674079178255689, guid: 214647fc108e40d43b5570e725beafdb, type: 3}
@@ -15281,6 +15285,7 @@ MonoBehaviour:
   - {fileID: 114000001, guid: bb4ebf38c5ff46c785768c48b5ab7cf4, type: 3}
   - {fileID: 6489902929851386473, guid: 7cac427acc3a3224cb2c5a8fe7d03d72, type: 3}
   - {fileID: 6479090948757009543, guid: 0041f46ad8fad3d479e2d53861101e49, type: 3}
+  - {fileID: 114000001, guid: 50d48c18fc731d64783fe1d33febb46e, type: 3}
   _spawnIntervalRange: {x: 0.35, y: 0.9}
   _schoolSizeRange: {x: 1, y: 3}
   _leadTimeRange: {x: 1, y: 2}
@@ -21629,15 +21634,9 @@ MonoBehaviour:
   _fish: {fileID: 747180400}
   _throwVelocity: {x: 0, y: 10, z: 50}
   _throwSpin: 30
-  _randomPitchRange: {x: 0, y: 30}
-  _randomRollRange: 25
   _randomSpinRange: {x: 0.7, y: 1.3}
   _steerRate: 15
   _bankAngle: 12
-  _pitchControlRate: 80
-  _pitchLimits: {x: -10, y: 55}
-  _rollControlRate: 100
-  _rollLimit: 60
   _stickDeadZone: 0.15
   _attitudeStiffness: 90
   _attitudeDamping: 15

@@ -34,6 +34,9 @@ public class GameFlowManager : MonoBehaviour
     private const string MONSTER_FISH_ID = "monster";
     private const string FISH_KEY_PREFIX = "SkipStoneV2.Fish.";
     private const float CINEMATIC_ASPECT = 21f / 9f;
+    private const int NOTE_TEXTURE_SIZE = 256;
+    // 리듬 노트 고리 두께 (반지름 대비 비율)
+    private const float NOTE_RING_THICKNESS = 0.1f;
 
     [Header("참조")]
     [SerializeField]
@@ -106,6 +109,22 @@ public class GameFlowManager : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField]
     private float _spaceHintHeight = 0.8f;
+    [Tooltip("SPACE 리듬 노트 중심 위치 (화면 비율, 왼쪽 위가 0). 물고기가 화면 가운데 있으므로 중앙 왼쪽에 둔다")]
+    [SerializeField]
+    private Vector2 _notePosition = new Vector2(0.3f, 0.5f);
+    [Tooltip("SPACE 리듬 노트 원의 반지름 (1080p 기준 픽셀)")]
+    [SerializeField]
+    private float _noteRadius = 64f;
+    [Tooltip("SPACE 안내가 뜰 때 접근 원의 크기 (노트 원 대비 배율). 수면에 닿는 순간 1배가 되어 노트 원과 겹친다")]
+    [SerializeField]
+    private float _approachStartScale = 3f;
+    [Tooltip("판정 성공 시 노트 원이 퍼지며 사라지는 시간(초)")]
+    [SerializeField]
+    private float _noteHitDuration = 0.25f;
+    private Texture2D _noteDiscTexture;
+    private Texture2D _noteRingTexture;
+    private Color _noteHitColor;
+    private float _noteHitTime = -10f;
     private string _popupText;
     private Color _popupColor;
     private float _popupTime = -10f;
@@ -117,6 +136,7 @@ public class GameFlowManager : MonoBehaviour
     private GUIStyle _centerStyle;
     private GUIStyle _centerSubStyle;
     private GUIStyle _popupStyle;
+    private GUIStyle _noteStyle;
     private GUIStyle _debugStyle;
     private GUIStyle _buttonStyle;
     private GUIStyle _previewStyle;
@@ -205,6 +225,12 @@ public class GameFlowManager : MonoBehaviour
         _fishSpawner.OnFishCaught -= HandleFishCaught;
         _progress.OnFishRegistered -= HandleFishRegistered;
         _fishSpawner.ScreenCapture.OnUnlocked -= HandleScreenUnlocked;
+        // 노트 텍스처는 HUD를 처음 그릴 때 만들어지므로 한 번도 그리지 않았으면 없다.
+        if (_noteRingTexture != null)
+        {
+            Destroy(_noteDiscTexture);
+            Destroy(_noteRingTexture);
+        }
         if (_endingCredit != null)
         {
             _endingCredit.OnEndingCompleted -= HandleEndingCompleted;
@@ -390,14 +416,15 @@ public class GameFlowManager : MonoBehaviour
             Color slideColor = new Color(1f, 1f, 1f, 0.35f + 0.65f * _playerController.SlidePower);
             ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("{Jump}을 마구 누르는!"), _centerStyle, slideColor);
         }
-        else if (_playerController.CanJudge && _playerController.TimeToWaterImpact <= _spaceHintLeadTime)
+        else
         {
-            // 닿을수록 진해지고, GOOD 이상 구간에 들어오면 금색으로 바뀐다.
-            float approach = 1f - Mathf.Clamp01(_playerController.TimeToWaterImpact / Mathf.Max(_spaceHintLeadTime, 0.01f));
-            Color hintColor = _playerController.IsInJudgeWindow
-                ? new Color(1f, 0.85f, 0.25f, 1f)
-                : new Color(1f, 1f, 1f, 0.35f + 0.5f * approach);
-            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("{Jump}"), _centerStyle, hintColor);
+            EnsureNoteTextures();
+            Vector2 noteCenter = new Vector2(width * _notePosition.x, height * _notePosition.y);
+            if (_playerController.CanJudge && _playerController.TimeToWaterImpact <= _spaceHintLeadTime)
+            {
+                DrawSpaceNote(noteCenter, s);
+            }
+            DrawSpaceNoteHit(noteCenter, s);
         }
 
         // 게임오버 화면에서는 제목과 겹치지 않도록 팝업을 그리지 않는다.
@@ -808,6 +835,8 @@ public class GameFlowManager : MonoBehaviour
         if (judge == SkipJudge.Perfect || judge == SkipJudge.Good)
         {
             PlayFishInteraction();
+            _noteHitTime = Time.unscaledTime;
+            _noteHitColor = JudgeColor(judge);
         }
 
         string direction = timingError < 0f ? "이른" : "늦은";
@@ -1588,6 +1617,7 @@ public class GameFlowManager : MonoBehaviour
             alignment = TextAnchor.UpperCenter,
         };
         _popupStyle = MakeStyle(52, TextAnchor.MiddleCenter, scale);
+        _noteStyle = MakeStyle(26, TextAnchor.MiddleCenter, scale);
         _debugStyle = MakeStyle(18, TextAnchor.UpperRight, scale);
         _debugStyle.fontStyle = FontStyle.Normal;
         _buttonStyle = new GUIStyle(GUI.skin.button)
@@ -1637,6 +1667,98 @@ public class GameFlowManager : MonoBehaviour
         GUI.Label(rect, text, style);
         style.normal.textColor = original;
         style.hover.textColor = originalHover;
+    }
+
+    /// <summary>
+    /// osu! 히트 서클처럼 고정된 노트 원과, 수면에 닿는 순간 노트 원과 겹치도록 줄어드는 접근 원을 그린다.
+    /// center, s와 TimeToWaterImpact, IsInJudgeWindow, _spaceHintLeadTime, _approachStartScale을 사용하며, 화면에 노트를 그린다.
+    /// </summary>
+    private void DrawSpaceNote(Vector2 center, float s)
+    {
+        // 닿을수록 진해지고, GOOD 이상 구간에 들어오면 금색으로 바뀐다.
+        float approach = 1f - Mathf.Clamp01(_playerController.TimeToWaterImpact / Mathf.Max(_spaceHintLeadTime, 0.01f));
+        Color noteColor = _playerController.IsInJudgeWindow
+            ? new Color(1f, 0.85f, 0.25f, 1f)
+            : new Color(1f, 1f, 1f, 0.35f + 0.5f * approach);
+        float radius = _noteRadius * s;
+        float approachRadius = radius * Mathf.Lerp(Mathf.Max(_approachStartScale, 1f), 1f, approach);
+
+        DrawCircle(_noteDiscTexture, center, radius, new Color(0f, 0f, 0f, 0.45f * noteColor.a));
+        DrawCircle(_noteRingTexture, center, radius, noteColor);
+        DrawCircle(_noteRingTexture, center, approachRadius, noteColor);
+        ShadowLabel(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f),
+            _input.ReplaceBindingName("{Jump}"), _noteStyle, noteColor);
+    }
+
+    /// <summary>
+    /// 판정 성공 직후 노트 원이 판정 색으로 커지며 사라지는 연출을 그린다.
+    /// center, s와 _noteHitTime, _noteHitColor, _noteHitDuration을 사용하며, 연출 시간이 지나면 아무것도 그리지 않는다.
+    /// </summary>
+    private void DrawSpaceNoteHit(Vector2 center, float s)
+    {
+        float t = (Time.unscaledTime - _noteHitTime) / Mathf.Max(_noteHitDuration, 0.01f);
+        if (t >= 1f) return;
+
+        Color color = _noteHitColor;
+        color.a = 1f - t;
+        float radius = _noteRadius * s * (1f + 0.5f * t);
+        DrawCircle(_noteDiscTexture, center, radius, new Color(color.r, color.g, color.b, 0.35f * color.a));
+        DrawCircle(_noteRingTexture, center, radius, color);
+    }
+
+    /// <summary>
+    /// 리듬 노트에 쓰는 원판과 고리 텍스처를 처음 한 번만 만든다.
+    /// NOTE_RING_THICKNESS를 사용하며, _noteDiscTexture와 _noteRingTexture를 변경한다.
+    /// </summary>
+    private void EnsureNoteTextures()
+    {
+        if (_noteRingTexture != null) return;
+        _noteDiscTexture = CreateCircleTexture(0f);
+        _noteRingTexture = CreateCircleTexture(NOTE_RING_THICKNESS);
+    }
+
+    /// <summary>
+    /// 가장자리를 부드럽게 처리한 흰색 원 텍스처를 만든다.
+    /// thickness(반지름 대비 고리 두께, 0이면 꽉 찬 원판)와 NOTE_TEXTURE_SIZE를 사용하며, 새 Texture2D를 반환한다.
+    /// </summary>
+    private static Texture2D CreateCircleTexture(float thickness)
+    {
+        Texture2D texture = new Texture2D(NOTE_TEXTURE_SIZE, NOTE_TEXTURE_SIZE, TextureFormat.RGBA32, true)
+        {
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Trilinear,
+            hideFlags = HideFlags.HideAndDontSave,
+        };
+        Color32[] pixels = new Color32[NOTE_TEXTURE_SIZE * NOTE_TEXTURE_SIZE];
+        float half = NOTE_TEXTURE_SIZE * 0.5f;
+        float inner = 1f - thickness;
+        float edge = 1.5f / half;
+        for (int y = 0; y < NOTE_TEXTURE_SIZE; y++)
+        {
+            for (int x = 0; x < NOTE_TEXTURE_SIZE; x++)
+            {
+                float distance = new Vector2(x + 0.5f - half, y + 0.5f - half).magnitude / half;
+                // 경계에서 1.5픽셀에 걸쳐 투명도를 줄여 계단 현상을 없앤다.
+                float alpha = Mathf.Clamp01((1f - distance) / edge);
+                if (thickness > 0f) alpha *= Mathf.Clamp01((distance - inner) / edge);
+                pixels[y * NOTE_TEXTURE_SIZE + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+            }
+        }
+        texture.SetPixels32(pixels);
+        texture.Apply(true, true);
+        return texture;
+    }
+
+    /// <summary>
+    /// texture를 center 중심, radius 반지름 크기로 color를 입혀 그린다.
+    /// 그린 뒤 GUI.color를 원래 값으로 되돌린다.
+    /// </summary>
+    private static void DrawCircle(Texture2D texture, Vector2 center, float radius, Color color)
+    {
+        Color original = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), texture);
+        GUI.color = original;
     }
 
     /// <summary>
