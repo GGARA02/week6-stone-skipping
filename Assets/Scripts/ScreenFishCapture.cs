@@ -13,6 +13,13 @@ public class ScreenFishCapture : MonoBehaviour
     private const int IMAGE_WIDTH = 1280;
     private const int IMAGE_HEIGHT = 720;
 
+    [Header("Panel Size")]
+    [Tooltip("패널의 생성 크기 (가로 X, 두께 Y, 세로 Z | 16: 9 비율)")]
+    [SerializeField] private Vector3 _panelSize = new Vector3(3.2f, 0.08f, 1.8f);
+#if UNITY_EDITOR
+    private Vector3 _lastPanelSize = new Vector3(3.2f, 0.08f, 1.8f);
+#endif
+
     [Header("Screen Suction")]
     [SerializeField, Range(1f, 2f)] private float _duration = 1.7f;
     [SerializeField, Range(0.5f, 4f)] private float _suctionStrength = 2.4f;
@@ -39,6 +46,11 @@ public class ScreenFishCapture : MonoBehaviour
     public Texture2D Image { get; private set; }
     public bool IsCapturing { get; private set; }
     public bool HasFrame => _frame != null;
+    public Vector3 PanelSize
+    {
+        get => _panelSize;
+        set => _panelSize = value;
+    }
     public event Action OnUnlocked;
 
     /// <summary>
@@ -57,14 +69,14 @@ public class ScreenFishCapture : MonoBehaviour
         _mesh = Instantiate(panel.GetComponent<MeshFilter>().sharedMesh);
         Vector3[] vertices = _mesh.vertices;
         for (int i = 0; i < vertices.Length; i++)
-            vertices[i] = Vector3.Scale(vertices[i], new Vector3(3.2f, 0.08f, 1.8f));
+            vertices[i] = Vector3.Scale(vertices[i], _panelSize);   //패널 크기 설정
         _mesh.vertices = vertices;
         Vector2[] uvs = _mesh.uv;
         Vector3[] normals = _mesh.normals;
         for (int i = 0; i < vertices.Length; i++)
         {
             if (Mathf.Abs(normals[i].y) > 0.5f)
-                uvs[i] = new Vector2(vertices[i].x / 3.2f + 0.5f, vertices[i].z / 1.8f + 0.5f);
+                uvs[i] = new Vector2(vertices[i].x / _panelSize.x + 0.5f, vertices[i].z / _panelSize.z + 0.5f);
         }
         _mesh.uv = uvs;
         _mesh.RecalculateBounds();
@@ -292,6 +304,27 @@ public class ScreenFishCapture : MonoBehaviour
         Time.timeScale = _previousTimeScale;
         IsCapturing = false;
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// 패널 크기 조절 시 자동으로 16:9 비율로 계산해주는 메서드
+    /// </summary>
+    void OnValidate()
+    {
+        // 가로(X)가 변경된 경우 세로(Z)를 16:9 비율로 자동 보정한다.
+        if (!Mathf.Approximately(_panelSize.x, _lastPanelSize.x))
+        {
+            _panelSize.z = _panelSize.x * (9f / 16f);
+        }
+        // 세로(Z)가 변경된 경우 가로(X)를 16:9 비율로 자동 보정한다.
+        else if (!Mathf.Approximately(_panelSize.z, _lastPanelSize.z))
+        {
+            _panelSize.x = _panelSize.z * (16f / 9f);
+        }
+
+        _lastPanelSize = _panelSize;
+    }
+#endif
 
     void OnDisable()
     {
