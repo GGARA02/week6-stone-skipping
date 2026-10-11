@@ -267,6 +267,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlackHoleEnding
   flowManager: {fileID: 0}
+  _progress: {fileID: 0}
+  _fishPrefab: {fileID: 652048137601599212, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
 --- !u!135 &9060220156711890970
 SphereCollider:
   m_ObjectHideFlags: 0

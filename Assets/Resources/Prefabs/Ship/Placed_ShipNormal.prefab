@@ -98,6 +98,7 @@ MonoBehaviour:
   _spawner: {fileID: 0}
   _fishPrefab: {fileID: 734896330305008744, guid: 244a2040746968f4b9dfc12ed50ed652, type: 3}
   _respawnOnRestart: 0
+  _hideAfterAcquisition: 1
 --- !u!1 &4017049759552047381
 GameObject:
   m_ObjectHideFlags: 0

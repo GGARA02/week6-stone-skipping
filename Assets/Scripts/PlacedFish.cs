@@ -15,6 +15,9 @@ public class PlacedFish : MonoBehaviour
     [Tooltip("켜면 잡힌 뒤 재시작할 때 다시 나타나고, 끄면 한 번 잡히면 다시 나타나지 않는다")]
     [SerializeField]
     private bool _respawnOnRestart = true;
+    [Tooltip("켜면 저장된 도감에 획득 기록이 있는 동안 배치 개체를 숨긴다")]
+    [SerializeField]
+    private bool _hideAfterAcquisition;
 
     void Awake()
     {
@@ -22,6 +25,12 @@ public class PlacedFish : MonoBehaviour
         if (_spawner == null) return;
         // 숨어 있는 동안에도 다시 나타날 수 있도록 활성 상태와 상관없이 구독을 유지한다.
         _spawner.OnCleared += HandleCleared;
+        HideIfAcquired();
+    }
+
+    void OnEnable()
+    {
+        HideIfAcquired();
     }
 
     void OnDestroy()
@@ -53,8 +62,22 @@ public class PlacedFish : MonoBehaviour
     /// </summary>
     private void HandleCleared()
     {
+        if (HideIfAcquired()) return;
         if (!_respawnOnRestart) return;
 
         gameObject.SetActive(true);
+    }
+
+    /// <summary>
+    /// 영구 숨김 설정과 지정 프리팹의 저장된 획득 기록을 확인해 배치 개체를 숨긴다.
+    /// _hideAfterAcquisition, _fishPrefab과 진행 기록을 사용하며 숨긴 경우 true를 반환한다.
+    /// </summary>
+    private bool HideIfAcquired()
+    {
+        if (!_hideAfterAcquisition || _spawner == null || !_spawner.Progress.IsFishRegistered(_fishPrefab.Type))
+            return false;
+
+        gameObject.SetActive(false);
+        return true;
     }
 }

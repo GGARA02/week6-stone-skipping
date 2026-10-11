@@ -66,6 +66,8 @@ public class GameFlowManager : MonoBehaviour
     private Vector2 _catalogScroll;
     private Vector2 _resultScroll;
     private readonly List<int> _ownedOptions = new List<int>();
+    private readonly List<int> _catalogOptions = new List<int>();
+    private readonly Dictionary<string, int> _catalogOrder = new Dictionary<string, int>();
     private readonly List<FishType> _newFish = new List<FishType>();
     private bool _endingCinemaRunning;
     private GameObject _endingAlienInstance;
@@ -146,6 +148,10 @@ public class GameFlowManager : MonoBehaviour
         _ownedFishSelectionPreview.PrepareDefaultFishTexture(_fishGenerator.GetComponent<MeshFilter>().sharedMesh,
             _fishGenerator.GetComponent<MeshRenderer>().sharedMaterials);
         _catalogEntries = JObject.Parse(Resources.Load<TextAsset>("FishCatalog").text);
+        foreach (JProperty entry in _catalogEntries.Properties())
+        {
+            _catalogOrder.Add(entry.Name, _catalogOrder.Count);
+        }
     }
 
     void OnDestroy()
@@ -538,17 +544,38 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 도감 등록 상태를 사용해 기본 물고기와 보유 종류만 선택 목록에 넣는다.
-    /// 입력값 없이 _ownedOptions를 갱신하며 미보유 종류는 제외한다.
+    /// JSON 항목 순서로 도감 목록을 구성하고 기본 짱돌과 획득한 종류만 투척 선택 목록에 넣는다.
+    /// 등록된 종류와 저장 기록을 사용해 _catalogOptions와 _ownedOptions를 갱신한다.
     /// </summary>
     private void RefreshOwnedOptions()
     {
         _ownedOptions.Clear();
-        _ownedOptions.Add(DEFAULT_FISH_INDEX);
+        _catalogOptions.Clear();
+        _catalogOptions.Add(DEFAULT_FISH_INDEX);
         for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
         {
-            if (_progress.IsFishRegistered(_fishSpawner.FishTypes[i])) _ownedOptions.Add(i);
+            _catalogOptions.Add(i);
         }
+        _catalogOptions.Sort((left, right) =>
+        {
+            int comparison = GetCatalogOrder(left).CompareTo(GetCatalogOrder(right));
+            return comparison != 0 ? comparison : left.CompareTo(right);
+        });
+        foreach (int index in _catalogOptions)
+        {
+            if (index == DEFAULT_FISH_INDEX || _progress.IsFishRegistered(_fishSpawner.FishTypes[index]))
+                _ownedOptions.Add(index);
+        }
+    }
+
+    /// <summary>
+    /// 등록 목록의 index를 물고기 ID에 대응하는 JSON 순번으로 변환한다.
+    /// 기본 짱돌은 default 순번을 사용하며 JSON에 없는 종류는 목록 끝 순번을 반환한다.
+    /// </summary>
+    private int GetCatalogOrder(int index)
+    {
+        string id = index == DEFAULT_FISH_INDEX ? "default" : _fishSpawner.FishTypes[index].Id;
+        return _catalogOrder.TryGetValue(id, out int order) ? order : int.MaxValue;
     }
 
     /// <summary>
@@ -871,6 +898,7 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void DrawCatalog(float width, float height, float scale)
     {
+        RefreshOwnedOptions();
         Color original = GUI.color;
         GUI.color = new Color(0.06f, 0.09f, 0.12f, 0.96f);
         GUI.DrawTexture(new Rect(0f, 0f, width, height), Texture2D.whiteTexture);
@@ -883,13 +911,14 @@ public class GameFlowManager : MonoBehaviour
         int columns = Mathf.Max(1, Mathf.FloorToInt(viewport.width / (240f * scale)));
         float cellWidth = (viewport.width - 24f * scale) / columns;
         float cellHeight = 220f * scale;
-        int count = _fishSpawner.FishTypes.Count + 1;
+        int count = _catalogOptions.Count;
         int rows = Mathf.CeilToInt((float)count / columns);
         _catalogScroll = GUI.BeginScrollView(viewport, _catalogScroll,
             new Rect(0f, 0f, viewport.width - 24f * scale, rows * cellHeight));
         for (int option = 0; option < count; option++)
         {
-            FishType fish = option == 0 ? null : _fishSpawner.FishTypes[option - 1];
+            int index = _catalogOptions[option];
+            FishType fish = index == DEFAULT_FISH_INDEX ? null : _fishSpawner.FishTypes[index];
             FishCatalogState catalogState = _fishSpawner.GetCatalogState(fish);
             bool owned = catalogState == FishCatalogState.Acquired;
             bool revealed = catalogState != FishCatalogState.Undiscovered;
@@ -908,7 +937,7 @@ public class GameFlowManager : MonoBehaviour
             Texture texture = fish == null ? _ownedFishSelectionPreview.DefaultFishTexture
                 : fish.Id == "screen" ? _fishSpawner.ScreenCapture.Image
                 : fish.Id == "catalog" ? _fishSpawner.CatalogCapture.Image
-                : (owned ? _ownedFishSelectionPreview : _fishSelectionPreview).GetTexture(_fishSpawner.FishPrefabs[option - 1]);
+                : (owned ? _ownedFishSelectionPreview : _fishSelectionPreview).GetTexture(_fishSpawner.FishPrefabs[index]);
             if (revealed && texture != null) GUI.DrawTexture(image, texture, ScaleMode.ScaleToFit, true);
             else ShadowLabel(image, "?", _centerStyle, new Color(1f, 1f, 1f, 0.5f));
             string name = revealed ? GetCatalogDisplayName(fish) : "?";
