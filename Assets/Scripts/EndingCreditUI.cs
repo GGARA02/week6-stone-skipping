@@ -19,6 +19,7 @@ public class EndingCreditUI : MonoBehaviour
     private bool _skipRequested;
 
     [Header("Skip UI")]
+    [SerializeField] private TMP_FontAsset _font;
     [SerializeField] private TMP_Text _skipMessage;
     private float _skipPromptDelay = 9f;
     private RectTransform _promptRect;
@@ -33,6 +34,11 @@ public class EndingCreditUI : MonoBehaviour
 
     void Awake()
     {
+        Canvas canvas = GetComponent<Canvas>();
+        if (canvas != null)
+        {
+            canvas.sortingOrder = 550;
+        }
         CreateSkipPrompt();
     }
 
@@ -153,7 +159,7 @@ public class EndingCreditUI : MonoBehaviour
 
     /// <summary>
     /// 외곽 테두리와 반투명 배경을 포함한 버튼 형태의 스킵 안내 UI를 동적으로 생성한다.
-    /// TextMeshProUGUI, Image, RectTransform을 사용하며, _skipMessage와 _promptRect를 생성 및 초기화한다.
+    /// TextMeshProUGUI, Image, RectTransform, _font를 사용하며, _skipMessage와 _promptRect를 생성 및 초기화한다.
     /// </summary>
     private void CreateSkipPrompt()
     {
@@ -207,17 +213,11 @@ public class EndingCreditUI : MonoBehaviour
         textRect.sizeDelta = Vector2.zero;
 
         _skipMessage = textObj.GetComponent<TextMeshProUGUI>();
+        _skipMessage.font = _font;
         _skipMessage.text = SKIP_PROMPT_TEXT;
         _skipMessage.fontSize = 20f;
         _skipMessage.alignment = TextAlignmentOptions.Center;
         _skipMessage.raycastTarget = false;
-
-        // 크레딧 내 다른 텍스트의 폰트가 존재하면 동일하게 맞춰준다.
-        TMP_Text referenceText = GetComponentInChildren<TMP_Text>(true);
-        if (referenceText != null && referenceText != _skipMessage && referenceText.font != null)
-        {
-            _skipMessage.font = referenceText.font;
-        }
 
         // 초기에는 스킵 대기 시간 동안 보이지 않도록 비활성화한다.
         rootObj.SetActive(false);

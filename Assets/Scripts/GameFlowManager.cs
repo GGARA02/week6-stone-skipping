@@ -29,9 +29,11 @@ public class GameFlowManager : MonoBehaviour
     private const float RETRY_INPUT_DELAY = 0.6f;
     private const float CATALOG_NAVIGATION_DELAY = 0.3f;
     private const float CATALOG_NAVIGATION_INTERVAL = 0.12f;
+    private const string BLACKHOLE_FISH_ID = "blackhole";
     private const string CREDIT_FISH_ID = "endingcredit";
     private const string MONSTER_FISH_ID = "monster";
     private const string FISH_KEY_PREFIX = "SkipStoneV2.Fish.";
+    private const float CINEMATIC_ASPECT = 21f / 9f;
 
     [Header("참조")]
     [SerializeField]
@@ -135,6 +137,19 @@ public class GameFlowManager : MonoBehaviour
     [Header("엔딩 크레딧 UI")]
     [SerializeField] private EndingCreditUI _endingCredit;
 
+    [Header("시네마틱 연출")]
+    [Tooltip("엔딩 시네마 동안 21:9 레터박스 연출을 엔딩 크레딧까지 유지할지 여부")]
+    [SerializeField] private bool _maintainCinemaDuringCredits = true;
+    [Tooltip("21:9 레터박스 전환 시간 (초)")]
+    [SerializeField] private float _cinemaTransitionDuration = 0.6f;
+    private GameObject _letterboxOverlay;
+    private RectTransform _topLetterboxBar;
+    private RectTransform _bottomLetterboxBar;
+    private RectTransform _leftLetterboxBar;
+    private RectTransform _rightLetterboxBar;
+    private Coroutine _letterboxCoroutine;
+    private Rect _originalCameraRect = new Rect(0f, 0f, 1f, 1f);
+
     void Start()
     {
         LockCursor(true);
@@ -157,6 +172,10 @@ public class GameFlowManager : MonoBehaviour
             _endingCredit.OnEndingCompleted += HandleEndingCompleted;
             _endingCredit.OnEndingSkipped += HandleEndingSkipped;
             _endingCredit.gameObject.SetActive(false);
+        }
+        if (Camera.main != null)
+        {
+            _originalCameraRect = Camera.main.rect;
         }
         _cameraController.Initialize(_fishGenerator);
 
@@ -191,6 +210,14 @@ public class GameFlowManager : MonoBehaviour
             _endingCredit.OnEndingCompleted -= HandleEndingCompleted;
             _endingCredit.OnEndingSkipped -= HandleEndingSkipped;
         }
+        if (Camera.main != null)
+        {
+            Camera.main.rect = _originalCameraRect;
+        }
+        if (_letterboxOverlay != null)
+        {
+            Destroy(_letterboxOverlay);
+        }
         _fishSelectionPreview.Dispose();
         _ownedFishSelectionPreview.Dispose();
     }
@@ -205,6 +232,15 @@ public class GameFlowManager : MonoBehaviour
         if (_pauseOpen)
         {
             UpdatePauseMenu();
+            return;
+        }
+        if (_endingCredit != null && _endingCredit.gameObject.activeInHierarchy)
+        {
+            if (_endingCredit.CanSkip && _input.JumpPressed)
+            {
+                ThrowCreditFish();
+                return;
+            }
             return;
         }
         if (_state == State.GameOver)
@@ -234,15 +270,6 @@ public class GameFlowManager : MonoBehaviour
                 LockCursor(true);
             }
             if (_catalogOpen) UpdateCatalogNavigation();
-            return;
-        }
-        if (_endingCredit != null && _endingCredit.gameObject.activeInHierarchy)
-        {
-            if (_endingCredit.CanSkip && _input.JumpPressed)
-            {
-                ThrowCreditFish();
-                return;
-            }
             return;
         }
         if (_input.CancelPressed)
@@ -321,6 +348,10 @@ public class GameFlowManager : MonoBehaviour
         // 도감이나 메뉴를 캡처하는 동안에는 그 화면을 계속 그려 캡처에 담는다.
         if (_screenThrowPending && !_catalogOpen && !_pauseOpen) return;
         if (_fishSpawner.ScreenCapture.IsCapturing && _fishSpawner.ScreenCapture.HasFrame) return;
+
+        // 물고기 획득 알림은 시네마 중이거나 정산 중이어도 항상 화면에 표시한다.
+        DrawFishPopup();
+
         if (_pauseOpen)
         {
             EnsureStyles();
@@ -378,14 +409,6 @@ public class GameFlowManager : MonoBehaviour
             color.a = 1f - t * t;
             float rise = 30f * s * t;
             ShadowLabel(new Rect(0f, height * _popupHeight - rise, width, 80f * s), _popupText, _popupStyle, color);
-        }
-        float fishPopupAge = Time.unscaledTime - _fishPopupTime;
-        if (_state != State.GameOver && _fishPopupText != null && fishPopupAge < POPUP_DURATION)
-        {
-            float t = fishPopupAge / POPUP_DURATION;
-            float top = Mathf.Max(height * 0.38f, height * _popupHeight + 100f * s);
-            ShadowLabel(new Rect(0f, top - 30f * s * t, width, 60f * s),
-                _fishPopupText, _centerSubStyle, new Color(1f, 0.85f, 0.3f, 1f - t * t));
         }
 
         if (_showDebug)
@@ -589,6 +612,7 @@ public class GameFlowManager : MonoBehaviour
             _endingAlienInstance = null;
         }
         _endingCinemaRunning = false;
+        SetCinematicLetterbox(false, immediate: true);
         if (_fishSpawner != null)
         {
             _fishSpawner.enabled = true;
@@ -1245,6 +1269,25 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 물고기 획득 알림 팝업 텍스트를 화면에 렌더링한다.
+    /// _fishPopupText와 _fishPopupTime을 사용하며, 시간 경과에 따라 떠오르고 페이드아웃되는 라벨을 그린다.
+    /// </summary>
+    private void DrawFishPopup()
+    {
+        float fishPopupAge = Time.unscaledTime - _fishPopupTime;
+        if (_fishPopupText == null || fishPopupAge >= POPUP_DURATION) return;
+
+        EnsureStyles();
+        float s = _styleScale;
+        float width = Screen.width;
+        float height = Screen.height;
+        float t = fishPopupAge / POPUP_DURATION;
+        float top = Mathf.Max(height * 0.38f, height * _popupHeight + 100f * s);
+        ShadowLabel(new Rect(0f, top - 30f * s * t, width, 60f * s),
+            _fishPopupText, _centerSubStyle, new Color(1f, 0.85f, 0.3f, 1f - t * t));
+    }
+
+    /// <summary>
     /// 준비 화면에서 일시정지 메뉴를 열고 첫 버튼을 고른 뒤 마우스로도 누를 수 있게 커서를 푼다.
     /// 입력값 없이 _pauseOpen, _resetConfirmOpen, _pauseSelection과 커서 잠금 상태를 변경한다.
     /// </summary>
@@ -1647,6 +1690,13 @@ public class GameFlowManager : MonoBehaviour
             screenshot = ScreenCapture.CaptureScreenshotAsTexture();
             PrepareCreditFishForThrow();
             yield return ShrinkPanelAndThrow(screenshot);
+
+            // 화면 축소 연출이 완료된 직후 크레딧 물고기 획득 팝업을 표시한다.
+            FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
+            if (creditFish != null)
+            {
+                ShowFishPopup($"{GetCatalogDisplayName(creditFish)}을(를) 얻은!");
+            }
         }
         finally
         {
@@ -1682,6 +1732,7 @@ public class GameFlowManager : MonoBehaviour
             }
         }
         _showHud = true;
+        SetCinematicLetterbox(false);
         Restart(clearNewFish: false);
     }
 
@@ -1698,7 +1749,35 @@ public class GameFlowManager : MonoBehaviour
             _endingCredit.gameObject.SetActive(false);
         }
         _showHud = true;
+        SetCinematicLetterbox(false);
+
+        // 크레딧 감상이 끝난 직후 크레딧 물고기 획득 팝업을 표시한다.
+        FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
+        if (creditFish != null)
+        {
+            ShowFishPopup($"{GetCatalogDisplayName(creditFish)}을(를) 얻은!");
+        }
+
         HandleGameOver(GameOverReason.Stopped);
+    }
+
+    /// <summary>
+    /// 지정된 식별자(ID)와 일치하는 물고기 타입을 FishSpawner 목록에서 찾아 반환한다.
+    /// id를 사용하며, 일치하는 FishType 또는 null을 반환한다.
+    /// </summary>
+    private FishType GetFishTypeById(string id)
+    {
+        if (_fishSpawner == null || _fishSpawner.FishTypes == null) return null;
+
+        for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
+        {
+            FishType fish = _fishSpawner.FishTypes[i];
+            if (fish != null && fish.Id == id)
+            {
+                return fish;
+            }
+        }
+        return null;
     }
 
     /// <summary>
@@ -1754,15 +1833,16 @@ public class GameFlowManager : MonoBehaviour
         if (_endingCinemaRunning) return;
         _endingCinemaRunning = true;
 
-        foreach (FishType fish in _fishSpawner.FishTypes)
+        FishType blackholeFish = GetFishTypeById(BLACKHOLE_FISH_ID);
+        if (blackholeFish != null)
         {
-            if (fish.Id != "blackhole") continue;
-            _fishSpawner.HandlePlacedFishCaught(fish, _playerController.transform.position);
-            if (!_newFish.Contains(fish))
+            _fishSpawner.HandlePlacedFishCaught(blackholeFish, _playerController.transform.position);
+            if (!_newFish.Contains(blackholeFish))
             {
-                _newFish.Add(fish);
+                _newFish.Add(blackholeFish);
             }
-            break;
+            // 블랙홀 접촉 즉시 획득 팝업을 표시한다.
+            ShowFishPopup($"{GetCatalogDisplayName(blackholeFish)}을(를) 얻은!");
         }
 
         _state = State.GameOver;
@@ -1789,6 +1869,10 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private IEnumerator PlayEndingCinemaRoutine()
     {
+        // 0. 블랙홀 흡입 및 획득 안내 여운 대기 후 시네마틱 레터박스 시작
+        yield return new WaitForSeconds(1f);
+        SetCinematicLetterbox(true);
+
         // 1. 우주 환경 전환 및 시네머신 카메라 제어권 확보
         if (_environmentController != null)
         {
@@ -1923,8 +2007,12 @@ public class GameFlowManager : MonoBehaviour
             Destroy(_endingAlienInstance);
         }
 
-
         UnlockMonsterFish();
+        FishType monsterFish = GetFishTypeById(MONSTER_FISH_ID);
+        if (monsterFish != null)
+        {
+            ShowFishPopup($"{GetCatalogDisplayName(monsterFish)}을(를) 얻은!");
+        }
 
         // 7. 정적 (1.5초) - 외계인을 먹은 돌만 남은 채 정적 유지
         yield return new WaitForSeconds(1.5f);
@@ -1932,6 +2020,10 @@ public class GameFlowManager : MonoBehaviour
         // 8. 엔딩 크레딧 오픈
         _endingCinemaCoroutine = null;
         _endingCinemaRunning = false;
+        if (!_maintainCinemaDuringCredits)
+        {
+            SetCinematicLetterbox(false);
+        }
         StartEndingCredit();
     }
 
@@ -1971,5 +2063,166 @@ public class GameFlowManager : MonoBehaviour
                 _newFish.Add(monsterType);
             }
         }
+    }
+
+    /// <summary>
+    /// 21:9 시네마틱 레터박스 연출을 활성화하거나 비활성화한다.
+    /// active와 immediate를 사용하며, _letterboxCoroutine을 시작하여 카메라 뷰포트와 레터박스를 전환한다.
+    /// </summary>
+    public void SetCinematicLetterbox(bool active, bool immediate = false)
+    {
+        if (_letterboxCoroutine != null)
+        {
+            StopCoroutine(_letterboxCoroutine);
+            _letterboxCoroutine = null;
+        }
+
+        EnsureLetterboxOverlay();
+        _letterboxOverlay.SetActive(true);
+
+        float duration = immediate ? 0f : _cinemaTransitionDuration;
+        _letterboxCoroutine = StartCoroutine(TransitionLetterboxRoutine(active, duration));
+    }
+
+    /// <summary>
+    /// 지정된 시간 동안 카메라 뷰포트와 레터박스 바 크기를 보간하여 부드러운 시네마틱 전환을 수행한다.
+    /// active와 duration을 사용하며, Camera.main.rect와 레터박스 트랜스폼 크기를 변경한다.
+    /// </summary>
+    private IEnumerator TransitionLetterboxRoutine(bool active, float duration)
+    {
+        float elapsed = 0f;
+        float start = active ? 0f : 1f;
+        float target = active ? 1f : 0f;
+
+        if (duration <= 0f)
+        {
+            UpdateLetterboxLayout(target);
+        }
+        else
+        {
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float smoothT = Mathf.SmoothStep(start, target, t);
+                UpdateLetterboxLayout(smoothT);
+                yield return null;
+            }
+            UpdateLetterboxLayout(target);
+        }
+
+        // 비활성화 완료 시 오버레이를 끈다.
+        if (!active && _letterboxOverlay != null)
+        {
+            _letterboxOverlay.SetActive(false);
+        }
+
+        _letterboxCoroutine = null;
+    }
+
+    /// <summary>
+    /// 상하좌우를 검은색으로 덮을 수 있는 시네마틱 레터박스 오버레이 캔버스와 바 오브젝트들을 준비한다.
+    /// 입력값 없이 _letterboxOverlay 및 각 방향의 RectTransform을 생성 및 초기화한다.
+    /// </summary>
+    private void EnsureLetterboxOverlay()
+    {
+        if (_letterboxOverlay != null) return;
+
+        _letterboxOverlay = new GameObject("CinematicLetterboxOverlay", typeof(Canvas), typeof(CanvasScaler));
+        Canvas canvas = _letterboxOverlay.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 500;
+
+        // 상단 바를 생성하고 검은색으로 채운다.
+        GameObject topObj = new GameObject("TopBar", typeof(RectTransform), typeof(Image));
+        topObj.transform.SetParent(_letterboxOverlay.transform, false);
+        _topLetterboxBar = topObj.GetComponent<RectTransform>();
+        _topLetterboxBar.anchorMin = new Vector2(0f, 1f);
+        _topLetterboxBar.anchorMax = new Vector2(1f, 1f);
+        _topLetterboxBar.pivot = new Vector2(0.5f, 1f);
+        _topLetterboxBar.sizeDelta = Vector2.zero;
+        Image topImg = topObj.GetComponent<Image>();
+        topImg.color = Color.black;
+        topImg.raycastTarget = false;
+
+        // 하단 바를 생성하고 검은색으로 채운다.
+        GameObject bottomObj = new GameObject("BottomBar", typeof(RectTransform), typeof(Image));
+        bottomObj.transform.SetParent(_letterboxOverlay.transform, false);
+        _bottomLetterboxBar = bottomObj.GetComponent<RectTransform>();
+        _bottomLetterboxBar.anchorMin = new Vector2(0f, 0f);
+        _bottomLetterboxBar.anchorMax = new Vector2(1f, 0f);
+        _bottomLetterboxBar.pivot = new Vector2(0.5f, 0f);
+        _bottomLetterboxBar.sizeDelta = Vector2.zero;
+        Image bottomImg = bottomObj.GetComponent<Image>();
+        bottomImg.color = Color.black;
+        bottomImg.raycastTarget = false;
+
+        // 좌측 바를 생성한다.
+        GameObject leftObj = new GameObject("LeftBar", typeof(RectTransform), typeof(Image));
+        leftObj.transform.SetParent(_letterboxOverlay.transform, false);
+        _leftLetterboxBar = leftObj.GetComponent<RectTransform>();
+        _leftLetterboxBar.anchorMin = new Vector2(0f, 0f);
+        _leftLetterboxBar.anchorMax = new Vector2(0f, 1f);
+        _leftLetterboxBar.pivot = new Vector2(0f, 0.5f);
+        _leftLetterboxBar.sizeDelta = Vector2.zero;
+        Image leftImg = leftObj.GetComponent<Image>();
+        leftImg.color = Color.black;
+        leftImg.raycastTarget = false;
+
+        // 우측 바를 생성한다.
+        GameObject rightObj = new GameObject("RightBar", typeof(RectTransform), typeof(Image));
+        rightObj.transform.SetParent(_letterboxOverlay.transform, false);
+        _rightLetterboxBar = rightObj.GetComponent<RectTransform>();
+        _rightLetterboxBar.anchorMin = new Vector2(1f, 0f);
+        _rightLetterboxBar.anchorMax = new Vector2(1f, 1f);
+        _rightLetterboxBar.pivot = new Vector2(1f, 0.5f);
+        _rightLetterboxBar.sizeDelta = Vector2.zero;
+        Image rightImg = rightObj.GetComponent<Image>();
+        rightImg.color = Color.black;
+        rightImg.raycastTarget = false;
+    }
+
+    /// <summary>
+    /// 진행도에 따라 카메라 뷰포트 rect와 상하좌우 레터박스 바의 크기를 갱신한다.
+    /// progress(0~1)를 사용하며, Camera.main.rect와 레터박스 RectTransform의 크기를 변경한다.
+    /// </summary>
+    private void UpdateLetterboxLayout(float progress)
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        EnsureLetterboxOverlay();
+
+        float screenAspect = (float)Screen.width / Screen.height;
+        float targetY = 0f;
+        float targetX = 0f;
+
+        if (screenAspect < CINEMATIC_ASPECT)
+        {
+            // 16:9 등 세로가 더 긴 화면에서는 상하단 레터박스를 적용한다.
+            float normalizedHeight = screenAspect / CINEMATIC_ASPECT;
+            targetY = (1f - normalizedHeight) * 0.5f;
+        }
+        else
+        {
+            // 21:9보다 넓은 화면에서는 좌우 필러박스를 적용한다.
+            float normalizedWidth = CINEMATIC_ASPECT / screenAspect;
+            targetX = (1f - normalizedWidth) * 0.5f;
+        }
+
+        float currentY = Mathf.Lerp(0f, targetY, progress);
+        float currentX = Mathf.Lerp(0f, targetX, progress);
+
+        // 카메라의 뷰포트 영역을 21:9 비율에 맞춰 조정한다.
+        cam.rect = new Rect(currentX, currentY, 1f - currentX * 2f, 1f - currentY * 2f);
+
+        // 빈 영역을 채우는 레터박스 바의 픽셀 크기를 설정한다.
+        float barHeight = Screen.height * currentY;
+        float barWidth = Screen.width * currentX;
+
+        _topLetterboxBar.sizeDelta = new Vector2(0f, barHeight);
+        _bottomLetterboxBar.sizeDelta = new Vector2(0f, barHeight);
+        _leftLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
+        _rightLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
     }
 }
