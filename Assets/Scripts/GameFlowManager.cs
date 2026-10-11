@@ -198,7 +198,7 @@ public class GameFlowManager : MonoBehaviour
         }
         if (_endingCredit != null && _endingCredit.gameObject.activeInHierarchy)
         {
-            if (_inputActions.Player.Jump.WasPressedThisFrame())
+            if (_endingCredit.CanSkip && _inputActions.Player.Jump.WasPressedThisFrame())
             {
                 ThrowCreditFish();
                 return;
