@@ -20,7 +20,8 @@
     "alkagi",
     "screen",
     "catalog",
-    "endingcredit"
+    "endingcredit",
+    "menu"
   ],
   "discoveryConditions": {
     "pickpocket": {
@@ -153,6 +154,7 @@
     "alkagi": [],
     "screen": [],
     "catalog": [],
-    "endingcredit": []
+    "endingcredit": [],
+    "menu": []
   }
 }

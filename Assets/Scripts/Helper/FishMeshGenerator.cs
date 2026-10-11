@@ -481,6 +481,7 @@ public class FishMeshGenerator : MonoBehaviour
             && _fishType.Id != "ice"
             && _fishType.Id != "screen"
             && _fishType.Id != "catalog"
+            && _fishType.Id != "menu"
             && _fishInstance.GetComponentInChildren<HopakJumpAnimation>(true) == null;
         if (_isFlopping == active) return;
 
