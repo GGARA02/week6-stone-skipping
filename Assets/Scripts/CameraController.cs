@@ -3,8 +3,9 @@ using UnityEngine;
 using Unity.Cinemachine;
 
 // 조작 없이 알아서 따라가는 카메라. 진행 방향 뒤에서 보고, 빠를수록 멀리서 앞을 더 보여주고,
-// 물고기가 높이 뜨면 각도를 높여 앞쪽 수면이 보이게 한다. 튕김 흔들림과 속도에 따른 FOV도 처리한다.
+// 물고기가 높이 뜨면 각도를 높여 앞쪽 수면이 보이게 한다. 튕김 FOV 펀치와 속도에 따른 FOV도 처리한다.
 // 시네머신 카메라의 Transform과 Lens를 직접 움직이고, 메인 카메라의 CinemachineBrain이 이를 화면에 반영한다.
+// 판정, 벽 충돌, 포획 흔들림은 임펄스로 발동해 추적 카메라와 락온 카메라의 ImpulseListener가 함께 받는다.
 [RequireComponent(typeof(CinemachineCamera))]
 public class CameraController : MonoBehaviour
 {
@@ -13,6 +14,8 @@ public class CameraController : MonoBehaviour
     private Transform _focalPoint;
     [SerializeField]
     private GameObject _water;
+    [SerializeField]
+    private FishSpawner _fishSpawner;
     private CinemachineCamera _cinemachineCamera;
     private Rigidbody _targetBody;
     private PlayerController _targetPlayer;
@@ -78,16 +81,36 @@ public class CameraController : MonoBehaviour
     private float _maxExtraFov = 12f;
     private float _smoothedFov;
 
-    [Header("튕김 흔들림")]
+    [Header("튕김 FOV 펀치")]
     [SerializeField]
     private float _shakeDuration = 0.25f;
-    [SerializeField]
-    private float _shakeAmplitude = 0.35f;
     [Tooltip("튕길 때 순간적으로 넓어지는 FOV")]
     [SerializeField]
     private float _punchFov = 6f;
     private float _punchTime = -10f;
     private float _punchStrength;
+
+    [Header("임펄스")]
+    [Tooltip("SPACE 판정과 물고기 포획 때 발동하는 짧은 임펄스")]
+    [SerializeField]
+    private CinemachineImpulseSource _judgeImpulse;
+    [Tooltip("벽에 부딪힐 때 발동하는 임펄스")]
+    [SerializeField]
+    private CinemachineImpulseSource _wallImpulse;
+    [SerializeField]
+    private float _perfectImpulseForce = 1f;
+    [SerializeField]
+    private float _goodImpulseForce = 0.5f;
+    [SerializeField]
+    private float _catchImpulseForce = 0.8f;
+    [Tooltip("이 충돌 속도(m/s) 이하에서는 벽 임펄스를 내지 않는다")]
+    [SerializeField]
+    private float _wallImpulseMinSpeed = 2f;
+    [Tooltip("이 충돌 속도(m/s)에서 벽 임펄스가 가장 세다")]
+    [SerializeField]
+    private float _wallImpulseFullSpeed = 30f;
+    [SerializeField]
+    private float _wallImpulseMaxForce = 1f;
 
     [Header("33Fisher QTE 카메라")]
     [SerializeField, Min(0f)] private float _qteShoulderSide = 1.5f;
@@ -150,8 +173,6 @@ public class CameraController : MonoBehaviour
         UpdateTransform();
 
         float punch = PunchAmount();
-        transform.position += Random.insideUnitSphere * (_shakeAmplitude * punch);
-
         _smoothedFov = Mathf.Lerp(_smoothedFov, _baseFov + _maxExtraFov * speed01, 1f - Mathf.Exp(-4f * dt));
         _cinemachineCamera.Lens.FieldOfView = _smoothedFov + _punchFov * punch;
         ApplyFisherQteReturn(dt);
@@ -245,13 +266,18 @@ public class CameraController : MonoBehaviour
 
     /// <summary>
     /// 대상과 물 높이를 준비하고 카메라를 물고기 뒤로 맞춘다.
-    /// projectileShape를 사용하며, 시네머신 카메라 참조와 _waterY, 카메라 위치를 변경한다.
+    /// projectileShape를 사용하며, 시네머신 카메라 참조와 _waterY, 카메라 위치, 임펄스 이벤트 구독을 변경한다.
     /// </summary>
     public void Initialize(FishMeshGenerator projectileShape)
     {
         _cinemachineCamera = GetComponent<CinemachineCamera>();
         _targetBody = _focalPoint.GetComponent<Rigidbody>();
         _targetPlayer = _focalPoint.GetComponent<PlayerController>();
+        _targetPlayer.OnJudge += HandleJudge;
+        _targetPlayer.OnWallHit += HandleWallHit;
+        _fishSpawner.OnFishCaught += HandleFishCaught;
+        // 시간이 멈추는 연출 직전에 시작한 흔들림이 그 자리에 굳지 않고 실제 시간으로 사라지게 한다.
+        CinemachineImpulseManager.Instance.IgnoreTimeScale = true;
         _waterY = _water.GetComponent<Collider>().bounds.max.y;
         _projectileShape = projectileShape;
         _projectileShape.OnGenerated += RefreshProjectileSize;
@@ -262,6 +288,41 @@ public class CameraController : MonoBehaviour
     void OnDestroy()
     {
         _projectileShape.OnGenerated -= RefreshProjectileSize;
+        _targetPlayer.OnJudge -= HandleJudge;
+        _targetPlayer.OnWallHit -= HandleWallHit;
+        _fishSpawner.OnFishCaught -= HandleFishCaught;
+    }
+
+    /// <summary>
+    /// SPACE 판정 결과에 맞는 세기로 판정 임펄스를 발동한다. MISS는 세기 0이라 발동하지 않는다.
+    /// judge와 판정별 임펄스 세기를 사용하며, 두 시네머신 카메라가 받는 임펄스를 만든다.
+    /// </summary>
+    private void HandleJudge(SkipJudge judge, float timingError)
+    {
+        float force = 0f;
+        if (judge == SkipJudge.Perfect) force = _perfectImpulseForce;
+        else if (judge == SkipJudge.Good) force = _goodImpulseForce;
+        if (force > 0f) _judgeImpulse.GenerateImpulseWithForce(force);
+    }
+
+    /// <summary>
+    /// 벽 충돌 속도에 비례한 세기로 벽 임펄스를 발동한다.
+    /// impactSpeed와 벽 임펄스 속도 범위, 최대 세기를 사용하며, 느린 충돌은 무시하고 나머지는 임펄스를 만든다.
+    /// </summary>
+    private void HandleWallHit(float impactSpeed)
+    {
+        float strength = Mathf.InverseLerp(_wallImpulseMinSpeed, _wallImpulseFullSpeed, impactSpeed);
+        if (strength <= 0f) return;
+        _wallImpulse.GenerateImpulseWithForce(strength * _wallImpulseMaxForce);
+    }
+
+    /// <summary>
+    /// 물고기를 잡으면 판정 임펄스를 포획 세기로 발동한다.
+    /// _catchImpulseForce를 사용하며 type은 쓰지 않고, 두 시네머신 카메라가 받는 임펄스를 만든다.
+    /// </summary>
+    private void HandleFishCaught(FishType type)
+    {
+        _judgeImpulse.GenerateImpulseWithForce(_catchImpulseForce);
     }
 
     /// <summary>
@@ -313,10 +374,12 @@ public class CameraController : MonoBehaviour
 
     /// <summary>
     /// 카메라를 대상의 월드 -Z 방향으로 즉시 옮기고 흔들림과 FOV를 초기화한다.
-    /// 대상의 현재 위치와 투척물 반경을 사용하며, _yaw, _pitch, _distance, _focus, 카메라 위치와 FOV를 변경한다.
+    /// 대상의 현재 위치와 투척물 반경을 사용하며, _yaw, _pitch, _distance, _focus, 카메라 위치와 FOV, 진행 중인 임펄스를 변경한다.
     /// </summary>
     public void SnapBehindTarget()
     {
+        // 재시작 전에 남은 판정, 벽 충돌, 포획, 레이저 흔들림이 선택 화면까지 이어지지 않게 끊는다.
+        CinemachineImpulseManager.Instance.Clear();
         EndFisherQte(false);
         _yaw = 0f;
         _pitch = _basePitch;
@@ -330,7 +393,7 @@ public class CameraController : MonoBehaviour
     }
 
     /// <summary>
-    /// 튕김 순간 카메라 흔들림과 FOV 펀치를 시작한다.
+    /// 튕김 순간 FOV 펀치를 시작한다. 화면 흔들림은 임펄스가 맡는다.
     /// strength(0~1 권장)를 사용하며, _punchTime과 _punchStrength를 변경한다.
     /// </summary>
     public void Punch(float strength)
@@ -340,7 +403,7 @@ public class CameraController : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 흔들림 세기를 구한다. 시작 직후 가장 세고 지속 시간 동안 줄어든다.
+    /// 현재 FOV 펀치 세기를 구한다. 시작 직후 가장 세고 지속 시간 동안 줄어든다.
     /// _punchTime, _punchStrength, _shakeDuration을 사용하며, 0 이상 세기를 반환한다.
     /// </summary>
     private float PunchAmount()
