@@ -64,13 +64,17 @@ PrefabInstance:
       propertyPath: m_Name
       value: Placed_Volcano
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 135000001, guid: d838b94dca64e1f40ae9b8b5e6192238, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 8412425026369584677, guid: d838b94dca64e1f40ae9b8b5e6192238, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2697051012546700689}
+    - targetCorrespondingSourceObject: {fileID: 8412425026369584677, guid: d838b94dca64e1f40ae9b8b5e6192238, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7729481007695554693}
   m_SourcePrefab: {fileID: 100100000, guid: d838b94dca64e1f40ae9b8b5e6192238, type: 3}
 --- !u!1 &3933440751148013574 stripped
 GameObject:
@@ -93,3 +97,24 @@ MonoBehaviour:
   _fishPrefab: {fileID: 114000001, guid: d838b94dca64e1f40ae9b8b5e6192238, type: 3}
   _respawnOnRestart: 0
   _hideAfterAcquisition: 1
+--- !u!65 &7729481007695554693
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3933440751148013574}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5, y: 5, z: 5}
+  m_Center: {x: 0, y: 0, z: 0}

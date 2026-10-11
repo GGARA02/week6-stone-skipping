@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
@@ -61,6 +62,11 @@ public class GameFlowManager : MonoBehaviour
     private bool _screenCaptureTriggered;
     // 게임을 켠 뒤 한 번이라도 던졌는지. 던지기 전 재시작은 날씨를 다시 뽑지 않는다.
     private bool _hasThrown;
+    private bool _pauseOpen;
+    private bool _resetConfirmOpen;
+    // 일시정지 메뉴에서 고른 버튼 순서와, 길게 누를 때 한 칸씩만 움직이도록 직전 프레임의 위아래 입력 방향.
+    private int _pauseSelection;
+    private int _pauseNavigateDirection;
     private bool _catalogOpen;
     private bool _catalogCapturePending;
     private FishType _catalogSelectedFish;
@@ -180,10 +186,16 @@ public class GameFlowManager : MonoBehaviour
 
     void Update()
     {
+        _fishSpawner.RecordDiscoveryDistance(_playerController.Distance);
         // 엔딩 시네마 연출 중에는 플레이어 및 게임 흐름 키 입력을 전면 차단한다.
         if (_endingCinemaRunning) return;
 
         if (_screenThrowPending || _catalogCapturePending || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f) return;
+        if (_pauseOpen)
+        {
+            UpdatePauseMenu();
+            return;
+        }
         if (_state == State.GameOver)
         {
             if ((_input.RestartPressed || _input.JumpPressed)
@@ -200,7 +212,7 @@ public class GameFlowManager : MonoBehaviour
         {
             if (_input.JumpPressed)
             {
-                StartCoroutine(CaptureCatalogAndThrow());
+                StartCoroutine(CapturePanelAndThrow(_fishSpawner.CatalogCapture, "catalog"));
                 return;
             }
             if (_input.CancelPressed)
@@ -221,6 +233,12 @@ public class GameFlowManager : MonoBehaviour
         }
         if (_input.CancelPressed)
         {
+            // 준비 화면 안내의 menu 키(Cancel 액션)로 일시정지 메뉴를 연다.
+            if (_state == State.Ready)
+            {
+                OpenPauseMenu();
+                return;
+            }
             LockCursor(Cursor.lockState != CursorLockMode.Locked);
         }
         if (_input.RestartPressed)
@@ -262,7 +280,7 @@ public class GameFlowManager : MonoBehaviour
         {
             foreach (FishType fish in _newFish)
             {
-                if (fish.Id == "screen" || fish.Id == "catalog") continue;
+                if (fish.Id == "screen" || fish.Id == "catalog" || fish.Id == "menu") continue;
                 Fish prefab = _fishSpawner.GetFishPrefab(fish);
                 if (prefab != null) _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block");
             }
@@ -273,7 +291,7 @@ public class GameFlowManager : MonoBehaviour
         for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
         {
             FishType fish = _fishSpawner.FishTypes[i];
-            if (fish.Id != "screen" && fish.Id != "catalog"
+            if (fish.Id != "screen" && fish.Id != "catalog" && fish.Id != "menu"
                 && (_progress.IsFishRegistered(fish)
                     || (_catalogOpen && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)))
             {
@@ -287,8 +305,15 @@ public class GameFlowManager : MonoBehaviour
 
     void OnGUI()
     {
-        if (_screenThrowPending && !_catalogOpen) return;
+        // 도감이나 메뉴를 캡처하는 동안에는 그 화면을 계속 그려 캡처에 담는다.
+        if (_screenThrowPending && !_catalogOpen && !_pauseOpen) return;
         if (_fishSpawner.ScreenCapture.IsCapturing && _fishSpawner.ScreenCapture.HasFrame) return;
+        if (_pauseOpen)
+        {
+            EnsureStyles();
+            DrawPauseMenu(Screen.width, Screen.height, _styleScale);
+            return;
+        }
         if (!_showHud) return;
 
         EnsureStyles();
@@ -376,25 +401,27 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 열린 도감 프레임의 캡처와 등록을 기다린 뒤 화면을 투척 크기로 축소하고 던진다.
-    /// 입력값 없이 캡처 중 입력을 막고 도감, 커서, 투척 외형, 환경과 게임 상태를 변경한다.
+    /// 열린 도감이나 일시정지 메뉴 프레임을 capture로 캡처하고 등록을 기다린 뒤 화면을 투척 크기로 축소하고 fishId 종류로 던진다.
+    /// capture와 fishId를 사용하며, 캡처 중 입력을 막고 도감과 메뉴, 커서, 투척 외형, 환경과 게임 상태를 변경한다.
     /// </summary>
-    private IEnumerator CaptureCatalogAndThrow()
+    private IEnumerator CapturePanelAndThrow(ScreenFishCapture capture, string fishId)
     {
         _catalogCapturePending = true;
         _screenThrowPending = true;
         Texture2D screenshot = null;
         try
         {
-            yield return _fishSpawner.CatalogCapture.CapturePanel();
+            yield return capture.CapturePanel();
             screenshot = ScreenCapture.CaptureScreenshotAsTexture();
             for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
             {
-                if (_fishSpawner.FishTypes[i].Id != "catalog") continue;
+                if (_fishSpawner.FishTypes[i].Id != fishId) continue;
                 _projectileIndex = i;
                 break;
             }
             _catalogOpen = false;
+            _pauseOpen = false;
+            _resetConfirmOpen = false;
             LockCursor(true);
             ApplyProjectileShape();
             if (_environmentController != null) _environmentController.ChangeFishInstant(SelectedFish());
@@ -777,11 +804,11 @@ public class GameFlowManager : MonoBehaviour
     {
         ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale), _input.ReplaceBindingName("{Jump} 던지기 위하여"), _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 80f * scale, width, 40f * scale),
-            _input.ReplaceBindingName(_input.GamePadConnected
+            _input.ReplaceBindingName(_input.IsUsingGamepad
                 ? "{Attitude} 기울이는    {Steer} / {CurveTriggers} 굽히는    {Jump} 물 점프    {Restart} 새 물고기"
                 : "방향키 기울이는    A/D 굽히는    {Jump} 물에 닿을 때    {Restart} 새 물고기"), _centerSubStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 112f * scale, width, 40f * scale),
-            _input.ReplaceBindingName(_input.GamePadConnected ? "{Cancel} 차림표" : "ESC 차림표"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+            _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel} 차림표" : "ESC 차림표"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
         if (_hasThrown)
         {
             ShadowLabel(new Rect(0f, height * 0.18f + 144f * scale, width, 40f * scale),
@@ -827,6 +854,7 @@ public class GameFlowManager : MonoBehaviour
             FishType fish = _fishSpawner.FishTypes[index];
             Texture preview = fish.Id == "screen" ? _fishSpawner.ScreenCapture.Image
                 : fish.Id == "catalog" ? _fishSpawner.CatalogCapture.Image
+                : fish.Id == "menu" ? _fishSpawner.MenuCapture.Image
                 : _ownedFishSelectionPreview.GetTexture(_fishSpawner.FishPrefabs[index]);
             if (preview != null) GUI.DrawTexture(rect, preview, ScaleMode.ScaleToFit, true);
             ShadowLabel(new Rect(rect.x, rect.yMax, slotWidth, 54f * scale), GetCatalogDisplayName(fish), _previewStyle,
@@ -863,6 +891,7 @@ public class GameFlowManager : MonoBehaviour
             Fish prefab = _fishSpawner.GetFishPrefab(fish);
             Texture texture = fish.Id == "screen" ? _fishSpawner.ScreenCapture.Image
                 : fish.Id == "catalog" ? _fishSpawner.CatalogCapture.Image
+                : fish.Id == "menu" ? _fishSpawner.MenuCapture.Image
                 : prefab != null ? _ownedFishSelectionPreview.GetTexture(prefab) : null;
             Rect cell = new Rect(i % columns * cellWidth, i / columns * cellHeight,
                 cellWidth - 12f * scale, cellHeight - 12f * scale);
@@ -922,7 +951,7 @@ public class GameFlowManager : MonoBehaviour
         GUI.color = original;
         ShadowLabel(new Rect(0f, 24f * scale, width, 80f * scale), "도감", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, 108f * scale, width, 40f * scale),
-            $"보유  {_ownedOptions.Count} / {_fishSpawner.FishTypes.Count + 1}    " + _input.ReplaceBindingName(_input.GamePadConnected
+            $"보유  {_ownedOptions.Count} / {_fishSpawner.FishTypes.Count + 1}    " + _input.ReplaceBindingName(_input.IsUsingGamepad
                 ? "{Catalog} / {Cancel} 닫기    {Jump} 투척" : "{Catalog} / ESC 닫기    {Jump} 투척"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         Rect viewport = new Rect(width * 0.08f, 170f * scale, width * 0.84f, height - 430f * scale);
         bool pointerInViewport = viewport.Contains(Event.current.mousePosition);
@@ -956,6 +985,7 @@ public class GameFlowManager : MonoBehaviour
             Texture texture = fish == null ? _ownedFishSelectionPreview.DefaultFishTexture
                 : fish.Id == "screen" ? _fishSpawner.ScreenCapture.Image
                 : fish.Id == "catalog" ? _fishSpawner.CatalogCapture.Image
+                : fish.Id == "menu" ? _fishSpawner.MenuCapture.Image
                 : (owned ? _ownedFishSelectionPreview : _fishSelectionPreview).GetTexture(_fishSpawner.FishPrefabs[index]);
             if (revealed && texture != null) GUI.DrawTexture(image, texture, ScaleMode.ScaleToFit, true);
             else ShadowLabel(image, "?", _centerStyle, new Color(1f, 1f, 1f, 0.5f));
@@ -1020,6 +1050,194 @@ public class GameFlowManager : MonoBehaviour
     {
         _fishPopupText = text;
         _fishPopupTime = Time.unscaledTime;
+    }
+
+    /// <summary>
+    /// 준비 화면에서 일시정지 메뉴를 열고 첫 버튼을 고른 뒤 마우스로도 누를 수 있게 커서를 푼다.
+    /// 입력값 없이 _pauseOpen, _resetConfirmOpen, _pauseSelection과 커서 잠금 상태를 변경한다.
+    /// </summary>
+    private void OpenPauseMenu()
+    {
+        _pauseOpen = true;
+        _resetConfirmOpen = false;
+        _pauseSelection = 0;
+        _pauseNavigateDirection = 0;
+        LockCursor(false);
+    }
+
+    /// <summary>
+    /// 일시정지 메뉴를 닫고 준비 화면 조작으로 돌아간다.
+    /// 입력값 없이 _pauseOpen, _resetConfirmOpen과 커서 잠금 상태를 변경한다.
+    /// </summary>
+    private void ClosePauseMenu()
+    {
+        _pauseOpen = false;
+        _resetConfirmOpen = false;
+        LockCursor(true);
+    }
+
+    /// <summary>
+    /// 일시정지 메뉴가 열린 동안의 입력을 처리한다. Navigate 위아래로 버튼을 고르고 Submit으로 누르며 Cancel로 한 단계 닫고, Jump로 메뉴를 던진다.
+    /// _input의 Navigate, Submit, Cancel, Jump 입력과 장치 종류를 사용하며, _pauseSelection, _pauseNavigateDirection과 메뉴 상태를 변경하거나 메뉴 투척을 시작한다.
+    /// </summary>
+    private void UpdatePauseMenu()
+    {
+        if (_input.CancelPressed)
+        {
+            if (!_resetConfirmOpen)
+            {
+                ClosePauseMenu();
+                return;
+            }
+            // 삭제 확인에서 취소하면 메뉴의 삭제 버튼으로 돌아간다.
+            _resetConfirmOpen = false;
+            _pauseSelection = 1;
+            return;
+        }
+
+        // 키보드 Space는 언제나 메뉴 화면을 fish로 던진다. 게임패드 A는 Submit과 같은 버튼이라 RESUME을 고른 상태에서만 던지고, 그 밖에는 아래 Submit으로 버튼을 누른다.
+        if (_input.JumpPressed && (!_input.IsUsingGamepad || (!_resetConfirmOpen && _pauseSelection == 0)))
+        {
+            StartCoroutine(CapturePanelAndThrow(_fishSpawner.MenuCapture, "menu"));
+            return;
+        }
+
+        float vertical = _input.NavigateInput.y;
+        int direction = vertical > 0.5f ? -1 : vertical < -0.5f ? 1 : 0;
+        int optionCount = _resetConfirmOpen ? 2 : 3;
+        if (direction != 0 && direction != _pauseNavigateDirection)
+        {
+            _pauseSelection = (_pauseSelection + direction + optionCount) % optionCount;
+        }
+        _pauseNavigateDirection = direction;
+
+        if (_input.SubmitPressed) ActivatePauseOption(_pauseSelection);
+    }
+
+    /// <summary>
+    /// index 순서의 일시정지 메뉴 버튼을 실행한다. 메뉴는 RESUME, 세이브 삭제, EXIT이고 삭제 확인은 삭제, 취소다.
+    /// index와 _resetConfirmOpen을 사용하며, 메뉴 상태를 바꾸거나 게임 종료, 세이브 삭제를 실행한다.
+    /// </summary>
+    private void ActivatePauseOption(int index)
+    {
+        if (_resetConfirmOpen)
+        {
+            if (index == 0)
+            {
+                DeleteAllSaveData();
+                return;
+            }
+            _resetConfirmOpen = false;
+            _pauseSelection = 1;
+            return;
+        }
+
+        if (index == 0)
+        {
+            ClosePauseMenu();
+        }
+        else if (index == 1)
+        {
+            // 실수로 지우지 않도록 확인 화면을 띄우고 취소를 먼저 고른다.
+            _resetConfirmOpen = true;
+            _pauseSelection = 1;
+        }
+        else
+        {
+            QuitGame();
+        }
+    }
+
+    /// <summary>
+    /// 화면을 어둡게 덮고 일시정지 메뉴 또는 삭제 확인 버튼을 그린다. 고른 버튼은 테두리로 표시한다.
+    /// 화면 크기와 scale, _resetConfirmOpen, _pauseSelection과 연결된 장치 종류를 사용하며, 마우스로 누른 버튼을 실행한다.
+    /// </summary>
+    private void DrawPauseMenu(float width, float height, float scale)
+    {
+        Color original = GUI.color;
+        GUI.color = new Color(0f, 0f, 0f, 0.65f);
+        GUI.DrawTexture(new Rect(0f, 0f, width, height), Texture2D.whiteTexture);
+        GUI.color = original;
+
+        string cancelName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel}" : "ESC");
+        string[] labels = _resetConfirmOpen
+            ? new[] { "삭제", $"취소 ({cancelName})" }
+            : new[] { $"RESUME ({cancelName})", "모든 세이브 데이터 삭제", "EXIT" };
+        float buttonWidth = 520f * scale;
+        float buttonHeight = 60f * scale;
+        float left = (width - buttonWidth) * 0.5f;
+        float top = height * 0.4f;
+        float step = buttonHeight + 20f * scale;
+
+        if (_resetConfirmOpen)
+        {
+            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale), "세이브 데이터 삭제", _centerStyle, Color.white);
+            ShadowLabel(new Rect(0f, top - 56f * scale, width, 40f * scale),
+                "획득한 물고기와 최고 기록 등 모든 진행 상황이 지워지고 처음부터 다시 시작합니다.", _centerSubStyle, new Color(1f, 0.6f, 0.5f));
+        }
+        else
+        {
+            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale), "PAUSED", _centerStyle, Color.white);
+        }
+
+        for (int i = 0; i < labels.Length; i++)
+        {
+            Rect rect = new Rect(left, top + step * i, buttonWidth, buttonHeight);
+            if (i == _pauseSelection)
+            {
+                GUI.color = new Color(1f, 0.92f, 0.7f);
+                GUI.DrawTexture(new Rect(rect.x - 4f * scale, rect.y - 4f * scale, rect.width + 8f * scale, rect.height + 8f * scale),
+                    Texture2D.whiteTexture);
+                GUI.color = original;
+            }
+            if (GUI.Button(rect, labels[i], _buttonStyle))
+            {
+                _pauseSelection = i;
+                ActivatePauseOption(i);
+                return;
+            }
+        }
+
+        // 시작 안내와 같이 장치별 문구를 고른다. Submit은 와일드카드 바인딩이라 키보드는 ENTER, 게임패드는 같은 아래쪽 버튼인 Jump 이름을 쓴다.
+        ShadowLabel(new Rect(0f, top + step * labels.Length + 20f * scale, width, 40f * scale),
+            _input.ReplaceBindingName(_input.IsUsingGamepad
+                ? "D-PAD select    {Jump} confirm    {Cancel} close"
+                : "ARROWS select    ENTER confirm    ESC close"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+    }
+
+    /// <summary>
+    /// 게임을 종료한다. 에디터에서는 플레이 모드를 끝낸다.
+    /// 입력값 없이 애플리케이션 실행 상태를 변경한다.
+    /// </summary>
+    private static void QuitGame()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    /// <summary>
+    /// PlayerPrefs와 화면, 도감 투척물 이미지 파일을 모두 지우고 현재 씬을 다시 불러와 처음 상태로 시작한다.
+    /// 입력값 없이 저장 데이터, 디스크의 이미지 파일과 로드된 씬을 변경한다.
+    /// </summary>
+    private void DeleteAllSaveData()
+    {
+        // 진행 상황 키가 여러 클래스에 흩어져 있어 Tools/Reset Progress처럼 전부 지운다.
+        PlayerPrefs.DeleteAll();
+        PlayerPrefs.Save();
+        _fishSpawner.ScreenCapture.DeleteSavedImage();
+        _fishSpawner.CatalogCapture.DeleteSavedImage();
+        _fishSpawner.MenuCapture.DeleteSavedImage();
+
+        Scene scene = SceneManager.GetActiveScene();
+#if UNITY_EDITOR
+        // 에디터에서는 Build Settings에 없는 씬도 다시 불러올 수 있도록 경로로 불러온다.
+        UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(scene.path, new LoadSceneParameters(LoadSceneMode.Single));
+#else
+        SceneManager.LoadScene(scene.buildIndex);
+#endif
     }
 
     /// <summary>

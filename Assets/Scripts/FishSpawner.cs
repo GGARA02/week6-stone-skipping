@@ -40,6 +40,7 @@ public class FishSpawner : MonoBehaviour
     private Fish _iceFish;
     private ScreenFishCapture _screenCapture;
     private ScreenFishCapture _catalogCapture;
+    private ScreenFishCapture _menuCapture;
     private Mesh _wallCatalogMesh;
     private Mesh _wallSpawnMesh;
     private Mesh _iceCatalogMesh;
@@ -109,6 +110,7 @@ public class FishSpawner : MonoBehaviour
     public Fish IceFish => _iceFish;
     public ScreenFishCapture ScreenCapture => _screenCapture;
     public ScreenFishCapture CatalogCapture => _catalogCapture;
+    public ScreenFishCapture MenuCapture => _menuCapture;
     public PlayerProgress Progress => _progress;
     public bool CanCollectFish => _acquisitionEnabled;
 
@@ -122,8 +124,8 @@ public class FishSpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// type의 도감 상태를 그래프 해금, 습득 기록과 이번 판의 바다 출현 등록으로 반환한다.
-    /// 사출 후 다음 판에 바다 출현이 허용된 특수 종류도 발견 상태로 표시하며 습득 기록은 변경하지 않는다.
+    /// type의 도감 상태를 연결 해금, 즉시 발견 조건, 습득 기록과 바다 출현 등록으로 반환한다.
+    /// 발견과 실제 자연 출현 허용을 구분하며 습득 기록은 변경하지 않는다.
     /// </summary>
     public FishCatalogState GetCatalogState(FishType type)
     {
@@ -132,6 +134,15 @@ public class FishSpawner : MonoBehaviour
             && _seaSpawnRegistry.IsUnlocked(type.Id))
             return FishCatalogState.Discovered;
         return state;
+    }
+
+    /// <summary>
+    /// 플레이어 이동 거리 distance를 그래프에 전달해 도감 발견 조건 달성을 저장한다.
+    /// 자연 출현 등록과 다음 판 연결 해금은 변경하지 않는다.
+    /// </summary>
+    public void RecordDiscoveryDistance(float distance)
+    {
+        _unlockGraph.RecordDiscoveryDistance(distance);
     }
 
     void Awake()
@@ -155,6 +166,10 @@ public class FishSpawner : MonoBehaviour
         _catalogCapture = gameObject.AddComponent<ScreenFishCapture>();
         _catalogCapture.PanelSize = _screenCapture.PanelSize;
         Fish catalogFish = _catalogCapture.Initialize(_progress, FishType.CreateCatalog());
+        // 메뉴 fish는 씬 목록에 넣은 패널 프리팹을 캡처 이미지를 보여 주는 템플릿으로 바꿔 쓴다.
+        int menuIndex = Array.FindIndex(_fishPrefabs, prefab => prefab.Type.Id == "menu");
+        _menuCapture = gameObject.AddComponent<ScreenFishCapture>();
+        _fishPrefabs[menuIndex] = _menuCapture.Initialize(_progress, _fishPrefabs[menuIndex]);
         int count = _fishPrefabs.Length;
         Array.Resize(ref _fishPrefabs, count + 2);
         _fishPrefabs[count] = screenFish;

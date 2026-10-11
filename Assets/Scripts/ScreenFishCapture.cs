@@ -54,6 +54,15 @@ public class ScreenFishCapture : MonoBehaviour
     public event Action OnUnlocked;
 
     /// <summary>
+    /// 종류별로 저장한 PNG 파일이 있으면 지운다. 세이브 데이터를 모두 지울 때 쓴다.
+    /// _imagePath를 사용하며, 디스크의 저장 이미지를 변경한다.
+    /// </summary>
+    public void DeleteSavedImage()
+    {
+        if (File.Exists(_imagePath)) File.Delete(_imagePath);
+    }
+
+    /// <summary>
     /// progress, type과 종류별 저장 PNG를 사용해 비활성 이미지 패널 템플릿을 만든다.
     /// 16:9 패널 메시와 이미지 머티리얼을 준비하고 선택 목록에 넣을 Fish를 반환한다.
     /// </summary>
@@ -86,6 +95,36 @@ public class ScreenFishCapture : MonoBehaviour
         panel.AddComponent<Rigidbody>().isKinematic = true;
         _template = panel.AddComponent<Fish>();
         _template.InitializeScreen(type);
+        LoadSavedImage(type);
+        return _template;
+    }
+
+    /// <summary>
+    /// progress, panelPrefab과 종류별 저장 PNG를 사용해 프리팹 모양 그대로의 비활성 이미지 패널 템플릿을 만든다.
+    /// 프리팹 머티리얼의 복사본에 저장 이미지를 넣고 선택 목록에 넣을 Fish를 반환한다.
+    /// </summary>
+    public Fish Initialize(PlayerProgress progress, Fish panelPrefab)
+    {
+        _progress = progress;
+        _imagePath = Path.Combine(Application.persistentDataPath, $"{panelPrefab.Type.Id}-fish.png");
+        _template = Instantiate(panelPrefab, transform, false);
+        _template.name = panelPrefab.name;
+        _template.gameObject.SetActive(false);
+        _template.enabled = false;
+        MeshRenderer panel = _template.GetComponentInChildren<MeshRenderer>(true);
+        // 캡처 이미지가 프리팹의 머티리얼 에셋에 들어가지 않도록 복사본에 넣는다.
+        _material = new Material(panel.sharedMaterial);
+        panel.sharedMaterial = _material;
+        LoadSavedImage(_template.Type);
+        return _template;
+    }
+
+    /// <summary>
+    /// type의 저장 PNG가 있으면 읽어 패널 머티리얼에 넣고, 없거나 읽지 못하면 그 종류의 획득 기록을 지운다.
+    /// _imagePath와 _material을 사용하며, Image와 PlayerPrefs의 획득 기록을 변경한다.
+    /// </summary>
+    private void LoadSavedImage(FishType type)
+    {
         if (File.Exists(_imagePath))
         {
             Image = new Texture2D(2, 2, TextureFormat.RGB24, false);
@@ -98,7 +137,6 @@ public class ScreenFishCapture : MonoBehaviour
             }
         }
         else PlayerPrefs.DeleteKey("SkipStoneV2.Fish." + type.Id);
-        return _template;
     }
 
     /// <summary>

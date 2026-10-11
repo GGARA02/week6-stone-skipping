@@ -110,7 +110,7 @@ public class InputManager
     }
 
     /// <summary>
-    /// text의 액션 이름 자리표시자를 연결된 장치의 바인딩 이름으로 치환한다.
+    /// text의 액션 이름 자리표시자를 마지막으로 입력한 장치의 바인딩 이름으로 치환한다.
     /// {Jump} 같은 자리표시자를 사용하며 키보드 또는 게임패드 안내 문자열을 반환한다.
     /// </summary>
     public string ReplaceBindingName(string text)
@@ -124,7 +124,7 @@ public class InputManager
     }
 
     /// <summary>
-    /// action에서 연결된 장치에 해당하는 첫 바인딩의 표시 이름을 반환한다.
+    /// action에서 마지막으로 입력한 장치(IsUsingGamepad)에 해당하는 첫 바인딩의 표시 이름을 반환한다.
     /// 합성 입력은 구성 바인딩의 장치를 확인하며 액션 상태는 변경하지 않는다.
     /// </summary>
     private string GetBindingName(InputAction action)
@@ -145,7 +145,8 @@ public class InputManager
                     }
                 }
             }
-            if (GamePadConnected != isGamepad) continue;
+            // 게임패드가 꽂혀 있어도 키보드로 조작하면 키보드 이름을 보여 주도록 연결 여부 대신 마지막 입력 장치를 쓴다.
+            if (IsUsingGamepad != isGamepad) continue;
             if (!binding.isComposite) return action.GetBindingDisplayString(i);
 
             string displayName = string.Empty;
