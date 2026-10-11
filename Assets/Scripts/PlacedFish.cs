@@ -41,7 +41,8 @@ public class PlacedFish : MonoBehaviour
     void OnTriggerEnter(Collider other)
     {
         // 같은 물리 단계에서 접촉이 겹쳐 두 번 잡히지 않도록 이미 숨었으면 무시한다.
-        if (_spawner == null || !gameObject.activeSelf || other.attachedRigidbody != _spawner.PlayerBody) return;
+        if (_spawner == null || !_spawner.CanCollectFish || !gameObject.activeSelf
+            || other.attachedRigidbody != _spawner.PlayerBody) return;
 
         gameObject.SetActive(false);
         _spawner.HandlePlacedFishCaught(_fishPrefab.Type, transform.position);

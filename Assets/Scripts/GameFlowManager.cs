@@ -178,6 +178,12 @@ public class GameFlowManager : MonoBehaviour
         if (_endingCinemaRunning) return;
 
         if (_screenThrowPending || _catalogCapturePending || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f) return;
+        if (_state == State.GameOver)
+        {
+            if ((_input.RestartPressed || _input.JumpPressed)
+                && Time.unscaledTime - _gameOverTime >= RETRY_INPUT_DELAY) Restart();
+            return;
+        }
         if (_state == State.Ready && _input.CatalogPressed)
         {
             _catalogOpen = !_catalogOpen;
@@ -213,7 +219,7 @@ public class GameFlowManager : MonoBehaviour
         }
         if (_input.RestartPressed)
         {
-            if (_state == State.Flying && _input.RestartFromKeyboardPressed)
+            if (_state == State.Flying)
             {
                 _playerController.GameOver(GameOverReason.Stopped);
             }
@@ -226,11 +232,6 @@ public class GameFlowManager : MonoBehaviour
 
         // SPACE와 게임패드 A는 Jump 액션에 묶여 있다.
         bool jumpPressed = _input.JumpPressed;
-        if (_state == State.GameOver)
-        {
-            if (jumpPressed && Time.unscaledTime - _gameOverTime >= RETRY_INPUT_DELAY) Restart();
-            return;
-        }
         if (_state != State.Ready) return;
 
         if (_input.PreviousPressed)
@@ -247,15 +248,6 @@ public class GameFlowManager : MonoBehaviour
             Throw();
             return;
         }
-        if (!_input.ClickPressed) return;
-
-        // 커서가 풀려 있을 때의 클릭은 다시 잠그는 용도로만 쓴다.
-        if (Cursor.lockState != CursorLockMode.Locked)
-        {
-            LockCursor(true);
-            return;
-        }
-        Throw();
     }
 
     void LateUpdate()
@@ -317,7 +309,7 @@ public class GameFlowManager : MonoBehaviour
         {
             // 미끄러지는 동안은 남은 밀기 힘만큼 진하게 연타 안내를 띄운다.
             Color slideColor = new Color(1f, 1f, 1f, 0.35f + 0.65f * _playerController.SlidePower);
-            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), "MASH SPACE!", _centerStyle, slideColor);
+            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("MASH {Jump}!"), _centerStyle, slideColor);
         }
         else if (_playerController.CanJudge && _playerController.TimeToWaterImpact <= _spaceHintLeadTime)
         {
@@ -326,7 +318,7 @@ public class GameFlowManager : MonoBehaviour
             Color hintColor = _playerController.IsInJudgeWindow
                 ? new Color(1f, 0.85f, 0.25f, 1f)
                 : new Color(1f, 1f, 1f, 0.35f + 0.5f * approach);
-            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), "SPACE", _centerStyle, hintColor);
+            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("{Jump}"), _centerStyle, hintColor);
         }
 
         // 게임오버 화면에서는 제목과 겹치지 않도록 팝업을 그리지 않는다.
@@ -476,6 +468,7 @@ public class GameFlowManager : MonoBehaviour
     private void Restart(bool clearNewFish = true)
     {
         _rumble.StopMotors();
+        _fishSpawner.SetAcquisitionEnabled(true);
         if (clearNewFish)
         {
             _newFish.Clear();
@@ -737,6 +730,7 @@ public class GameFlowManager : MonoBehaviour
     private void HandleGameOver(GameOverReason reason)
     {
         _rumble.StopMotors();
+        _fishSpawner.SetAcquisitionEnabled(false);
         _state = State.GameOver;
         _gameOverReason = reason;
         _gameOverTime = Time.unscaledTime;
@@ -761,14 +755,16 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void DrawReady(float width, float height, float scale)
     {
-        ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale), "SPACE TO THROW", _centerStyle, Color.white);
+        ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale), _input.ReplaceBindingName("{Jump} TO THROW"), _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 80f * scale, width, 40f * scale),
-            "ARROWS tilt    A/D curve    SPACE when it hits the water    R new fish", _centerSubStyle, Color.white);
+            _input.ReplaceBindingName(_input.GamePadConnected
+                ? "{Attitude} tilt    {Steer} / {CurveTriggers} curve    {Jump} water jump    {Restart} new fish"
+                : "ARROWS tilt    A/D curve    {Jump} when it hits the water    {Restart} new fish"), _centerSubStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 112f * scale, width, 40f * scale),
-            "PAD   A throw/skip    R-stick tilt    L-stick/triggers curve    Y new fish", _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+            _input.ReplaceBindingName(_input.GamePadConnected ? "{Cancel} menu" : "ESC menu"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
 
         ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 40f * scale),
-            "<  Q/LB   THROW   E/RB  >    TAB 도감", _centerSubStyle, new Color(1f, 0.92f, 0.7f));
+            _input.ReplaceBindingName("<  {Previous}   THROW   {Next}  >    {Catalog} 도감"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         DrawFishPreviews(width, height, scale);
     }
 
@@ -861,7 +857,7 @@ public class GameFlowManager : MonoBehaviour
         float buttonWidth = 620f * scale;
         float buttonHeight = 60f * scale;
         float left = (width - buttonWidth) * 0.5f;
-        if (GUI.Button(new Rect(left, height * 0.8f, buttonWidth, buttonHeight), "RETRY   (SPACE / A / R)", _buttonStyle))
+        if (GUI.Button(new Rect(left, height * 0.8f, buttonWidth, buttonHeight), _input.ReplaceBindingName("RETRY   ({Jump} / {Restart})"), _buttonStyle))
         {
             Restart();
         }
@@ -902,7 +898,8 @@ public class GameFlowManager : MonoBehaviour
         GUI.color = original;
         ShadowLabel(new Rect(0f, 24f * scale, width, 80f * scale), "도감", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, 108f * scale, width, 40f * scale),
-            $"보유  {_ownedOptions.Count} / {_fishSpawner.FishTypes.Count + 1}    TAB / ESC 닫기", _centerSubStyle, new Color(1f, 0.92f, 0.7f));
+            $"보유  {_ownedOptions.Count} / {_fishSpawner.FishTypes.Count + 1}    " + _input.ReplaceBindingName(_input.GamePadConnected
+                ? "{Catalog} / {Cancel} 닫기    {Jump} 투척" : "{Catalog} / ESC 닫기    {Jump} 투척"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         Rect viewport = new Rect(width * 0.08f, 170f * scale, width * 0.84f, height - 430f * scale);
         bool pointerInViewport = viewport.Contains(Event.current.mousePosition);
         int columns = Mathf.Max(1, Mathf.FloorToInt(viewport.width / (240f * scale)));
@@ -964,7 +961,7 @@ public class GameFlowManager : MonoBehaviour
         ShadowLabel(new Rect(details.x + 24f * scale, details.y + 54f * scale, details.width - 48f * scale, 76f * scale),
             text, _catalogDetailStyle, Color.white);
         GUI.enabled = !_catalogCapturePending;
-        if (GUI.Button(new Rect(width * 0.5f - 130f * scale, height - 70f * scale, 260f * scale, 48f * scale), "닫기 (TAB)", _buttonStyle))
+        if (GUI.Button(new Rect(width * 0.5f - 130f * scale, height - 70f * scale, 260f * scale, 48f * scale), _input.ReplaceBindingName("닫기 ({Catalog})"), _buttonStyle))
         {
             _catalogOpen = false;
             LockCursor(true);

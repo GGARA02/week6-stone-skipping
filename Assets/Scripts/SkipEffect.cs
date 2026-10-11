@@ -97,7 +97,7 @@ public class SkipEffect : MonoBehaviour
         _rumble.SetContinuous(_player.isActiveAndEnabled && _player.IsThrown && _player.IsSliding
             && !_player.IsGameOver && Time.timeScale > 0f
             ? Mathf.Lerp(0.12f, 0.3f, Mathf.Clamp01(_player.Speed / _splashFullSpeed)) : 0f);
-        if (!_player.InContact)
+        if (_player.IsGameOver || !_player.InContact)
         {
             _sprayAccumulator = 0f;
             return;
@@ -190,6 +190,7 @@ public class SkipEffect : MonoBehaviour
     /// </summary>
     public void PlaySplash(Vector3 point, float power, float rippleScale = 1f)
     {
+        if (_player.IsGameOver) return;
         _splash.transform.position = point;
         ParticleSystem.MainModule main = _splash.main;
         main.startSpeedMultiplier = Mathf.Lerp(0.4f, 1f, power);
@@ -238,6 +239,7 @@ public class SkipEffect : MonoBehaviour
     /// </summary>
     public void PlayImpact(float strength, Color color, float rumbleScale = 1f)
     {
+        if (_player.IsGameOver) return;
         _cameraController.Punch(strength);
         _rumble.Pulse(strength * rumbleScale, Mathf.Lerp(0.08f, 0.3f, strength));
         _flashColor = color;
@@ -250,6 +252,7 @@ public class SkipEffect : MonoBehaviour
     /// </summary>
     private void HandleSkip(int count, SkipJudge judge)
     {
+        if (_player.IsGameOver) return;
         float strength = Mathf.Lerp(0.2f, 1f, Mathf.Clamp01(_player.Speed / Mathf.Max(_splashFullSpeed, 0.01f)));
         if (judge != SkipJudge.Perfect && judge != SkipJudge.Good)
         {
@@ -267,6 +270,7 @@ public class SkipEffect : MonoBehaviour
     /// </summary>
     private void HandleJudge(SkipJudge judge, float timingError)
     {
+        if (_player.IsGameOver) return;
         switch (judge)
         {
             case SkipJudge.Miss: _rumble.Pulse(0.125f, 0.08f); break;
@@ -281,6 +285,7 @@ public class SkipEffect : MonoBehaviour
     /// </summary>
     private void HandleSlidePush()
     {
+        if (_player.IsGameOver) return;
         _rumble.Pulse(Mathf.Lerp(0.2f, 0.5f, _player.SlidePower), 0.09f);
     }
 

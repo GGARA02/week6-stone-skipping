@@ -83,6 +83,7 @@ public class FishSpawner : MonoBehaviour
     private readonly List<Fish> _activeFish = new List<Fish>();
     private readonly List<Fish> _cutPieces = new List<Fish>();
     private float _nextSpawnTime;
+    private bool _acquisitionEnabled = true;
     public event Action<FishType> OnFishCaught;
     public event Action OnClearing;
     public event Action OnCleared;
@@ -109,6 +110,16 @@ public class FishSpawner : MonoBehaviour
     public ScreenFishCapture ScreenCapture => _screenCapture;
     public ScreenFishCapture CatalogCapture => _catalogCapture;
     public PlayerProgress Progress => _progress;
+    public bool CanCollectFish => _acquisitionEnabled;
+
+    /// <summary>
+    /// enabled로 정산 중 물고기 획득과 등록 효과의 허용 여부를 설정한다.
+    /// 획득 가능 상태를 변경하며 재시작 시 다시 허용한다.
+    /// </summary>
+    public void SetAcquisitionEnabled(bool enabled)
+    {
+        _acquisitionEnabled = enabled;
+    }
 
     /// <summary>
     /// type의 도감 상태를 그래프 해금, 습득 기록과 이번 판의 바다 출현 등록으로 반환한다.
@@ -282,6 +293,11 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void HandleFishLanded(Fish fish)
     {
+        if (!_acquisitionEnabled)
+        {
+            Remove(fish);
+            return;
+        }
         if (fish.Type.Id == "wall" || fish.Type.Id == "ice")
         {
             Mesh mesh = _progress.SaveSeaMesh(fish.Type, fish.GetComponent<MeshFilter>().sharedMesh,
@@ -302,6 +318,7 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void HandleFishCaught(Fish fish)
     {
+        if (!_acquisitionEnabled) return;
         if (!CanAcquire(fish.Type))
         {
             fish.gameObject.SetActive(false);
@@ -338,6 +355,7 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void HandlePlacedFishCaught(FishType type, Vector3 point)
     {
+        if (!_acquisitionEnabled) return;
         if (!CanAcquire(type)) return;
         _progress.AddFish(type);
         _effect.PlaySplash(point, 0.6f);
@@ -611,6 +629,7 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public bool TryEject(Fish prefab, Vector3 position, Quaternion rotation, Vector3 scale, Vector3 velocity)
     {
+        if (!_acquisitionEnabled) return false;
         FishType type = prefab.Type;
         if (!CanCreate(type)) return false;
         if (!type.AllowRepeatEjection)
