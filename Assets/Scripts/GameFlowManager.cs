@@ -24,6 +24,7 @@ public class GameFlowManager : MonoBehaviour
     private const string BEST_SKIPS_KEY = "SkipStoneV2.BestSkips";
     private const string BEST_DISTANCE_KEY = "SkipStoneV2.BestDistance";
     private const float POPUP_DURATION = 1.1f;
+    private const float RESTART_HINT_IDLE_DELAY = 3f;
     private const int DEFAULT_FISH_INDEX = -1;
     // 게임오버 직후 SPACE 연타로 바로 재시작되지 않게 기다리는 시간(초)
     private const float RETRY_INPUT_DELAY = 0.6f;
@@ -117,6 +118,13 @@ public class GameFlowManager : MonoBehaviour
     private FishSelectionPreview _fishSelectionPreview;
     private FishSelectionPreview _ownedFishSelectionPreview;
 
+    [Header("재시작 안내")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float _restartHintHeight = 0.9f;
+    private float _lastRestartHintInputTime;
+    private GUIStyle _restartHintStyle;
+
     [Header("화면 투척 전환")]
     [SerializeField, Min(0.1f)] private float _panelShrinkDuration = 0.65f;
     private bool _screenThrowPending;
@@ -186,6 +194,12 @@ public class GameFlowManager : MonoBehaviour
 
     void Update()
     {
+        if (_state != State.Flying || _playerController.IsControlling || _pauseOpen
+            || _endingCinemaRunning || _screenThrowPending || _catalogCapturePending
+            || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f)
+        {
+            _lastRestartHintInputTime = Time.unscaledTime;
+        }
         _fishSpawner.RecordDiscoveryDistance(_playerController.Distance);
         // 엔딩 시네마 연출 중에는 플레이어 및 게임 흐름 키 입력을 전면 차단한다.
         if (_endingCinemaRunning) return;
@@ -353,10 +367,11 @@ public class GameFlowManager : MonoBehaviour
                 : new Color(1f, 1f, 1f, 0.35f + 0.5f * approach);
             ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("{Jump}"), _centerStyle, hintColor);
         }
-        else if (_state == State.Flying && !_endingCinemaRunning && !_playerController.IsControlling)
+        if (_state == State.Flying && !_endingCinemaRunning && !_playerController.IsControlling
+            && Time.unscaledTime - Mathf.Max(_lastRestartHintInputTime, _input.LastInputTime) >= RESTART_HINT_IDLE_DELAY)
         {
-            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s),
-                _input.ReplaceBindingName("{Restart} 키를 눌러 재시작"), _popupStyle, Color.white);
+            ShadowLabel(new Rect(0f, height * _restartHintHeight, width, 80f * s),
+                _input.ReplaceBindingName("재시작 {Restart}키를 눌러"), _restartHintStyle, Color.white);
         }
 
         // 게임오버 화면에서는 제목과 겹치지 않도록 팝업을 그리지 않는다.
@@ -1292,6 +1307,7 @@ public class GameFlowManager : MonoBehaviour
         _catalogDetailStyle.fontStyle = FontStyle.Normal;
         _catalogDetailStyle.wordWrap = true;
         _popupStyle = MakeStyle(52, TextAnchor.MiddleCenter, scale);
+        _restartHintStyle = MakeStyle(52, TextAnchor.MiddleCenter, scale);
         _debugStyle = MakeStyle(18, TextAnchor.UpperRight, scale);
         _debugStyle.fontStyle = FontStyle.Normal;
         _buttonStyle = new GUIStyle(GUI.skin.button)
