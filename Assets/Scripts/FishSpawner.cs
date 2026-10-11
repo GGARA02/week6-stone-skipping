@@ -590,7 +590,6 @@ public class FishSpawner : MonoBehaviour
             if (!_seaSpawnRegistry.IsUnlocked(type.Id)) return false;
         }
         else if (!_unlockGraph.AllowsNaturalSpawn(type)) return false;
-        if (type.Id == "ice" && _player.Distance <= _obstacles.IceStartDistance) return false;
         if (_obstacles != null && type.Id == "blackhole") return false;
         if (type.SpawnOnlyInRain && (_environment == null || !_environment.IsRaining)) return false;
         if (type.SpawnOnlyAtNight && (_environment == null || !_environment.IsNight)) return false;
