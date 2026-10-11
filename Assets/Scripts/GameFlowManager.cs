@@ -992,7 +992,7 @@ public class GameFlowManager : MonoBehaviour
             string name = revealed ? GetCatalogDisplayName(fish) : "?";
             ShadowLabel(new Rect(cell.x, cell.y + 142f * scale, cell.width, 34f * scale), name, _previewStyle, Color.white);
             ShadowLabel(new Rect(cell.x, cell.y + 180f * scale, cell.width, 28f * scale),
-                owned ? "획득" : revealed ? "발견" : "미발견", _centerSubStyle,
+                owned ? "획득" : revealed ? "미획득" : "???", _centerSubStyle,
                 owned ? new Color(1f, 0.92f, 0.7f) : new Color(1f, 1f, 1f, 0.45f));
         }
         GUI.EndScrollView();
@@ -1008,7 +1008,7 @@ public class GameFlowManager : MonoBehaviour
         JToken entry = _catalogEntries[selectedId];
         string heading = selectedOwned
             ? $"{selectedName}    누적 획득 {(selectedFish == null ? 0 : _progress.GetFishCount(selectedFish))}개"
-            : selectedState == FishCatalogState.Undiscovered ? "?    미발견" : $"{selectedName}    해금 힌트";
+            : selectedState == FishCatalogState.Undiscovered ? "???" : $"{selectedName}    해금 힌트";
         string text = selectedState == FishCatalogState.Undiscovered
             ? string.Empty : entry.Value<string>(selectedOwned ? "description" : "unlockHint");
         ShadowLabel(new Rect(details.x + 24f * scale, details.y + 14f * scale, details.width - 48f * scale, 36f * scale),
