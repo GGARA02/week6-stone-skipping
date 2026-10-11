@@ -26,6 +26,12 @@
     "pickpocket": {
       "afterAcquiringFish": "car"
     },
+    "bucket_full": {
+      "afterAcquiringFish": "bucket_empty"
+    },
+    "water_block": {
+      "afterAcquiringFish": "bucket_empty"
+    },
     "volcano": {
       "always": true
     },
