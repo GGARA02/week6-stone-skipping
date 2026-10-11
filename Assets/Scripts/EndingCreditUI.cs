@@ -12,7 +12,7 @@ public class EndingCreditUI : MonoBehaviour
     private const float PULSE_SPEED = 4f;
     private const float MIN_SCALE = 0.92f;
     private const float MAX_SCALE = 1.12f;
-    private const string SKIP_PROMPT_TEXT = "<b></color>";
+    private const string SKIP_PROMPT_TEXT = "<b>Press <color=#FFD700>[ SPACE ]</color></b> <color=#FFFFFF>to Skip Credits >></color>";
 
     [Header("Settings")]
     private float _timer;
