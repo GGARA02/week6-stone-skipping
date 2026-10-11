@@ -25,7 +25,8 @@
     "screen",
     "catalog",
     "boost",
-    "endingcredit"
+    "endingcredit",
+    "menu"
   ],
   "connections": {
     "default": [],
@@ -119,6 +120,7 @@
       "kinghopak"
     ],
     "endingcredit": [],
-    "keyboard": []
+    "keyboard": [],
+    "menu": []
   }
 }

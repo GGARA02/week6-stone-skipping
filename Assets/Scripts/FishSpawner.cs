@@ -40,6 +40,7 @@ public class FishSpawner : MonoBehaviour
     private Fish _iceFish;
     private ScreenFishCapture _screenCapture;
     private ScreenFishCapture _catalogCapture;
+    private ScreenFishCapture _menuCapture;
     private Mesh _wallCatalogMesh;
     private Mesh _wallSpawnMesh;
     private Mesh _iceCatalogMesh;
@@ -109,6 +110,7 @@ public class FishSpawner : MonoBehaviour
     public Fish IceFish => _iceFish;
     public ScreenFishCapture ScreenCapture => _screenCapture;
     public ScreenFishCapture CatalogCapture => _catalogCapture;
+    public ScreenFishCapture MenuCapture => _menuCapture;
     public PlayerProgress Progress => _progress;
     public bool CanCollectFish => _acquisitionEnabled;
 
@@ -155,6 +157,10 @@ public class FishSpawner : MonoBehaviour
         _catalogCapture = gameObject.AddComponent<ScreenFishCapture>();
         _catalogCapture.PanelSize = _screenCapture.PanelSize;
         Fish catalogFish = _catalogCapture.Initialize(_progress, FishType.CreateCatalog());
+        // 메뉴 fish는 씬 목록에 넣은 패널 프리팹을 캡처 이미지를 보여 주는 템플릿으로 바꿔 쓴다.
+        int menuIndex = Array.FindIndex(_fishPrefabs, prefab => prefab.Type.Id == "menu");
+        _menuCapture = gameObject.AddComponent<ScreenFishCapture>();
+        _fishPrefabs[menuIndex] = _menuCapture.Initialize(_progress, _fishPrefabs[menuIndex]);
         int count = _fishPrefabs.Length;
         Array.Resize(ref _fishPrefabs, count + 2);
         _fishPrefabs[count] = screenFish;

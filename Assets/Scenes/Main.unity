@@ -15280,6 +15280,7 @@ MonoBehaviour:
   - {fileID: 114000001, guid: 6f3b0342169a4104db5e6b94847841ed, type: 3}
   - {fileID: 114000001, guid: bb4ebf38c5ff46c785768c48b5ab7cf4, type: 3}
   - {fileID: 6489902929851386473, guid: 7cac427acc3a3224cb2c5a8fe7d03d72, type: 3}
+  - {fileID: 6479090948757009543, guid: 0041f46ad8fad3d479e2d53861101e49, type: 3}
   _spawnIntervalRange: {x: 0.35, y: 0.9}
   _schoolSizeRange: {x: 1, y: 3}
   _leadTimeRange: {x: 1, y: 2}
