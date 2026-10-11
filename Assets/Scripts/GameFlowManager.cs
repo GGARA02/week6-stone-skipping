@@ -266,7 +266,7 @@ public class GameFlowManager : MonoBehaviour
             {
                 if (fish.Id == "screen" || fish.Id == "catalog") continue;
                 Fish prefab = _fishSpawner.GetFishPrefab(fish);
-                if (prefab != null) _ownedFishSelectionPreview.PrepareTexture(prefab);
+                if (prefab != null) _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block");
             }
             return;
         }
@@ -280,9 +280,11 @@ public class GameFlowManager : MonoBehaviour
                     || (_catalogOpen && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)))
             {
                 FishSelectionPreview previews = _progress.IsFishRegistered(fish) ? _ownedFishSelectionPreview : _fishSelectionPreview;
-                previews.PrepareTexture(_fishSpawner.FishPrefabs[i]);
+                previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block");
             }
         }
+        // 물 블록 미리보기는 선택 창과 도감이 보이는 동안 매 프레임 다시 그려 물결이 흐르게 한다.
+        _ownedFishSelectionPreview.RefreshAnimatedTextures();
     }
 
     void OnGUI()
