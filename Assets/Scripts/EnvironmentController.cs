@@ -272,6 +272,19 @@ public class EnvironmentController : MonoBehaviour
     }
 
     /// <summary>
+    /// 던질 거리를 바꿨을 때 그 물고기의 선택 시 날씨와 볼륨 설정을 서서히 바꾸지 않고 바로 적용한다. 이번 판의 기본 날씨는 유지한다.
+    /// fish(기본 물고기면 null)와 기본 날씨를 사용하며, 목표 날씨, 현재 날씨 비중, 물고기 볼륨을 변경한다.
+    /// </summary>
+    public void ChangeFishInstant(FishType fish)
+    {
+        SetTarget(fish);
+        _rainWeight = _targetRain ? 1f : 0f;
+        _nightWeight = _targetNight ? 1f : 0f;
+        ApplyWeights();
+        SetFishVolume(fish, true);
+    }
+
+    /// <summary>
     /// 우주 하늘을 페이드 없이 바로 켜거나 끈다. 켜져 있는 동안에는 날씨가 바뀌어도 하늘을 우주로 두고 구름층을 숨긴다.
     /// active와 _spaceSkybox를 사용하며, 화면 스카이박스, 구름층 표시, 반사 프로브와 _isSpace를 변경한다.
     /// </summary>

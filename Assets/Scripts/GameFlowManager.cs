@@ -368,7 +368,7 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 열린 도감 프레임의 캡처와 등록을 기다린 뒤 화면을 투척 크기로 축소하고 던진다.
-    /// 입력값 없이 캡처 중 입력을 막고 도감, 커서, 투척 외형과 게임 상태를 변경한다.
+    /// 입력값 없이 캡처 중 입력을 막고 도감, 커서, 투척 외형, 환경과 게임 상태를 변경한다.
     /// </summary>
     private IEnumerator CaptureCatalogAndThrow()
     {
@@ -388,6 +388,7 @@ public class GameFlowManager : MonoBehaviour
             _catalogOpen = false;
             LockCursor(true);
             ApplyProjectileShape();
+            if (_environmentController != null) _environmentController.ChangeFishInstant(SelectedFish());
             yield return ShrinkPanelAndThrow(screenshot);
         }
         finally
