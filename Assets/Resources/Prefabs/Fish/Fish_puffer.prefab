@@ -101,7 +101,11 @@ MonoBehaviour:
     _displayName: PUFFER
     _value: 40
     _color: {r: 0.95, g: 0.8, b: 0.35, a: 1}
-    _spawnWeight: 0.12
+    _requiresEjection: 0
+    _allowRepeatEjection: 1
+    _maxConcurrent: 0
+    _stopAfterCatch: 0
+    _isRevealed: 1
     _shape: 0
     _length: 2
     _height: 1.3
@@ -113,9 +117,18 @@ MonoBehaviour:
     _liftMultiplier: 0.9
     _frictionMultiplier: 0.3
     _airGravityScale: 1
+    _selectEffects:
+      _causesRain: 0
+      _causesNight: 0
+      _preventsRain: 0
+      _preventsNight: 0
+      _volumeProfile: {fileID: 0}
+    _spawnConditions:
+      _onlyInRain: 0
+      _onlyAtNight: 0
+      _requiredPlayerFish: {fileID: 0}
+      _fallsFromSky: 0
   _body: {fileID: 7070125815422434734}
-  _renderers:
-  - {fileID: 335217239988722874}
 --- !u!114 &3817264950182736451
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -129,7 +142,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PufferAbility
   _inflateScale: 2.2
-  _inflatedGravityScale: 0.3
+  _inflatedGravityScale: 0.8
 --- !u!1 &6671979776909514670
 GameObject:
   m_ObjectHideFlags: 0
