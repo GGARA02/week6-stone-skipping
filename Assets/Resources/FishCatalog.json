@@ -125,12 +125,6 @@
     "description": "원래는 어두운 고래의 라이벌로 하늘을 날 예정이었습니다. 기획 회의에서 잘려 나간 뒤로, 이렇게라도 날 수 있어 만족하고 있습니다.",
     "unlockHint": "빛으로 밤바다를 날아보세요."
   },
-  "arrow": {
-    "spawnWeight": 0.2,
-    "displayName": "",
-    "description": "길쭉한 화살입니다. 날카로운 외형으로 바다를 가로지릅니다.",
-    "unlockHint": "수면에서 나타나는 화살을 맞혀 보세요."
-  },
   "week4arrow": {
     "spawnWeight": 0.2,
     "displayName": "빛",

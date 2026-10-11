@@ -91,4 +91,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlacedFish
   _spawner: {fileID: 0}
   _fishPrefab: {fileID: 114000001, guid: d838b94dca64e1f40ae9b8b5e6192238, type: 3}
-  _respawnOnRestart: 1
+  _respawnOnRestart: 0
+  _hideAfterAcquisition: 1
