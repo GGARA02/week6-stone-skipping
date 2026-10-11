@@ -15179,7 +15179,7 @@ MonoBehaviour:
   _spaceHintLeadTime: 0.6
   _popupHeight: 0.13
   _spaceHintHeight: 0.8
-  _endingCredit: {fileID: 0}
+  _endingCredit: {fileID: 1774445642}
 --- !u!4 &403970196
 Transform:
   m_ObjectHideFlags: 0

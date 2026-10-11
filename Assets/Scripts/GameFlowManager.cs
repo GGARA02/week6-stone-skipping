@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
+using UnityEngine.UI;
 
 using Unity.Cinemachine;
 
@@ -102,6 +103,10 @@ public class GameFlowManager : MonoBehaviour
     private FishSelectionPreview _fishSelectionPreview;
     private FishSelectionPreview _ownedFishSelectionPreview;
 
+    [Header("화면 투척 전환")]
+    [SerializeField, Min(0.1f)] private float _panelShrinkDuration = 0.65f;
+    private bool _screenThrowPending;
+
     [Header("엔딩 크레딧 UI")]
     [SerializeField] private EndingCreditUI _endingCredit;
 
@@ -164,7 +169,7 @@ public class GameFlowManager : MonoBehaviour
 
     void Update()
     {
-        if (_catalogCapturePending || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f) return;
+        if (_screenThrowPending || _catalogCapturePending || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f) return;
         Keyboard keyboard = Keyboard.current;
         Gamepad gamepad = Gamepad.current;
         if (_state == State.Ready && keyboard != null && keyboard.tabKey.wasPressedThisFrame)
@@ -278,6 +283,7 @@ public class GameFlowManager : MonoBehaviour
 
     void OnGUI()
     {
+        if (_screenThrowPending && !_catalogOpen) return;
         if (_fishSpawner.ScreenCapture.IsCapturing && _fishSpawner.ScreenCapture.HasFrame) return;
         if (!_showHud) return;
 
@@ -357,15 +363,18 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 열린 도감 프레임의 캡처와 등록을 기다린 뒤 도감 패널을 선택해 즉시 던진다.
+    /// 열린 도감 프레임의 캡처와 등록을 기다린 뒤 화면을 투척 크기로 축소하고 던진다.
     /// 입력값 없이 캡처 중 입력을 막고 도감, 커서, 투척 외형과 게임 상태를 변경한다.
     /// </summary>
     private IEnumerator CaptureCatalogAndThrow()
     {
         _catalogCapturePending = true;
+        _screenThrowPending = true;
+        Texture2D screenshot = null;
         try
         {
             yield return _fishSpawner.CatalogCapture.CapturePanel();
+            screenshot = ScreenCapture.CaptureScreenshotAsTexture();
             for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
             {
                 if (_fishSpawner.FishTypes[i].Id != "catalog") continue;
@@ -375,12 +384,84 @@ public class GameFlowManager : MonoBehaviour
             _catalogOpen = false;
             LockCursor(true);
             ApplyProjectileShape();
-            Throw();
+            yield return ShrinkPanelAndThrow(screenshot);
         }
         finally
         {
             _catalogCapturePending = false;
+            _screenThrowPending = false;
+            if (screenshot != null) Destroy(screenshot);
         }
+    }
+
+    /// <summary>
+    /// screenshot 전체를 회전 없이 실제 투척물의 화면 위치와 크기로 축소한다.
+    /// 카메라와 물고기 외형을 사용하며, 축소 완료 프레임부터 기존 회전과 비행을 시작한다.
+    /// </summary>
+    private IEnumerator ShrinkPanelAndThrow(Texture2D screenshot)
+    {
+        GameObject overlay = new GameObject("Screen Throw Overlay", typeof(Canvas));
+        Canvas canvas = overlay.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = short.MaxValue;
+        GameObject panel = new GameObject("Captured Panel", typeof(RectTransform), typeof(RawImage));
+        panel.transform.SetParent(overlay.transform, false);
+        RawImage image = panel.GetComponent<RawImage>();
+        image.texture = screenshot;
+        image.raycastTarget = false;
+        RectTransform rect = panel.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(Screen.width, Screen.height);
+        Renderer[] renderers = _fishGenerator.GetComponentsInChildren<Renderer>();
+        bool[] visible = new bool[renderers.Length];
+        Canvas[] fishCanvases = _fishGenerator.GetComponentsInChildren<Canvas>();
+        bool[] canvasVisible = new bool[fishCanvases.Length];
+        try
+        {
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                visible[i] = renderers[i].enabled;
+                renderers[i].enabled = false;
+            }
+            for (int i = 0; i < fishCanvases.Length; i++)
+            {
+                canvasVisible[i] = fishCanvases[i].enabled;
+                fishCanvases[i].enabled = false;
+            }
+            yield return new WaitForEndOfFrame();
+            Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            Camera camera = Camera.main;
+            foreach (Vector3 point in _fishGenerator.HullPoints)
+            {
+                Vector3 screen = camera.WorldToScreenPoint(_fishGenerator.transform.TransformPoint(point));
+                minimum = Vector2.Min(minimum, screen);
+                maximum = Vector2.Max(maximum, screen);
+            }
+            Vector2 destination = (minimum + maximum) * 0.5f - new Vector2(Screen.width, Screen.height) * 0.5f;
+            float targetScale = Mathf.Max((maximum.x - minimum.x) / Screen.width, (maximum.y - minimum.y) / Screen.height);
+            float elapsed = 0f;
+            while (elapsed < _panelShrinkDuration)
+            {
+                float progress = Mathf.SmoothStep(0f, 1f, elapsed / _panelShrinkDuration);
+                rect.localScale = Vector3.one * Mathf.Lerp(1f, targetScale, progress);
+                rect.anchoredPosition = Vector2.Lerp(Vector2.zero, destination, progress);
+                yield return null;
+                elapsed += Time.unscaledDeltaTime;
+            }
+            rect.localScale = Vector3.one * targetScale;
+            rect.anchoredPosition = destination;
+            yield return new WaitForEndOfFrame();
+        }
+        finally
+        {
+            for (int i = 0; i < renderers.Length; i++)
+                if (renderers[i] != null) renderers[i].enabled = visible[i];
+            for (int i = 0; i < fishCanvases.Length; i++)
+                if (fishCanvases[i] != null) fishCanvases[i].enabled = canvasVisible[i];
+            overlay.SetActive(false);
+            Destroy(overlay);
+        }
+        Throw();
     }
 
     /// <summary>
@@ -963,13 +1044,35 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 엔딩 크레딧을 종료하고 크레딧 물고기(endingcredit)를 선택하여 재시작 후 즉시 투척한다.
-    /// 입력값은 없으며, CompleteEndingCredit 후 Throw를 호출한다.
+    /// 크레딧 화면을 유지한 채 축소 후 투척 전환을 한 번 시작한다.
+    /// 입력값 없이 중복 입력을 막고 크레딧 캡처 코루틴을 실행한다.
     /// </summary>
     private void ThrowCreditFish()
     {
-        CompleteEndingCredit();
-        Throw();
+        if (_screenThrowPending) return;
+        _screenThrowPending = true;
+        StartCoroutine(CaptureCreditAndThrow());
+    }
+
+    /// <summary>
+    /// 크레딧이 그려진 프레임을 캡처한 뒤 기존 재시작 준비와 화면 축소를 순서대로 실행한다.
+    /// 입력값 없이 캡처 이미지를 해제하고 전환 중 입력 차단 상태를 복원한다.
+    /// </summary>
+    private IEnumerator CaptureCreditAndThrow()
+    {
+        Texture2D screenshot = null;
+        try
+        {
+            yield return new WaitForEndOfFrame();
+            screenshot = ScreenCapture.CaptureScreenshotAsTexture();
+            CompleteEndingCredit();
+            yield return ShrinkPanelAndThrow(screenshot);
+        }
+        finally
+        {
+            if (screenshot != null) Destroy(screenshot);
+            _screenThrowPending = false;
+        }
     }
 
     /// <summary>

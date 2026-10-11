@@ -9,6 +9,7 @@ public class EndingCreditUI : MonoBehaviour
 
     [Header("Settings")]
     private float _timer;
+    private bool _skipRequested;
 
     public event Action OnEndingCompleted;
     public event Action OnEndingSkipped;
@@ -16,12 +17,14 @@ public class EndingCreditUI : MonoBehaviour
     void OnEnable()
     {
         _timer = 0f;
+        _skipRequested = false;
     }
 
     void Update()
     {
+        if (_skipRequested) return;
         HandleSkipInput();
-        UpdateTimer();
+        if (!_skipRequested) UpdateTimer();
     }
 
     /// <summary>
@@ -35,12 +38,13 @@ public class EndingCreditUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 스킵 입력 또는 외부 스킵 버튼 클릭 시 크레딧을 즉시 종료하고 스킵 이벤트를 호출한다.
-    /// 입력값은 없으며, gameObject를 비활성화하고 OnEndingSkipped 이벤트를 호출한다.
+    /// 스킵 입력 또는 버튼 클릭 시 화면 캡처를 위해 크레딧을 유지하고 스킵 이벤트를 한 번 호출한다.
+    /// 입력값 없이 중복 스킵과 자동 완료를 막으며, 화면 종료는 전환 흐름에서 처리한다.
     /// </summary>
     public void SkipCredits()
     {
-        gameObject.SetActive(false);
+        if (_skipRequested) return;
+        _skipRequested = true;
         OnEndingSkipped?.Invoke();
     }
 
