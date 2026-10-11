@@ -2,29 +2,49 @@ using System;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
+
+using TMPro;
 
 public class EndingCreditUI : MonoBehaviour
 {
-    private const float DISPLAYDURATION = 5f;
+    private const float DISPLAYDURATION = 16f;
+    private const float PULSE_SPEED = 4f;
+    private const float MIN_SCALE = 0.92f;
+    private const float MAX_SCALE = 1.12f;
+    private const string SKIP_PROMPT_TEXT = "<b>Press <color=#FFD700>[ SPACE ]</color></b> <color=#FFFFFF>to Skip Credits >></color>";
 
     [Header("Settings")]
     private float _timer;
     private bool _skipRequested;
 
+    [Header("Skip UI")]
+    [SerializeField] private TMP_Text _skipMessage;
+    private RectTransform _promptRect;
+    private float _pulseTimer;
+
     public event Action OnEndingCompleted;
     public event Action OnEndingSkipped;
+
+    void Awake()
+    {
+        CreateSkipPrompt();
+    }
 
     void OnEnable()
     {
         _timer = 0f;
         _skipRequested = false;
+        _pulseTimer = 0f;
+        _promptRect.localScale = Vector3.one;
     }
 
     void Update()
     {
         if (_skipRequested) return;
         HandleSkipInput();
-        if (!_skipRequested) UpdateTimer();
+        UpdateTimer();
+        UpdatePulseEffect();
     }
 
     /// <summary>
@@ -85,5 +105,88 @@ public class EndingCreditUI : MonoBehaviour
         {
             FinishCredits();
         }
+    }
+
+    /// <summary>
+    /// 외곽 테두리와 반투명 배경을 포함한 버튼 형태의 스킵 안내 UI를 동적으로 생성한다.
+    /// TextMeshProUGUI, Image, RectTransform을 사용하며, _skipMessage와 _promptRect를 생성 및 초기화한다.
+    /// </summary>
+    private void CreateSkipPrompt()
+    {
+        // 버튼 전체를 감싸는 루트 컨테이너를 생성하고 하단 중앙에 배치한다.
+        GameObject rootObj = new GameObject("SkipPromptButton", typeof(RectTransform));
+        rootObj.transform.SetParent(transform, false);
+
+        RectTransform rootRect = rootObj.GetComponent<RectTransform>();
+        rootRect.anchorMin = new Vector2(0.5f, 0f);
+        rootRect.anchorMax = new Vector2(0.5f, 0f);
+        rootRect.pivot = new Vector2(0.5f, 0.5f);
+        rootRect.anchoredPosition = new Vector2(0f, 45f);
+        rootRect.sizeDelta = new Vector2(600f, 50f);
+
+        _promptRect = rootRect;
+
+        // 외곽선 테두리용 이미지를 생성하여 루트 전체 영역에 채운다.
+        GameObject borderObj = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        borderObj.transform.SetParent(rootRect, false);
+
+        RectTransform borderRect = borderObj.GetComponent<RectTransform>();
+        borderRect.anchorMin = Vector2.zero;
+        borderRect.anchorMax = Vector2.one;
+        borderRect.sizeDelta = Vector2.zero;
+
+        Image borderImage = borderObj.GetComponent<Image>();
+        borderImage.color = new Color(1f, 0.84f, 0f, 0.85f);
+        borderImage.raycastTarget = false;
+
+        // 테두리 안쪽을 덮는 어두운 반투명 배경 이미지를 생성한다.
+        GameObject bgObj = new GameObject("Background", typeof(RectTransform), typeof(Image));
+        bgObj.transform.SetParent(borderRect, false);
+
+        RectTransform bgRect = bgObj.GetComponent<RectTransform>();
+        bgRect.anchorMin = Vector2.zero;
+        bgRect.anchorMax = Vector2.one;
+        bgRect.offsetMin = new Vector2(2f, 2f);
+        bgRect.offsetMax = new Vector2(-2f, -2f);
+
+        Image bgImage = bgObj.GetComponent<Image>();
+        bgImage.color = new Color(0.08f, 0.08f, 0.08f, 0.85f);
+        bgImage.raycastTarget = false;
+
+        // 버튼 중앙에 스킵 텍스트를 배치한다.
+        GameObject textObj = new GameObject("SkipText", typeof(RectTransform), typeof(TextMeshProUGUI));
+        textObj.transform.SetParent(bgRect, false);
+
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.sizeDelta = Vector2.zero;
+
+        _skipMessage = textObj.GetComponent<TextMeshProUGUI>();
+        _skipMessage.text = SKIP_PROMPT_TEXT;
+        _skipMessage.fontSize = 20f;
+        _skipMessage.alignment = TextAlignmentOptions.Center;
+        _skipMessage.raycastTarget = false;
+
+        // 크레딧 내 다른 텍스트의 폰트가 존재하면 동일하게 맞춰준다.
+        TMP_Text referenceText = GetComponentInChildren<TMP_Text>(true);
+        if (referenceText != null && referenceText != _skipMessage && referenceText.font != null)
+        {
+            _skipMessage.font = referenceText.font;
+        }
+    }
+
+    /// <summary>
+    /// 스킵 버튼 전체의 크기를 시간에 따라 주기적으로 변경하여 시선을 끄는 펄스 연출을 재생한다.
+    /// Time.unscaledDeltaTime과 PULSE_SPEED를 사용하며, _promptRect의 localScale을 변경한다.
+    /// </summary>
+    private void UpdatePulseEffect()
+    {
+        // 시간에 따라 크기가 부드럽게 커졌다 작아지는 사인 곡선을 계산한다.
+        _pulseTimer += Time.unscaledDeltaTime * PULSE_SPEED;
+        float wave = (Mathf.Sin(_pulseTimer) + 1f) * 0.5f;
+        float scale = Mathf.Lerp(MIN_SCALE, MAX_SCALE, wave);
+
+        _promptRect.localScale = new Vector3(scale, scale, 1f);
     }
 }

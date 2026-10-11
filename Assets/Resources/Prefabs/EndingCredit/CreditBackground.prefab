@@ -95,6 +95,9 @@ MonoBehaviour:
   _creditText: {fileID: 0}
   _is3DMode: 0
   _autoApplyRectMask2D: 1
+  _maskPaddingBottom: 80
+  _maskPaddingTop: 90
+  _maskSoftnessY: 30
   _marginOffset: 100
 --- !u!1 &5142363612032009437
 GameObject:

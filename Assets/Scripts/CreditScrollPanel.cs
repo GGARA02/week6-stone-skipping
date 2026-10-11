@@ -9,6 +9,8 @@ using TMPro;
 public class CreditScrollPanel : MonoBehaviour
 {
     private const string DEFAULT_TITLE = "Special Thanks";
+    private const float UI_TITLE_SPACING = 70f;
+    private const float WORLD_TITLE_SPACING = 150f;
 
     [Header("Font")]
     [SerializeField] private TMP_FontAsset _fontAsset;
@@ -19,6 +21,7 @@ public class CreditScrollPanel : MonoBehaviour
     [Header("UI Reference")]
     [Tooltip("스크롤될 CreditPanel (미할당 시 본 오브젝트의 RectTransform)")]
     [SerializeField] private RectTransform _creditPanel;
+    [SerializeField] private TMP_Text _titleText;
     [SerializeField] private TMP_Text _creditText;
 
     [Header("Display Mode (Text Size)")]
@@ -32,12 +35,22 @@ public class CreditScrollPanel : MonoBehaviour
     [Header("Mask Settings")]
     [Tooltip("부모 패널에 RectMask2D를 자동 적용하여 보드 크기 밖으로 나가는 글자를 자를지 여부")]
     [SerializeField] private bool _autoApplyRectMask2D = true;
+    [Tooltip("2D UI 모드에서 하단 스킵 문구와 겹치지 않도록 마스크를 띄울 여백(px)")]
+    private float _maskPaddingBottom = 80f;
+    [Tooltip("2D UI 모드에서 상단 경계와 여백을 둘 마스크 여백(px)")]
+    private float _maskPaddingTop = 50f;
+    [Tooltip("마스크 상하단 경계면의 부드러운 페이드아웃 효과 크기(px)")]
+    private int _maskSoftnessY = 30;
 
     [Header("Scroll Settings")]
-    [Tooltip("위로 스크롤되는 속도 (px/초)")]
-    private float _scrollSpeed = 120f;
+    [Tooltip("기여자 목록 좌우 위치 오프셋(px, 음수 시 왼쪽으로 이동)")]
+    [SerializeField] private float _horizontalOffset = -80f;
+    [Tooltip("제목(Special Thanks) 좌우 위치 오프셋(px, 0이면 정중앙)")]
+    [SerializeField] private float _titleOffset = 0f;
     [Tooltip("바닥 시작 및 상단 종료 시 추가 여백(px)")]
     [SerializeField] private float _marginOffset = 140f;
+    [Tooltip("위로 스크롤되는 속도 (px/초)")]
+    private float _scrollSpeed = 120f;
 
     private bool _isInitialized;
 
@@ -68,16 +81,24 @@ public class CreditScrollPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// 부모 패널에 RectMask2D가 없으면 자동으로 추가하여 보드 영역 바깥의 글자를 마스킹한다.
-    /// _creditPanel의 부모를 탐색하며, 필요 시 RectMask2D 컴포넌트를 추가한다.
+    /// 부모 패널에 RectMask2D를 적용하고 2D UI 모드 시 상하단 패딩 및 소프트니스 페이드를 설정한다.
+    /// _autoApplyRectMask2D와 _is3DMode를 사용하며, RectMask2D 컴포넌트의 padding과 softness를 변경한다.
     /// </summary>
     private void EnsureRectMask()
     {
         if (!_autoApplyRectMask2D || _creditPanel == null || _creditPanel.parent == null) return;
 
-        if (_creditPanel.parent.GetComponent<RectMask2D>() == null && _creditPanel.parent.GetComponent<Mask>() == null)
+        RectMask2D mask = _creditPanel.parent.GetComponent<RectMask2D>();
+        if (mask == null && _creditPanel.parent.GetComponent<Mask>() == null)
         {
-            _creditPanel.parent.gameObject.AddComponent<RectMask2D>();
+            mask = _creditPanel.parent.gameObject.AddComponent<RectMask2D>();
+        }
+
+        if (mask != null && !_is3DMode)
+        {
+            // 하단 스킵 문구와 상단 화면 경계에 여백을 두고 경계면을 부드럽게 페이드 처리한다.
+            mask.padding = new Vector4(0f, _maskPaddingBottom, 0f, _maskPaddingTop);
+            mask.softness = new Vector2Int(0, _maskSoftnessY);
         }
     }
 
@@ -100,10 +121,13 @@ public class CreditScrollPanel : MonoBehaviour
     {
         if (_creditPanel == null) return;
 
+        UpdateTextOffsets();
+
         float startY = GetStartY();
         float endY = GetEndY();
 
         Vector2 pos = _creditPanel.anchoredPosition;
+        pos.x = 0f;
         pos.y += _scrollSpeed * Time.unscaledDeltaTime;
 
         // 화면 위로 완전히 벗어나면 바닥 위치로 되돌려 무한 반복한다.
@@ -117,20 +141,25 @@ public class CreditScrollPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// Special Thanks 제목과 기여자 목록을 영화 크레딧 형태로 조합하여 텍스트 상단부터 반영한다.
-    /// _contributor의 목록을 사용하며, _creditText의 내용과 상단 정렬을 변경한다.
+    /// Special Thanks 제목과 기여자 목록을 분리하여 각각의 텍스트 컴포넌트에 반영한다.
+    /// _contributor의 목록을 사용하며, _titleText와 _creditText의 내용을 설정한다.
     /// </summary>
     private void SetupCreditContent()
     {
+        float fontSize = _is3DMode ? WORLDFONTSIZE : UIFONTSIZE;
+
+        if (_titleText != null)
+        {
+            _titleText.fontSize = fontSize;
+            _titleText.text = $"<size=140%><b>{DEFAULT_TITLE}</b></size>";
+            _titleText.alignment = TextAlignmentOptions.Center;
+        }
+
         if (_creditText == null) return;
 
-        _creditText.fontSize = _is3DMode ? WORLDFONTSIZE : UIFONTSIZE;
+        _creditText.fontSize = fontSize;
 
         StringBuilder builder = new StringBuilder();
-        builder.AppendLine("<align=center><size=140%><b>" + DEFAULT_TITLE + "</b></size></align>");
-        builder.AppendLine();
-        builder.AppendLine();
-
         if (_contributor != null && _contributor.contributorList != null)
         {
             for (int i = 0; i < _contributor.contributorList.Count; i++)
@@ -188,20 +217,63 @@ public class CreditScrollPanel : MonoBehaviour
         _creditPanel.localRotation = Quaternion.identity;
         _creditPanel.localScale = Vector3.one;
         _creditPanel.anchoredPosition = new Vector2(0f, GetStartY());
+
+        UpdateTextOffsets();
     }
 
     /// <summary>
-    /// 크레딧 텍스트 컴포넌트가 없으면 패널 자식에 상단 정렬 형태로 새로 생성한다.
-    /// _creditPanel을 탐색하며, _creditText를 초기화한다.
+    /// 제목 및 본문 텍스트 컴포넌트가 없으면 패널 자식에 새로 생성하고 초기화한다.
+    /// _creditPanel을 탐색하며, _titleText와 _creditText를 초기화한다.
     /// </summary>
     private void EnsureCreditText()
     {
         if (_isInitialized) return;
         _isInitialized = true;
 
+        float fontSize = _is3DMode ? WORLDFONTSIZE : UIFONTSIZE;
+        float titleSpacing = GetTitleSpacing();
+
+        if (_titleText == null)
+        {
+            Transform titleChild = _creditPanel.Find("TitleText");
+            if (titleChild != null)
+            {
+                _titleText = titleChild.GetComponent<TMP_Text>();
+            }
+        }
+
+        if (_titleText == null)
+        {
+            GameObject titleObj = new GameObject("TitleText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            titleObj.transform.SetParent(_creditPanel, false);
+
+            RectTransform titleRect = titleObj.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.05f, 1f);
+            titleRect.anchorMax = new Vector2(0.95f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.sizeDelta = new Vector2(0f, titleSpacing);
+            titleRect.anchoredPosition = new Vector2(_titleOffset, 0f);
+
+            _titleText = titleObj.GetComponent<TextMeshProUGUI>();
+            _titleText.font = _fontAsset;
+            _titleText.fontSize = fontSize;
+            _titleText.color = Color.white;
+            _titleText.alignment = TextAlignmentOptions.Center;
+        }
+        else
+        {
+            _titleText.font = _fontAsset;
+            _titleText.fontSize = fontSize;
+            _titleText.alignment = TextAlignmentOptions.Center;
+        }
+
         if (_creditText == null)
         {
-            _creditText = _creditPanel.GetComponentInChildren<TMP_Text>();
+            Transform creditChild = _creditPanel.Find("CreditText");
+            if (creditChild != null)
+            {
+                _creditText = creditChild.GetComponent<TMP_Text>();
+            }
         }
 
         if (_creditText == null)
@@ -210,24 +282,57 @@ public class CreditScrollPanel : MonoBehaviour
             textObj.transform.SetParent(_creditPanel, false);
 
             RectTransform rect = textObj.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.05f, 0f);
+            rect.anchorMin = new Vector2(0.05f, 1f);
             rect.anchorMax = new Vector2(0.95f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
             rect.sizeDelta = Vector2.zero;
-            rect.anchoredPosition = Vector2.zero;
+            rect.anchoredPosition = new Vector2(_horizontalOffset, -titleSpacing);
 
             _creditText = textObj.GetComponent<TextMeshProUGUI>();
             _creditText.font = _fontAsset;
-            _creditText.fontSize = _is3DMode ? WORLDFONTSIZE : UIFONTSIZE;
+            _creditText.fontSize = fontSize;
             _creditText.color = Color.white;
             _creditText.alignment = TextAlignmentOptions.Top;
         }
         else
         {
             _creditText.font = _fontAsset;
-            _creditText.fontSize = _is3DMode ? WORLDFONTSIZE : UIFONTSIZE;
+            _creditText.fontSize = fontSize;
             _creditText.alignment = TextAlignmentOptions.Top;
         }
+    }
+
+    /// <summary>
+    /// 제목 및 기여자 텍스트의 가로 오프셋 위치를 갱신한다.
+    /// _titleOffset과 _horizontalOffset을 사용하며, 각 텍스트의 anchoredPosition을 변경한다.
+    /// </summary>
+    private void UpdateTextOffsets()
+    {
+        float titleSpacing = GetTitleSpacing();
+
+        if (_titleText != null)
+        {
+            Vector2 titlePos = _titleText.rectTransform.anchoredPosition;
+            titlePos.x = _titleOffset;
+            _titleText.rectTransform.anchoredPosition = titlePos;
+        }
+
+        if (_creditText != null)
+        {
+            Vector2 creditPos = _creditText.rectTransform.anchoredPosition;
+            creditPos.x = _horizontalOffset;
+            creditPos.y = -titleSpacing;
+            _creditText.rectTransform.anchoredPosition = creditPos;
+        }
+    }
+
+    /// <summary>
+    /// 모드에 따른 제목 텍스트 높이 및 본문과의 간격을 반환한다.
+    /// _is3DMode를 사용하며, 타이틀 영역 높이(픽셀)를 반환한다.
+    /// </summary>
+    private float GetTitleSpacing()
+    {
+        return _is3DMode ? WORLD_TITLE_SPACING : UI_TITLE_SPACING;
     }
 
     /// <summary>
@@ -266,15 +371,12 @@ public class CreditScrollPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// 크레딧 텍스트의 전체 세로 길이를 계산한다.
-    /// _creditText를 사용하며, 계산된 텍스트 높이(픽셀)를 반환한다.
+    /// 제목과 기여자 본문을 포함한 전체 세로 길이를 계산한다.
+    /// _creditText와 타이틀 간격을 사용하며, 계산된 전체 텍스트 높이(픽셀)를 반환한다.
     /// </summary>
     private float GetContentHeight()
     {
-        if (_creditText != null)
-        {
-            return _creditText.preferredHeight;
-        }
-        return 1000f;
+        float bodyHeight = _creditText != null ? _creditText.preferredHeight : 1000f;
+        return GetTitleSpacing() + bodyHeight;
     }
 }

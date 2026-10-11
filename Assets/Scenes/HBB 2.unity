@@ -21337,6 +21337,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: efa945dd070f6ae43805b1dd8e49d46d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EndingCreditUI
+  _skipMessage: {fileID: 0}
 --- !u!114 &1774445643
 MonoBehaviour:
   m_ObjectHideFlags: 0
