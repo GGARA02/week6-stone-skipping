@@ -34,6 +34,11 @@ public class EndingCreditUI : MonoBehaviour
 
     void Awake()
     {
+        Canvas canvas = GetComponent<Canvas>();
+        if (canvas != null)
+        {
+            canvas.sortingOrder = 550;
+        }
         CreateSkipPrompt();
     }
 
