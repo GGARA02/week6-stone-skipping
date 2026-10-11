@@ -27,7 +27,6 @@ public class InputManager
     public bool NextPressed => PlayerMap.Next.WasPressedThisFrame();
     public bool SprintHeld => PlayerMap.Sprint.IsPressed();
     public bool RestartPressed => PlayerMap.Restart.WasPressedThisFrame();
-    public bool RestartFromKeyboardPressed => RestartPressed && PlayerMap.Restart.activeControl?.device is Keyboard;
     public bool CatalogPressed => PlayerMap.Catalog.WasPressedThisFrame();
     public Vector2 NavigateInput => UIMap.Navigate.ReadValue<Vector2>();
     public bool SubmitPressed => UIMap.Submit.WasPressedThisFrame();
@@ -108,6 +107,56 @@ public class InputManager
     public bool IsKeyHeld(Key key)
     {
         return key != Key.None && Keyboard.current != null && Keyboard.current[key].isPressed;
+    }
+
+    /// <summary>
+    /// text의 액션 이름 자리표시자를 연결된 장치의 바인딩 이름으로 치환한다.
+    /// {Jump} 같은 자리표시자를 사용하며 키보드 또는 게임패드 안내 문자열을 반환한다.
+    /// </summary>
+    public string ReplaceBindingName(string text)
+    {
+        foreach (InputAction action in _inputActions)
+        {
+            string placeholder = $"{{{action.name}}}";
+            if (text.Contains(placeholder)) text = text.Replace(placeholder, GetBindingName(action));
+        }
+        return text;
+    }
+
+    /// <summary>
+    /// action에서 연결된 장치에 해당하는 첫 바인딩의 표시 이름을 반환한다.
+    /// 합성 입력은 구성 바인딩의 장치를 확인하며 액션 상태는 변경하지 않는다.
+    /// </summary>
+    private string GetBindingName(InputAction action)
+    {
+        for (int i = 0; i < action.bindings.Count; i++)
+        {
+            InputBinding binding = action.bindings[i];
+            if (binding.isPartOfComposite) continue;
+            bool isGamepad = binding.effectivePath.StartsWith("<Gamepad>/");
+            if (binding.isComposite)
+            {
+                for (int j = i + 1; j < action.bindings.Count && action.bindings[j].isPartOfComposite; j++)
+                {
+                    if (action.bindings[j].effectivePath.StartsWith("<Gamepad>/"))
+                    {
+                        isGamepad = true;
+                        break;
+                    }
+                }
+            }
+            if (GamePadConnected != isGamepad) continue;
+            if (!binding.isComposite) return action.GetBindingDisplayString(i);
+
+            string displayName = string.Empty;
+            for (int j = i + 1; j < action.bindings.Count && action.bindings[j].isPartOfComposite; j++)
+            {
+                if (displayName.Length > 0) displayName += "/";
+                displayName += action.GetBindingDisplayString(j);
+            }
+            return displayName;
+        }
+        return action.GetBindingDisplayString();
     }
 
     /// <summary>

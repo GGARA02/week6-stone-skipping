@@ -246,7 +246,7 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        if (Time.timeScale == 0f) return;
+        if (Time.timeScale == 0f || _isGameOver) return;
         // 던지기 전에는 방향키로 자세를 맞추고, 떠 있는 물고기에 바로 보여준다.
         if (!_isThrown)
         {
@@ -328,7 +328,7 @@ public class PlayerController : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        if (!enabled || !_isThrown || Time.timeScale == 0f) return;
+        if (!enabled || !_isThrown || _isGameOver || Time.timeScale == 0f) return;
 
         FishAbility ability = _fish.CurrentAbility;
         if (ability != null)
@@ -407,6 +407,8 @@ public class PlayerController : MonoBehaviour
         float spinSign = UnityEngine.Random.value < 0.5f ? -1f : 1f;
         _spinScale = spinSign * UnityEngine.Random.Range(_randomSpinRange.x, _randomSpinRange.y);
 
+        _playerRB.isKinematic = false;
+        _playerRB.detectCollisions = true;
         _playerRB.useGravity = false;
         _playerRB.linearVelocity = Vector3.zero;
         _playerRB.angularVelocity = Vector3.zero;
@@ -966,14 +968,14 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 한 번만 게임오버 상태로 바꾸고 이유와 함께 이벤트를 보낸다.
-    /// reason을 사용하며, _isGameOver와 _jumpPending을 변경한다.
+    /// 물리와 조작을 즉시 정지하고 한 번만 게임오버 이벤트를 보낸다.
+    /// reason을 사용하며 비행·접촉 상태와 Rigidbody 충돌을 끄고 정산 이유를 전달한다.
     /// </summary>
     public void GameOver(GameOverReason reason)
     {
         if (_isGameOver) return;
-        _isGameOver = true;
-        _jumpPending = false;
+        StopImmediately();
+        _playerRB.detectCollisions = false;
         OnGameOver?.Invoke(reason);
     }
 

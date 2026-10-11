@@ -92,7 +92,8 @@ public class Fish : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        if (_isWall || _isEjected || _caught || _landed || !_jumped || Time.timeScale == 0f || other.attachedRigidbody != _spawner.PlayerBody) return;
+        if (_isWall || _isEjected || _caught || _landed || !_jumped || !_spawner.CanCollectFish
+            || Time.timeScale == 0f || other.attachedRigidbody != _spawner.PlayerBody) return;
 
         if (_fisherQte != null)
         {
