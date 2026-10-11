@@ -139,13 +139,13 @@
     "unlockHint": "밤에 바다에서 나타나는 빛을 맞혀 보세요."
   },
   "whale_dark": {
-    "spawnWeight": 0.05,
+    "spawnWeight": 0.2,
     "displayName": "개씹어두운고래",
     "description": "한때 밤하늘을 누비며 온 도시를 정전시키던 빌딩 고래입니다. 지금은 물 위를 튈 때마다 박수를 받으니, 악당 인생 처음으로 환영받는 중입니다.",
     "unlockHint": "빛으로 밤바다를 날아보세요."
   },
   "whale_white": {
-    "spawnWeight": 0.05,
+    "spawnWeight": 0.2,
     "displayName": "개씹밝은고래",
     "description": "원래는 어두운 고래의 라이벌로 하늘을 날 예정이었습니다. 기획 회의에서 잘려 나간 뒤로, 이렇게라도 날 수 있어 만족하고 있습니다.",
     "unlockHint": "빛으로 밤바다를 날아보세요."
