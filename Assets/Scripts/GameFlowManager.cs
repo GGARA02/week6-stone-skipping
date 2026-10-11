@@ -492,7 +492,11 @@ public class GameFlowManager : MonoBehaviour
             _endingAlienInstance = null;
         }
         _endingCinemaRunning = false;
-        _fishSpawner.Clear();
+        if (_fishSpawner != null)
+        {
+            _fishSpawner.enabled = true;
+            _fishSpawner.Clear();
+        }
         ApplyProjectileShape();
         if (_cameraController != null)
         {
@@ -1198,16 +1202,16 @@ public class GameFlowManager : MonoBehaviour
         _state = State.GameOver;
         _showHud = false;
 
+        if (_fishSpawner != null)
+        {
+            _fishSpawner.Clear();
+            _fishSpawner.enabled = false;
+        }
+
         if (_playerController != null)
         {
+            _playerController.StopImmediately();
             _playerController.enabled = false;
-            Rigidbody rb = _playerController.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-                rb.isKinematic = true;
-            }
         }
 
         _endingCinemaCoroutine = StartCoroutine(PlayEndingCinemaRoutine());
