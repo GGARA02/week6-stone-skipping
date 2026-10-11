@@ -374,11 +374,6 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 135000001}
   m_SourcePrefab: {fileID: 100100000, guid: 6218e11d765e4ce4bad457f6099fbdae, type: 3}
---- !u!137 &1168247625074693255 stripped
-SkinnedMeshRenderer:
-  m_CorrespondingSourceObject: {fileID: -8510500791693994474, guid: 6218e11d765e4ce4bad457f6099fbdae, type: 3}
-  m_PrefabInstance: {fileID: 1860782248599700113}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1518762323126157248 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 6218e11d765e4ce4bad457f6099fbdae, type: 3}
@@ -401,21 +396,33 @@ MonoBehaviour:
     _displayName: KING HOPAK
     _value: 50
     _color: {r: 0.958, g: 0.958, b: 0.958, a: 1}
-    _spawnWeight: 0.3
+    _allowRepeatEjection: 1
+    _maxConcurrent: 0
+    _stopAfterCatch: 0
+    _isRevealed: 1
     _shape: 0
     _length: 12.7
     _height: 5.3
     _thickness: 3.9
     _tailLength: 0
     _dorsalFin: 0
-    _inflateScale: 0
     _speedMultiplier: 1
     _spinMultiplier: 1
     _liftMultiplier: 1
     _frictionMultiplier: 0.25
     _airGravityScale: 1
+    _selectEffects:
+      _causesRain: 0
+      _causesNight: 0
+      _preventsRain: 0
+      _preventsNight: 0
+      _volumeProfile: {fileID: 0}
+    _spawnConditions:
+      _onlyInRain: 0
+      _onlyAtNight: 0
+      _requiredPlayerFish: {fileID: 0}
+      _fallsFromSky: 0
   _body: {fileID: 2186615154536228218}
-  _bodyRenderer: {fileID: 1168247625074693255}
 --- !u!54 &540000001
 Rigidbody:
   m_ObjectHideFlags: 0

@@ -713,7 +713,7 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// SPACE 판정 결과를 표시하고, 성공하면 선택한 프리팹의 애니메이션 또는 레이저를 재생한다.
+    /// SPACE 판정 결과를 표시하고, 성공하면 선택한 프리팹의 발 교대 애니메이션을 재생한다.
     /// judge와 timingError(초, 빠르면 음수)를 사용하며, 팝업, 판정 횟수와 프리팹 연출 상태를 변경한다.
     /// </summary>
     private void HandleJudge(SkipJudge judge, float timingError)
@@ -766,28 +766,17 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 선택한 물고기의 공격, 발 교대 또는 레이저 연출을 실행한다.
-    /// 현재 던질 거리의 자식 컴포넌트를 사용하며, 각 프리팹의 애니메이션과 레이저 표시 상태를 변경한다.
+    /// 판정 성공이나 미끄러짐 밀기 때 선택한 물고기의 발 교대 연출을 실행한다.
+    /// 현재 던질 거리의 자식 컴포넌트를 사용하며, 호팍 애니메이션 상태를 변경한다.
     /// </summary>
     private void PlayFishInteraction()
     {
-        BallController ballController = _fishGenerator.GetComponentInChildren<BallController>();
-        if (ballController != null)
-        {
-            ballController.PlayAttackSequence();
-        }
         HopakJumpAnimation hopakAnimation = _fishGenerator.GetComponentInChildren<HopakJumpAnimation>();
         if (hopakAnimation != null)
         {
             hopakAnimation.PlayJumpSegment();
         }
-        AlkagiLaser laser = _fishGenerator.GetComponentInChildren<AlkagiLaser>();
-        if (laser != null)
-        {
-            laser.Fire();
-        }
     }
-
     /// <summary>
     /// 물에 닿으면 파닥임을 멈추고 블랙홀의 투척별 최초 접촉 화면을 흡입한다.
     /// point와 speed는 쓰지 않으며, 캡처 시작 여부와 던질 거리의 파닥임을 변경한다.

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 
 using UnityEngine;
 
@@ -14,6 +15,27 @@ public class ShipNormalAbility : FishAbility
     private ShipAideController _controller;
     private bool _throwStarted;
 
+    [Header("톱날 절단")]
+    private PlayerController _player;
+    private MeshFilter _throwGeometry;
+    private Mesh _throwMesh;
+    private readonly List<Renderer> _saws = new List<Renderer>();
+    private readonly HashSet<CuttableWall> _contactWalls = new HashSet<CuttableWall>();
+    private readonly HashSet<CuttableWall> _currentWalls = new HashSet<CuttableWall>();
+    public override MeshFilter ThrowGeometry => _throwGeometry;
+
+    void FixedUpdate()
+    {
+        if (_player == null || !_player.IsThrown || _player.IsGameOver) return;
+
+        CutWallsWithSaws();
+    }
+
+    void OnDestroy()
+    {
+        if (_throwMesh != null) Destroy(_throwMesh);
+    }
+
     void OnDisable()
     {
         if (_flameRoutine != null) StopCoroutine(_flameRoutine);
@@ -28,6 +50,84 @@ public class ShipNormalAbility : FishAbility
     public void Bind(ShipAideController controller)
     {
         _controller = controller;
+    }
+
+    /// <summary>
+    /// 던질 개체가 될 때 플레이어와 톱날을 저장하고, 톱날을 뺀 선체만으로 투척 형상을 만든다.
+    /// 부모 PlayerController와 자식 MeshFilter, 이름이 Ice Saw인 자식을 사용하며, _player, _saws와 ThrowGeometry를 변경한다.
+    /// </summary>
+    public override void OnPrepareThrow()
+    {
+        _player = GetComponentInParent<PlayerController>();
+        foreach (Transform part in GetComponentsInChildren<Transform>(true))
+        {
+            if (part.name != "Ice Saw" && part.name != "IceSaw") continue;
+            Renderer saw = part.GetComponentInChildren<Renderer>(true);
+            if (saw != null) _saws.Add(saw);
+        }
+
+        // 톱날은 충돌체와 수면 판정에서 빼서 벽을 갈고 지나가고, 선체만 벽에 부딪히게 한다.
+        GameObject geometry = new GameObject("Ship Throw Geometry");
+        geometry.transform.SetParent(transform, false);
+        List<CombineInstance> parts = new List<CombineInstance>();
+        foreach (MeshFilter filter in GetComponentsInChildren<MeshFilter>(true))
+        {
+            if (IsSawPart(filter.transform)) continue;
+            for (int i = 0; i < filter.sharedMesh.subMeshCount; i++)
+            {
+                parts.Add(new CombineInstance
+                {
+                    mesh = filter.sharedMesh,
+                    subMeshIndex = i,
+                    transform = geometry.transform.worldToLocalMatrix * filter.transform.localToWorldMatrix,
+                });
+            }
+        }
+        _throwMesh = new Mesh { name = "Ship_Throw_Geometry" };
+        _throwMesh.CombineMeshes(parts.ToArray(), true, true);
+        _throwGeometry = geometry.AddComponent<MeshFilter>();
+        _throwGeometry.sharedMesh = _throwMesh;
+    }
+
+    /// <summary>
+    /// part 자신이나 배 안의 부모 중에 톱날이 있는지 확인한다.
+    /// part에서 이 오브젝트까지의 이름을 사용하며, 톱날의 일부면 true를 반환한다.
+    /// </summary>
+    private bool IsSawPart(Transform part)
+    {
+        for (Transform current = part; current != transform; current = current.parent)
+        {
+            if (current.name == "Ice Saw" || current.name == "IceSaw") return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 톱날 범위에서 다음 물리 단계까지 닿을 벽과 유빙을 톱날 높이에서 수평으로 갈아 자른다.
+    /// _saws의 범위와 플레이어 속도를 사용하며, 장애물 모양과 접촉 중인 벽 목록을 변경한다.
+    /// </summary>
+    private void CutWallsWithSaws()
+    {
+        Vector3 step = _player.Velocity * Time.fixedDeltaTime;
+        _currentWalls.Clear();
+        foreach (Renderer saw in _saws)
+        {
+            Bounds bounds = saw.bounds;
+            float radius = Mathf.Max(bounds.extents.x, bounds.extents.y, bounds.extents.z);
+            foreach (Collider collider in Physics.OverlapCapsule(bounds.center, bounds.center + step, radius, ~0, QueryTriggerInteraction.Ignore))
+            {
+                if (!collider.TryGetComponent(out CuttableWall wall)) continue;
+                // 닿아 있는 동안에는 한 번만 잘라 물리 단계마다 조각이 쏟아지지 않게 한다.
+                if (_contactWalls.Contains(wall) || _currentWalls.Contains(wall))
+                {
+                    _currentWalls.Add(wall);
+                    continue;
+                }
+                if (wall.Cut(bounds.center, Vector3.up)) _currentWalls.Add(wall);
+            }
+        }
+        _contactWalls.Clear();
+        _contactWalls.UnionWith(_currentWalls);
     }
 
     /// <summary>
