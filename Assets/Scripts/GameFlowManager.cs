@@ -1095,7 +1095,7 @@ public class GameFlowManager : MonoBehaviour
         {
             yield return new WaitForEndOfFrame();
             screenshot = ScreenCapture.CaptureScreenshotAsTexture();
-            CompleteEndingCredit();
+            PrepareCreditFishForThrow();
             yield return ShrinkPanelAndThrow(screenshot);
         }
         finally
@@ -1106,10 +1106,10 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 엔딩 크레딧을 정리하고 크레딧 물고기를 해금 및 선택한 뒤 재시작 상태로 전환한다.
+    /// 크레딧 물고기를 해금 및 선택하고 투척할 수 있도록 재시작 상태로 준비한다.
     /// 입력값은 없으며, 크레딧 물고기 해금, 선택 상태, HUD 및 카메라 복구, 게임 재시작을 수행한다.
     /// </summary>
-    private void CompleteEndingCredit()
+    private void PrepareCreditFishForThrow()
     {
         UnlockCreditFish();
         SelectCreditFish();
@@ -1133,6 +1133,22 @@ public class GameFlowManager : MonoBehaviour
         }
         _showHud = true;
         Restart(clearNewFish: false);
+    }
+
+    /// <summary>
+    /// 엔딩 크레딧을 정리하고 크레딧 물고기를 해금 및 선택한 뒤 게임오버(정산) 상태로 전환한다.
+    /// 새로 획득한 물고기 목록을 확인할 수 있도록 GameOver 화면을 표시한다.
+    /// </summary>
+    private void CompleteEndingCredit()
+    {
+        UnlockCreditFish();
+        SelectCreditFish();
+        if (_endingCredit != null)
+        {
+            _endingCredit.gameObject.SetActive(false);
+        }
+        _showHud = true;
+        HandleGameOver(GameOverReason.Stopped);
     }
 
     /// <summary>
