@@ -5,6 +5,7 @@ using UnityEngine;
 public class FisherQteController : MonoBehaviour
 {
     private const string SUCCESS_KEY = "SkipStoneV2.FisherQteSuccess";
+    private const string ATTEMPT_KEY = "SkipStoneV2.FisherQteAttempt";
     private const float DURATION = 5f;
     private const float SUCCESS_SPIN_DURATION = 0.3f;
 
@@ -26,10 +27,10 @@ public class FisherQteController : MonoBehaviour
     [Header("QTE 설정")]
     [SerializeField, Min(0.1f)] private float _cameraMoveDuration = 1f;
     [SerializeField, Min(0.1f)] private float _readyDuration = 1f;
-    [Tooltip("성공 0회, 1회, 2회, 3회 이상의 심볼 편도 이동 시간")]
-    [SerializeField] private Vector4 _symbolTravelTimes = new Vector4(1.6f, 1.2f, 0.9f, 0.7f);
-    [Tooltip("성공 횟수별 중앙 판정 영역의 전체 막대 대비 폭")]
-    [SerializeField] private Vector4 _successZoneWidths = new Vector4(0.2f, 0.15f, 0.1f, 0.07f);
+    [Tooltip("최초, 보통, 극한 난이도의 심볼 편도 이동 시간")]
+    [SerializeField] private Vector3 _symbolTravelTimes = new Vector3(1.6f, 1.2f, 0.1f);
+    [Tooltip("최초, 보통, 극한 난이도의 중앙 판정 영역 비율")]
+    [SerializeField] private Vector3 _successZoneWidths = new Vector3(0.2f, 0.15f, 0.001f);
 
     [Header("QTE 상태")]
     private Vector3 _incomingVelocity;
@@ -101,7 +102,7 @@ public class FisherQteController : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 접촉 상태와 누적 성공 횟수로 난이도를 정하고 카메라 진입 연출을 시작한다.
+    /// 현재 접촉 상태와 시도 기록으로 최초 난이도 또는 반반 확률의 보통 및 극한 난이도를 정한다.
     /// 접촉 속도와 시간 배율을 저장하고 게임을 정지하며 시작 여부를 반환한다.
     /// </summary>
     public bool TryBegin()
@@ -110,9 +111,10 @@ public class FisherQteController : MonoBehaviour
             || !_player.IsThrown || _player.IsGameOver || _spawner.ScreenCapture.IsCapturing
             || Time.timeScale <= 0f) return false;
         int successes = PlayerPrefs.GetInt(SUCCESS_KEY, 0);
-        int difficulty = Mathf.Clamp(successes, 0, 3);
+        int attempts = PlayerPrefs.GetInt(ATTEMPT_KEY, successes > 0 ? 1 : 0);
+        int difficulty = attempts == 0 ? 0 : Random.Range(1, 3);
         _symbolTravelTime = Mathf.Max(0.1f, _symbolTravelTimes[difficulty]);
-        _successZoneWidth = Mathf.Clamp(_successZoneWidths[difficulty], 0.01f, 1f);
+        _successZoneWidth = Mathf.Clamp(_successZoneWidths[difficulty], 0.0001f, 1f);
         _incomingVelocity = _spawner.PlayerBody.linearVelocity;
         _rotationBeforeQte = transform.rotation;
         _previousTimeScale = Time.timeScale;
@@ -127,7 +129,7 @@ public class FisherQteController : MonoBehaviour
 
     /// <summary>
     /// successes를 기록으로 사용해 카메라 이동 이후 Ready를 보여주고 입력 단계를 시작한다.
-    /// 실제 시간 대기 후 5초 제한 시간과 심볼 이동을 시작한다.
+    /// 실제 시간 대기 후 시도 횟수를 저장하고 5초 제한 시간과 심볼 이동을 시작한다.
     /// </summary>
     private IEnumerator PrepareInput(int successes)
     {
@@ -138,6 +140,9 @@ public class FisherQteController : MonoBehaviour
         _inputStartTime = Time.unscaledTime;
         _deadline = _inputStartTime + DURATION;
         _startedFrame = Time.frameCount;
+        int attempts = PlayerPrefs.GetInt(ATTEMPT_KEY, successes > 0 ? 1 : 0);
+        PlayerPrefs.SetInt(ATTEMPT_KEY, attempts + 1);
+        PlayerPrefs.Save();
         _ui.ShowTiming(_successZoneWidth, successes);
         _phase = QtePhase.Input;
     }

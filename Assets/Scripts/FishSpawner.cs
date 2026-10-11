@@ -111,8 +111,8 @@ public class FishSpawner : MonoBehaviour
     public PlayerProgress Progress => _progress;
 
     /// <summary>
-    /// type의 도감 상태를 그래프 해금, 습득 기록과 이번 판의 바다 출현 등록으로 반환한다.
-    /// 사출 후 다음 판에 바다 출현이 허용된 특수 종류도 발견 상태로 표시하며 습득 기록은 변경하지 않는다.
+    /// type의 도감 상태를 연결 해금, 즉시 발견 조건, 습득 기록과 바다 출현 등록으로 반환한다.
+    /// 발견과 실제 자연 출현 허용을 구분하며 습득 기록은 변경하지 않는다.
     /// </summary>
     public FishCatalogState GetCatalogState(FishType type)
     {
@@ -121,6 +121,15 @@ public class FishSpawner : MonoBehaviour
             && _seaSpawnRegistry.IsUnlocked(type.Id))
             return FishCatalogState.Discovered;
         return state;
+    }
+
+    /// <summary>
+    /// 플레이어 이동 거리 distance를 그래프에 전달해 도감 발견 조건 달성을 저장한다.
+    /// 자연 출현 등록과 다음 판 연결 해금은 변경하지 않는다.
+    /// </summary>
+    public void RecordDiscoveryDistance(float distance)
+    {
+        _unlockGraph.RecordDiscoveryDistance(distance);
     }
 
     void Awake()
