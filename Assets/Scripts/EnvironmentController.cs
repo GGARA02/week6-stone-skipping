@@ -246,14 +246,15 @@ public class EnvironmentController : MonoBehaviour
     }
 
     /// <summary>
-    /// 우주 하늘을 끄고, 이번 판의 기본 날씨를 확률로 새로 정하고, 고른 물고기의 날씨와 선택 시 볼륨까지 더해 바로 적용한다.
-    /// fish(기본 물고기면 null)와 비, 밤 확률을 사용하며, 우주 하늘 여부, 기본 날씨, 목표 날씨, 현재 날씨 비중, 물고기 볼륨을 변경한다.
+    /// 우주 하늘을 끄고, 이번 판의 기본 날씨를 정하고, 고른 물고기의 날씨와 선택 시 볼륨까지 더해 바로 적용한다.
+    /// fish(기본 물고기면 null)와 randomWeather, 비, 밤 확률을 사용하며, randomWeather가 false면 기본 날씨를 맑은 낮으로 둔다.
+    /// 우주 하늘 여부, 기본 날씨, 목표 날씨, 현재 날씨 비중, 물고기 볼륨을 변경한다.
     /// </summary>
-    public void Roll(FishType fish)
+    public void Roll(FishType fish, bool randomWeather = true)
     {
         SetSpace(false);
-        _baseRain = RollChance(_rainChance);
-        _baseNight = RollChance(_nightChance);
+        _baseRain = randomWeather && RollChance(_rainChance);
+        _baseNight = randomWeather && RollChance(_nightChance);
         SetTarget(fish);
         _rainWeight = _targetRain ? 1f : 0f;
         _nightWeight = _targetNight ? 1f : 0f;

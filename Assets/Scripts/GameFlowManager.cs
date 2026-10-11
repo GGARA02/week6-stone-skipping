@@ -59,6 +59,8 @@ public class GameFlowManager : MonoBehaviour
     private int _goodCount;
     private int _missCount;
     private bool _screenCaptureTriggered;
+    // 게임을 켠 뒤 한 번이라도 던졌는지. 던지기 전 재시작은 날씨를 다시 뽑지 않는다.
+    private bool _hasThrown;
     private bool _catalogOpen;
     private bool _catalogCapturePending;
     private FishType _catalogSelectedFish;
@@ -140,7 +142,8 @@ public class GameFlowManager : MonoBehaviour
         _bestSkips = PlayerPrefs.GetInt(BEST_SKIPS_KEY, 0);
         _bestDistance = PlayerPrefs.GetFloat(BEST_DISTANCE_KEY, 0f);
         _state = State.Ready;
-        if (_environmentController != null) _environmentController.Roll(SelectedFish());
+        // 게임을 켠 첫 판은 맑은 낮으로 시작한다.
+        if (_environmentController != null) _environmentController.Roll(SelectedFish(), false);
         _fishSelectionPreview = new FishSelectionPreview();
         _ownedFishSelectionPreview = new FishSelectionPreview(true);
         _ownedFishSelectionPreview.PrepareDefaultFishTexture(_fishGenerator.GetComponent<MeshFilter>().sharedMesh,
@@ -355,7 +358,7 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 선택한 던질 거리(기본 물고기 또는 도감에 등록된 물고기)를 최대 강화 기준 능력치로 던진다.
-    /// _projectileIndex와 진행 상황을 사용하며, _state를 변경한다.
+    /// _projectileIndex와 진행 상황을 사용하며, _state와 _hasThrown을 변경한다.
     /// </summary>
     private void Throw()
     {
@@ -364,6 +367,7 @@ public class GameFlowManager : MonoBehaviour
             ? fish.ToThrowModifiers(_progress.PowerMultiplier, _progress.SpinMultiplier)
             : ThrowModifiers.ForFish(_progress.PowerMultiplier, _progress.SpinMultiplier);
         _state = State.Flying;
+        _hasThrown = true;
         _screenCaptureTriggered = false;
         _playerController.Throw(modifiers);
     }
@@ -473,6 +477,7 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 새 던질 거리를 만들고 물고기와 카메라를 던지기 전 상태로 되돌린 뒤 이번 판 날씨를 새로 정한다.
+    /// 한 번도 던지지 않았으면(_hasThrown이 false) 날씨를 뽑지 않고 맑은 낮을 유지한다.
     /// clearNewFish가 true면 이번 판 신규 획득 목록을 비운다.
     /// 입력값은 없으며, 물고기, 던질 거리 메시, 물고기 상태, 카메라, _state, 날씨를 변경한다.
     /// </summary>
@@ -521,7 +526,7 @@ public class GameFlowManager : MonoBehaviour
         _goodCount = 0;
         _missCount = 0;
         _state = State.Ready;
-        if (_environmentController != null) _environmentController.Roll(SelectedFish());
+        if (_environmentController != null) _environmentController.Roll(SelectedFish(), _hasThrown);
         LockCursor(true);
     }
 
@@ -735,16 +740,22 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 던지기 전 안내와 지금 던질 거리를 그린다.
-    /// 화면 크기와 scale을 사용하며, 화면에 라벨을 그린다.
+    /// 던지기 전 안내와 지금 던질 거리를 그린다. 한 번이라도 던졌으면 재시작으로 날씨를 다시 뽑는 안내도 그린다.
+    /// 화면 크기와 scale, _hasThrown을 사용하며, 화면에 라벨을 그린다.
     /// </summary>
     private void DrawReady(float width, float height, float scale)
     {
         ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale), "SPACE TO THROW", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 80f * scale, width, 40f * scale),
-            "ARROWS tilt    A/D curve    SPACE when it hits the water    R new fish", _centerSubStyle, Color.white);
+            "ARROWS tilt    A/D curve    SPACE when it hits the water", _centerSubStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 112f * scale, width, 40f * scale),
-            "PAD   A throw/skip    R-stick tilt    L-stick/triggers curve    Y new fish", _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+            "PAD   A throw/skip    R-stick tilt    L-stick/triggers curve", _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+        // 첫 판은 맑은 낮으로 고정이고, 한 번 던진 뒤의 재시작부터 날씨와 낮밤을 다시 뽑는다.
+        if (_hasThrown)
+        {
+            ShadowLabel(new Rect(0f, height * 0.18f + 144f * scale, width, 40f * scale),
+                "R / Y   날씨 · 시간 · 장소 재설정", _centerSubStyle, new Color(1f, 0.92f, 0.7f));
+        }
 
         ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 40f * scale),
             "<  Q/LB   THROW   E/RB  >    TAB 도감", _centerSubStyle, new Color(1f, 0.92f, 0.7f));
