@@ -15363,6 +15363,8 @@ MonoBehaviour:
   _wrinkleStrength: 0.065
   _twistStrength: 0.045
   _finalCollapseSpeed: 3.5
+  _catalogDebrisSize: {x: 5, y: 5, z: 5}
+  _catalogScatterCount: 12
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -21508,6 +21510,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: efa945dd070f6ae43805b1dd8e49d46d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EndingCreditUI
+  _font: {fileID: 11400000, guid: da901c4c4f01db84a890f5de2a918872, type: 2}
   _skipMessage: {fileID: 0}
 --- !u!114 &1774445643
 MonoBehaviour:
