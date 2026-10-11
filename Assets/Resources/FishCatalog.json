@@ -36,7 +36,7 @@
     "unlockHint": "물수제비 중 나타나는 붉은 불가사리를 맞혀 보세요."
   },
   "babyshark": {
-    "spawnWeight": 0.025,
+    "spawnWeight": 0.1,
     "displayName": "부캉이",
     "description": "작은 상어입니다. 바다의 최상위 포식자가 될 예정이었지만, 그 전에 물수제비가 먼저 되었습니다.",
     "unlockHint": "바다에서 튀어 오르는 작은 상어를 맞혀 보세요."
