@@ -329,7 +329,7 @@ public class PlayerController : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        if (!_isThrown || Time.timeScale == 0f) return;
+        if (!enabled || !_isThrown || Time.timeScale == 0f) return;
 
         FishAbility ability = _fish.CurrentAbility;
         if (ability != null)
@@ -410,6 +410,26 @@ public class PlayerController : MonoBehaviour
         _playerRB.position = _startPosition;
         _playerRB.rotation = _startRotation;
         transform.SetPositionAndRotation(_startPosition, _startRotation);
+    }
+
+    /// <summary>
+    /// 외부 연출(시네마 등)을 위해 플레이어의 물리 이동과 속도를 즉시 멈추고 게임오버 상태로 전환한다.
+    /// 이벤트를 발생시키지 않고 비행과 물리 연산만 중단한다.
+    /// </summary>
+    public void StopImmediately()
+    {
+        _velocity = Vector3.zero;
+        _isGameOver = true;
+        _isThrown = false;
+        _inContact = false;
+        _isSliding = false;
+        _jumpPending = false;
+        if (_playerRB != null)
+        {
+            _playerRB.linearVelocity = Vector3.zero;
+            _playerRB.angularVelocity = Vector3.zero;
+            _playerRB.isKinematic = true;
+        }
     }
 
     /// <summary>
