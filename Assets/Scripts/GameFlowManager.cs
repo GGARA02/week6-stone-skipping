@@ -177,6 +177,7 @@ public class GameFlowManager : MonoBehaviour
 
     void Update()
     {
+        _fishSpawner.RecordDiscoveryDistance(_playerController.Distance);
         // 엔딩 시네마 연출 중에는 플레이어 및 게임 흐름 키 입력을 전면 차단한다.
         if (_endingCinemaRunning) return;
 
@@ -949,7 +950,7 @@ public class GameFlowManager : MonoBehaviour
             string name = revealed ? GetCatalogDisplayName(fish) : "?";
             ShadowLabel(new Rect(cell.x, cell.y + 142f * scale, cell.width, 34f * scale), name, _previewStyle, Color.white);
             ShadowLabel(new Rect(cell.x, cell.y + 180f * scale, cell.width, 28f * scale),
-                owned ? "획득" : revealed ? "발견 및 출현" : "미발견", _centerSubStyle,
+                owned ? "획득" : revealed ? "발견" : "미발견", _centerSubStyle,
                 owned ? new Color(1f, 0.92f, 0.7f) : new Color(1f, 1f, 1f, 0.45f));
         }
         GUI.EndScrollView();
