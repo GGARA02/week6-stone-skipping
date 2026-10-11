@@ -216,7 +216,9 @@ MonoBehaviour:
     _displayName: VOLCANO
     _value: 100
     _color: {r: 1, g: 1, b: 1, a: 1}
-    _spawnWeight: 0.1
+    _allowRepeatEjection: 1
+    _maxConcurrent: 0
+    _stopAfterCatch: 0
     _isRevealed: 1
     _shape: 0
     _length: 6
@@ -229,7 +231,38 @@ MonoBehaviour:
     _liftMultiplier: 1
     _frictionMultiplier: 1
     _airGravityScale: 1
+    _selectEffects:
+      _causesRain: 0
+      _causesNight: 0
+      _preventsRain: 0
+      _preventsNight: 0
+      _volumeProfile: {fileID: 0}
+    _spawnConditions:
+      _onlyInRain: 0
+      _onlyAtNight: 0
+      _requiredPlayerFish: {fileID: 0}
+      _fallsFromSky: 0
   _body: {fileID: 40000001}
+--- !u!114 &114000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8412425026369584677}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bff50c6b2b7d487499c7d2128b6771aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EjectFishAbility
+  _fishPrefab: {fileID: 114000003, guid: 8275716c08f94c27b315bb0c91629dd3, type: 3}
+  _origin: {fileID: 6113373415671624634}
+  _perfectOnly: 0
+  _maxEjections: 0
+  _localVelocity: {x: 0, y: 12, z: 0}
+  _inheritVelocity: 0.35
+  _collisionEjectCount: 6
+  _collisionScatterSpeed: 50
 --- !u!1001 &433493641409139344
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -458,21 +491,3 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3640661126572887836, guid: 318b88ba37b52fa40b0a3185308008e2, type: 3}
   m_PrefabInstance: {fileID: 7372721044016020646}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &114000002
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8412425026369584677}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bff50c6b2b7d487499c7d2128b6771aa, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::EjectFishAbility
-  _fishPrefab: {fileID: 114000003, guid: 8275716c08f94c27b315bb0c91629dd3, type: 3}
-  _origin: {fileID: 6113373415671624634}
-  _perfectOnly: 0
-  _maxEjections: 0
-  _localVelocity: {x: 0, y: 12, z: 0}
-  _inheritVelocity: 0.35

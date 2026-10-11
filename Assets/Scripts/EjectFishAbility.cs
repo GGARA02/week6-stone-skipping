@@ -18,6 +18,12 @@ public class EjectFishAbility : FishAbility
     [SerializeField] private Vector3 _localVelocity = new Vector3(0f, 12f, 0f);
     [SerializeField] private float _inheritVelocity = 0.35f;
 
+    [Header("충돌 사출")]
+    [Tooltip("장애물(벽) 충돌 시 사출할 개수 (0이면 충돌 시 미사출)")]
+    [SerializeField] private int _collisionEjectCount = 6;
+    [Tooltip("충돌 시 사방으로 튀어나갈 무작위 속도")]
+    [SerializeField] private float _collisionScatterSpeed;
+
     public Fish FishPrefab => _fishPrefab;
 
     /// <summary>
@@ -30,6 +36,30 @@ public class EjectFishAbility : FishAbility
             + Vector3.up * _localVelocity.y
             + context.Player.Velocity * _inheritVelocity;
         TryEjectFrom(context, judge, _origin, velocity, _origin.lossyScale);
+    }
+
+    /// <summary>
+    /// 장애물(벽)과 충돌했을 때 기준 위치에서 사방으로 여러 개의 물고기를 사출한다.
+    /// context와 collision을 사용하며, _collisionEjectCount만큼 무작위 속도를 부여해 사출한다.
+    /// </summary>
+    public override void OnObstacleCollision(ThrowContext context, Collision collision)
+    {
+        base.OnObstacleCollision(context, collision);
+
+        if (_origin == null || _collisionEjectCount <= 0) return;
+
+        // 충돌 시 사방으로 튀어나가도록 무작위 편차를 주어 연속 사출한다.
+        for (int i = 0; i < _collisionEjectCount; i++)
+        {
+            Vector3 randomSpread = Random.insideUnitSphere * _collisionScatterSpeed;
+            randomSpread.y = Mathf.Abs(randomSpread.y);
+
+            Vector3 velocity = _origin.TransformDirection(new Vector3(_localVelocity.x, 0f, _localVelocity.z))
+                + Vector3.up * _localVelocity.y
+                + randomSpread;
+
+            TryEjectFrom(context, SkipJudge.Good, _origin, velocity, _origin.lossyScale);
+        }
     }
 
     /// <summary>
