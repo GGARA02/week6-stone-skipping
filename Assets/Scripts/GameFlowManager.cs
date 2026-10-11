@@ -27,6 +27,8 @@ public class GameFlowManager : MonoBehaviour
     private const int DEFAULT_FISH_INDEX = -1;
     // 게임오버 직후 SPACE 연타로 바로 재시작되지 않게 기다리는 시간(초)
     private const float RETRY_INPUT_DELAY = 0.6f;
+    private const float CATALOG_NAVIGATION_DELAY = 0.3f;
+    private const float CATALOG_NAVIGATION_INTERVAL = 0.12f;
     private const string CREDIT_FISH_ID = "endingcredit";
     private const string MONSTER_FISH_ID = "monster";
     private const string FISH_KEY_PREFIX = "SkipStoneV2.Fish.";
@@ -73,8 +75,12 @@ public class GameFlowManager : MonoBehaviour
     private JObject _catalogEntries;
     private Vector2 _catalogScroll;
     private Vector2 _catalogDetailScroll;
+    private Vector2Int _catalogNavigateDirection;
+    private float _catalogNavigateTime;
+    private bool _catalogScrollToSelection;
     private Vector2 _resultScroll;
     private readonly List<int> _ownedOptions = new List<int>();
+    private readonly List<int> _selectionOptions = new List<int>();
     private readonly List<int> _catalogOptions = new List<int>();
     private readonly Dictionary<string, int> _catalogOrder = new Dictionary<string, int>();
     private readonly List<FishType> _newFish = new List<FishType>();
@@ -113,9 +119,12 @@ public class GameFlowManager : MonoBehaviour
     private GUIStyle _buttonStyle;
     private GUIStyle _previewStyle;
     private GUIStyle _catalogDetailStyle;
+    private GUIStyle _selectionDetailStyle;
     private float _styleScale = -1f;
     private FishSelectionPreview _fishSelectionPreview;
     private FishSelectionPreview _ownedFishSelectionPreview;
+    private readonly List<Renderer> _hiddenProjectileRenderers = new List<Renderer>();
+    private readonly List<Canvas> _hiddenProjectileCanvases = new List<Canvas>();
 
     [Header("화면 투척 전환")]
     [SerializeField, Min(0.1f)] private float _panelShrinkDuration = 0.65f;
@@ -207,6 +216,8 @@ public class GameFlowManager : MonoBehaviour
         if (_state == State.Ready && _input.CatalogPressed)
         {
             _catalogOpen = !_catalogOpen;
+            _catalogNavigateDirection = Vector2Int.zero;
+            _catalogScrollToSelection = _catalogOpen;
             LockCursor(!_catalogOpen);
             return;
         }
@@ -222,6 +233,7 @@ public class GameFlowManager : MonoBehaviour
                 _catalogOpen = false;
                 LockCursor(true);
             }
+            if (_catalogOpen) UpdateCatalogNavigation();
             return;
         }
         if (_endingCredit != null && _endingCredit.gameObject.activeInHierarchy)
@@ -294,8 +306,7 @@ public class GameFlowManager : MonoBehaviour
         {
             FishType fish = _fishSpawner.FishTypes[i];
             if (fish.Id != "screen" && fish.Id != "catalog" && fish.Id != "menu"
-                && (_progress.IsFishRegistered(fish)
-                    || (_catalogOpen && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)))
+                && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)
             {
                 FishSelectionPreview previews = _progress.IsFishRegistered(fish) ? _ownedFishSelectionPreview : _fishSelectionPreview;
                 previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block");
@@ -389,11 +400,12 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 선택한 던질 거리(기본 물고기 또는 도감에 등록된 물고기)를 최대 강화 기준 능력치로 던진다.
+    /// 선택한 던질 거리가 획득 상태일 때만 최대 강화 기준 능력치로 던진다.
     /// _projectileIndex와 진행 상황을 사용하며, _state와 _hasThrown을 변경한다.
     /// </summary>
     private void Throw()
     {
+        if (!CanThrowSelectedFish()) return;
         FishType fish = SelectedFish();
         ThrowModifiers modifiers = fish != null
             ? fish.ToThrowModifiers(_progress.PowerMultiplier, _progress.SpinMultiplier)
@@ -604,32 +616,33 @@ public class GameFlowManager : MonoBehaviour
         _goodCount = 0;
         _missCount = 0;
         _state = State.Ready;
-        if (_environmentController != null) _environmentController.Roll(SelectedFish(), _hasThrown);
+        if (_environmentController != null) _environmentController.Roll(CanThrowSelectedFish() ? SelectedFish() : null, _hasThrown);
         LockCursor(true);
     }
 
     /// <summary>
-    /// 기본 물고기와 도감에 등록된 물고기 사이에서 던질 거리를 바꾼다. 등록되지 않은 종류는 건너뛴다.
-    /// direction(-1 또는 1)을 사용하며, _projectileIndex, 던질 거리 메시와 고른 물고기에 따른 목표 날씨를 변경한다.
+    /// direction(-1 또는 1)으로 획득하거나 발견한 물고기 사이에서 선택 항목을 바꾼다.
+    /// _projectileIndex와 외형을 변경하며 미획득 항목은 기본 환경과 도감용 미리보기를 사용한다.
     /// </summary>
     private void CycleProjectile(int direction)
     {
         RefreshOwnedOptions();
-        int option = _ownedOptions.IndexOf(_projectileIndex);
-        int index = _ownedOptions[(option + direction + _ownedOptions.Count) % _ownedOptions.Count];
+        int option = _selectionOptions.IndexOf(_projectileIndex);
+        int index = _selectionOptions[(option + direction + _selectionOptions.Count) % _selectionOptions.Count];
         if (index == _projectileIndex) return;
         _projectileIndex = index;
         ApplyProjectileShape();
-        if (_environmentController != null) _environmentController.ChangeFish(SelectedFish());
+        if (_environmentController != null) _environmentController.ChangeFish(CanThrowSelectedFish() ? SelectedFish() : null);
     }
 
     /// <summary>
-    /// JSON 항목 순서로 도감 목록을 구성하고 기본 짱돌과 획득한 종류만 투척 선택 목록에 넣는다.
-    /// 등록된 종류와 저장 기록을 사용해 _catalogOptions와 _ownedOptions를 갱신한다.
+    /// JSON 순서로 전체 도감, 획득 목록과 미발견을 제외한 선택 목록을 구성한다.
+    /// 등록된 종류와 도감 상태를 사용해 _catalogOptions, _ownedOptions와 _selectionOptions를 갱신한다.
     /// </summary>
     private void RefreshOwnedOptions()
     {
         _ownedOptions.Clear();
+        _selectionOptions.Clear();
         _catalogOptions.Clear();
         _catalogOptions.Add(DEFAULT_FISH_INDEX);
         for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
@@ -645,6 +658,9 @@ public class GameFlowManager : MonoBehaviour
         {
             if (index == DEFAULT_FISH_INDEX || _progress.IsFishRegistered(_fishSpawner.FishTypes[index]))
                 _ownedOptions.Add(index);
+            if (index == DEFAULT_FISH_INDEX
+                || _fishSpawner.GetCatalogState(_fishSpawner.FishTypes[index]) != FishCatalogState.Undiscovered)
+                _selectionOptions.Add(index);
         }
     }
 
@@ -670,11 +686,18 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 선택한 던질 거리에 맞게 기본 물고기 또는 프리팹 메시를 만든다. 프리팹은 던지기 전부터 파닥이게 한다.
-    /// _projectileIndex를 사용하며, 던질 거리 메시, 파닥임 상태와 스포너가 아는 플레이어 물고기를 변경한다.
+    /// 선택 항목이 획득 상태이면 투척 메시를 만들고 미획득이면 실제 모델을 숨긴다.
+    /// _projectileIndex와 획득 기록을 사용하며 외형, 파닥임과 스포너의 플레이어 물고기를 변경한다.
     /// </summary>
     private void ApplyProjectileShape()
     {
+        if (!CanThrowSelectedFish())
+        {
+            SetProjectileVisualsVisible(false);
+            _fishSpawner.SetPlayerFish(null);
+            return;
+        }
+        SetProjectileVisualsVisible(true);
         FishType fish = SelectedFish();
         if (fish != null)
         {
@@ -688,6 +711,44 @@ public class GameFlowManager : MonoBehaviour
             _ownedFishSelectionPreview.PrepareDefaultFishTexture(_fishGenerator.GetComponent<MeshFilter>().sharedMesh,
                 _fishGenerator.GetComponent<MeshRenderer>().sharedMaterials);
             _fishSpawner.SetPlayerFish(null);
+        }
+    }
+
+    /// <summary>
+    /// 현재 선택 항목의 획득 기록을 확인해 투척 가능 여부를 반환한다.
+    /// 기본 짱돌은 항상 허용하며 발견 상태만으로는 투척을 허용하지 않는다.
+    /// </summary>
+    private bool CanThrowSelectedFish()
+    {
+        FishType fish = SelectedFish();
+        return fish == null || _progress.IsFishRegistered(fish);
+    }
+
+    /// <summary>
+    /// visible로 실제 투척 모델의 렌더러와 Canvas를 숨기거나 이전 활성 상태로 복원한다.
+    /// 생성기 자식의 표시 상태를 보관하며 원래 꺼진 파츠와 게임 동작은 변경하지 않는다.
+    /// </summary>
+    private void SetProjectileVisualsVisible(bool visible)
+    {
+        if (visible)
+        {
+            foreach (Renderer renderer in _hiddenProjectileRenderers) renderer.enabled = true;
+            foreach (Canvas canvas in _hiddenProjectileCanvases) canvas.enabled = true;
+            _hiddenProjectileRenderers.Clear();
+            _hiddenProjectileCanvases.Clear();
+            return;
+        }
+        foreach (Renderer renderer in _fishGenerator.GetComponentsInChildren<Renderer>(true))
+        {
+            if (!renderer.enabled) continue;
+            _hiddenProjectileRenderers.Add(renderer);
+            renderer.enabled = false;
+        }
+        foreach (Canvas canvas in _fishGenerator.GetComponentsInChildren<Canvas>(true))
+        {
+            if (!canvas.enabled) continue;
+            _hiddenProjectileCanvases.Add(canvas);
+            canvas.enabled = false;
         }
     }
 
@@ -832,15 +893,17 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 던지기 전 안내와 지금 던질 거리를 그린다. 한 번이라도 던졌으면 재시작으로 날씨를 다시 뽑는 안내도 그린다.
-    /// 화면 크기와 scale, _hasThrown을 사용하며, 화면에 라벨을 그린다.
+    /// 화면 크기와 scale, _hasThrown 및 획득 상태를 사용해 선택 항목의 설명 또는 힌트를 중앙 정렬로 그린다.
     /// </summary>
     private void DrawReady(float width, float height, float scale)
     {
-        ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale), _input.ReplaceBindingName("{Jump} 던지기 위하여"), _centerStyle, Color.white);
+        bool canThrow = CanThrowSelectedFish();
+        ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale),
+            canThrow ? _input.ReplaceBindingName("{Jump} 던지기 위하여") : "미획득 · 획득 후 투척 가능", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 80f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.IsUsingGamepad
-                ? "{Attitude} 기울이는    {Steer} / {CurveTriggers} 굽히는    {Jump} 물 점프    {Restart} 새 물고기"
-                : "방향키 기울이는    A/D 굽히는    {Jump} 물에 닿을 때    {Restart} 새 물고기"), _centerSubStyle, Color.white);
+                ? "{Steer} / {CurveTriggers} 굽히는    {Jump} 물 점프    {Restart} 새 물고기"
+                : "A/D 굽히는    {Jump} 물에 닿을 때    {Restart} 새 물고기"), _centerSubStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 112f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel} 차림표" : "ESC 차림표"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
         if (_hasThrown)
@@ -851,16 +914,21 @@ public class GameFlowManager : MonoBehaviour
         ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 40f * scale),
             _input.ReplaceBindingName("<  {Previous}   던지는   {Next}  >    {Catalog} 도감"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         DrawFishPreviews(width, height, scale);
+        string fishId = SelectedFish()?.Id ?? "default";
+        string details = _catalogEntries[fishId]?.Value<string>(canThrow ? "description" : "unlockHint");
+        float top = height * _spaceHintHeight + 44f * scale;
+        ShadowLabel(new Rect(width * 0.15f, top, width * 0.7f, Mathf.Max(0f, height - top - 12f * scale)),
+            details, _selectionDetailStyle, Color.white);
     }
 
     /// <summary>
-    /// 보유 선택 목록에서 현재 항목과 앞뒤 최대 두 개를 표시한다.
-    /// 화면 크기와 scale을 사용하며 보유 모델과 이름만 그린다.
+    /// 선택 목록의 현재 항목과 앞뒤 최대 두 개를 화면 크기와 scale에 맞춰 표시한다.
+    /// 획득 항목은 원본 외형을, 미획득 항목은 도감용 미리보기와 이름을 그린다.
     /// </summary>
     private void DrawFishPreviews(float width, float height, float scale)
     {
-        int optionCount = _ownedOptions.Count;
-        int selectedOption = _ownedOptions.IndexOf(_projectileIndex);
+        int optionCount = _selectionOptions.Count;
+        int selectedOption = _selectionOptions.IndexOf(_projectileIndex);
         float slotWidth = Mathf.Min(234f * scale, width * 0.16f);
         float slotHeight = slotWidth * 2f / 3f;
         float slotSpacing = width * 0.21f;
@@ -868,7 +936,7 @@ public class GameFlowManager : MonoBehaviour
         for (int offset = -Mathf.Min(2, (optionCount - 1) / 2); offset <= Mathf.Min(2, optionCount / 2); offset++)
         {
             Rect rect = new Rect(width * 0.5f + offset * slotSpacing - slotWidth * 0.5f, top, slotWidth, slotHeight);
-            if (offset == 0)
+            if (offset == 0 && CanThrowSelectedFish())
             {
                 FishType selectedFish = SelectedFish();
                 ShadowLabel(new Rect(rect.x, rect.yMax, slotWidth, 54f * scale),
@@ -876,7 +944,7 @@ public class GameFlowManager : MonoBehaviour
                         ? GetCatalogDisplayName(selectedFish) : "?", _previewStyle, new Color(1f, 0.92f, 0.7f));
                 continue;
             }
-            int index = _ownedOptions[(selectedOption + offset + optionCount) % optionCount];
+            int index = _selectionOptions[(selectedOption + offset + optionCount) % optionCount];
             if (index == DEFAULT_FISH_INDEX)
             {
                 GUI.DrawTexture(rect, _ownedFishSelectionPreview.DefaultFishTexture, ScaleMode.ScaleToFit, true);
@@ -886,13 +954,15 @@ public class GameFlowManager : MonoBehaviour
             }
 
             FishType fish = _fishSpawner.FishTypes[index];
-            Texture preview = fish.Id == "screen" ? _fishSpawner.ScreenCapture.Image
+            bool owned = _progress.IsFishRegistered(fish);
+            Texture preview = !owned ? _fishSelectionPreview.GetTexture(_fishSpawner.FishPrefabs[index])
+                : fish.Id == "screen" ? _fishSpawner.ScreenCapture.Image
                 : fish.Id == "catalog" ? _fishSpawner.CatalogCapture.Image
                 : fish.Id == "menu" ? _fishSpawner.MenuCapture.Image
                 : _ownedFishSelectionPreview.GetTexture(_fishSpawner.FishPrefabs[index]);
             if (preview != null) GUI.DrawTexture(rect, preview, ScaleMode.ScaleToFit, true);
             ShadowLabel(new Rect(rect.x, rect.yMax, slotWidth, 54f * scale), GetCatalogDisplayName(fish), _previewStyle,
-                new Color(0.75f, 0.75f, 0.75f, 0.7f));
+                offset == 0 ? new Color(1f, 0.92f, 0.7f) : new Color(0.75f, 0.75f, 0.75f, 0.7f));
         }
     }
 
@@ -973,7 +1043,7 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 전체 종류를 보유 상태와 함께 그리드로 그리고 선택한 항목의 JSON 상세 정보를 표시한다.
+    /// 전체 종류와 선택한 항목의 JSON 상세 정보를 그리며 선택 칸을 화면 안으로 스크롤한다.
     /// 화면 크기, scale과 마우스 입력을 사용하며 선택 항목과 도감·커서 상태를 변경한다.
     /// </summary>
     private void DrawCatalog(float width, float height, float scale)
@@ -986,14 +1056,16 @@ public class GameFlowManager : MonoBehaviour
         ShadowLabel(new Rect(0f, 24f * scale, width, 80f * scale), "도감", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, 108f * scale, width, 40f * scale),
             $"보유  {_ownedOptions.Count} / {_fishSpawner.FishTypes.Count + 1}    " + _input.ReplaceBindingName(_input.IsUsingGamepad
-                ? "{Catalog} / {Cancel} 닫기    {Jump} 투척" : "{Catalog} / ESC 닫기    {Jump} 투척"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
+                ? "{Navigate} 선택    {Catalog} / {Cancel} 닫기    {Jump} 투척" : "WASD 선택    {Catalog} / ESC 닫기    {Jump} 투척"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         Rect viewport = new Rect(width * 0.08f, 170f * scale, width * 0.84f, height - 430f * scale);
         bool pointerInViewport = viewport.Contains(Event.current.mousePosition);
-        int columns = Mathf.Max(1, Mathf.FloorToInt(viewport.width / (240f * scale)));
+        int columns = GetCatalogColumns(width, scale);
         float cellWidth = (viewport.width - 24f * scale) / columns;
         float cellHeight = 220f * scale;
         int count = _catalogOptions.Count;
         int rows = Mathf.CeilToInt((float)count / columns);
+        if (_catalogScrollToSelection)
+            ScrollCatalogSelectionIntoView(viewport.height, cellHeight, columns, rows);
         _catalogScroll = GUI.BeginScrollView(viewport, _catalogScroll,
             new Rect(0f, 0f, viewport.width - 24f * scale, rows * cellHeight));
         for (int option = 0; option < count; option++)
@@ -1007,8 +1079,7 @@ public class GameFlowManager : MonoBehaviour
             bool hovered = pointerInViewport && cell.Contains(Event.current.mousePosition);
             if (hovered && !_catalogCapturePending && Event.current.type == EventType.MouseDown && Event.current.button == 0)
             {
-                if (_catalogSelectedFish != fish) _catalogDetailScroll = Vector2.zero;
-                _catalogSelectedFish = fish;
+                SelectCatalogFish(fish);
                 Event.current.Use();
             }
             bool selected = fish == _catalogSelectedFish;
@@ -1026,7 +1097,7 @@ public class GameFlowManager : MonoBehaviour
             string name = revealed ? GetCatalogDisplayName(fish) : "?";
             ShadowLabel(new Rect(cell.x, cell.y + 142f * scale, cell.width, 34f * scale), name, _previewStyle, Color.white);
             ShadowLabel(new Rect(cell.x, cell.y + 180f * scale, cell.width, 28f * scale),
-                owned ? "획득" : revealed ? "발견" : "미발견", _centerSubStyle,
+                owned ? "획득" : revealed ? "미획득" : "???", _centerSubStyle,
                 owned ? new Color(1f, 0.92f, 0.7f) : new Color(1f, 1f, 1f, 0.45f));
         }
         GUI.EndScrollView();
@@ -1042,7 +1113,7 @@ public class GameFlowManager : MonoBehaviour
         JToken entry = _catalogEntries[selectedId];
         string heading = selectedOwned
             ? $"{selectedName}    누적 획득 {(selectedFish == null ? 0 : _progress.GetFishCount(selectedFish))}개"
-            : selectedState == FishCatalogState.Undiscovered ? "?    미발견" : $"{selectedName}    해금 힌트";
+            : selectedState == FishCatalogState.Undiscovered ? "???" : $"{selectedName}    해금 힌트";
         string text = selectedState == FishCatalogState.Undiscovered
             ? string.Empty : entry.Value<string>(selectedOwned ? "description" : "unlockHint");
         ShadowLabel(new Rect(details.x + 24f * scale, details.y + 14f * scale, details.width - 48f * scale, 36f * scale),
@@ -1063,6 +1134,93 @@ public class GameFlowManager : MonoBehaviour
             LockCursor(true);
         }
         GUI.enabled = true;
+    }
+
+    /// <summary>
+    /// Navigate 입력으로 도감 선택 칸을 이동하고 길게 누르면 일정 간격으로 반복한다.
+    /// 입력 방향, 화면 열 수와 JSON 순서를 사용하며 선택 항목과 반복 대기 시간을 변경한다.
+    /// </summary>
+    private void UpdateCatalogNavigation()
+    {
+        Vector2 input = _input.NavigateInput;
+        Vector2Int direction = Vector2Int.zero;
+        if (Mathf.Abs(input.y) >= Mathf.Abs(input.x) && Mathf.Abs(input.y) > 0.5f)
+            direction.y = input.y > 0f ? -1 : 1;
+        else if (Mathf.Abs(input.x) > 0.5f)
+            direction.x = input.x > 0f ? 1 : -1;
+        if (direction == Vector2Int.zero)
+        {
+            _catalogNavigateDirection = direction;
+            return;
+        }
+        bool firstInput = direction != _catalogNavigateDirection;
+        if (!firstInput && Time.unscaledTime < _catalogNavigateTime) return;
+        _catalogNavigateDirection = direction;
+        _catalogNavigateTime = Time.unscaledTime
+            + (firstInput ? CATALOG_NAVIGATION_DELAY : CATALOG_NAVIGATION_INTERVAL);
+
+        RefreshOwnedOptions();
+        int option = GetCatalogSelectedOption();
+        float scale = Mathf.Max(0.5f, Screen.height / 1080f);
+        int columns = GetCatalogColumns(Screen.width, scale);
+        int next = option;
+        if (direction.x < 0 && option % columns > 0) next--;
+        else if (direction.x > 0 && option % columns < columns - 1 && option + 1 < _catalogOptions.Count) next++;
+        else if (direction.y < 0 && option >= columns) next -= columns;
+        else if (direction.y > 0 && (option / columns + 1) * columns < _catalogOptions.Count)
+            next = Mathf.Min(option + columns, _catalogOptions.Count - 1);
+        if (next == option) return;
+        int index = _catalogOptions[next];
+        SelectCatalogFish(index == DEFAULT_FISH_INDEX ? null : _fishSpawner.FishTypes[index]);
+    }
+
+    /// <summary>
+    /// fish를 도감 선택 항목으로 설정하고 변경 시 상세 스크롤을 초기화한다.
+    /// 선택 상태를 저장하며 다음 그리기에서 선택 칸을 표시 범위에 넣도록 예약한다.
+    /// </summary>
+    private void SelectCatalogFish(FishType fish)
+    {
+        if (_catalogSelectedFish != fish) _catalogDetailScroll = Vector2.zero;
+        _catalogSelectedFish = fish;
+        _catalogScrollToSelection = true;
+    }
+
+    /// <summary>
+    /// 현재 선택 물고기를 JSON 순서의 도감 목록에서 찾아 선택 위치를 반환한다.
+    /// _catalogOptions와 선택 상태를 사용하며 해당 항목이 없으면 첫 위치를 반환한다.
+    /// </summary>
+    private int GetCatalogSelectedOption()
+    {
+        for (int option = 0; option < _catalogOptions.Count; option++)
+        {
+            int index = _catalogOptions[option];
+            FishType fish = index == DEFAULT_FISH_INDEX ? null : _fishSpawner.FishTypes[index];
+            if (fish == _catalogSelectedFish) return option;
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// width와 scale로 그리기와 입력 처리에 공통으로 사용할 도감 열 수를 반환한다.
+    /// 화면 너비의 84퍼센트와 기준 칸 너비를 사용하며 최소 한 열을 확보한다.
+    /// </summary>
+    private int GetCatalogColumns(float width, float scale)
+    {
+        return Mathf.Max(1, Mathf.FloorToInt(width * 0.84f / (240f * scale)));
+    }
+
+    /// <summary>
+    /// 선택 행을 viewportHeight 안에 표시하도록 도감 스크롤 위치를 보정한다.
+    /// cellHeight, columns, rows와 선택 위치를 사용하며 표시 범위와 갱신 예약을 변경한다.
+    /// </summary>
+    private void ScrollCatalogSelectionIntoView(float viewportHeight, float cellHeight, int columns, int rows)
+    {
+        float top = GetCatalogSelectedOption() / columns * cellHeight;
+        float bottom = top + cellHeight;
+        if (top < _catalogScroll.y) _catalogScroll.y = top;
+        else if (bottom > _catalogScroll.y + viewportHeight) _catalogScroll.y = bottom - viewportHeight;
+        _catalogScroll.y = Mathf.Clamp(_catalogScroll.y, 0f, Mathf.Max(0f, rows * cellHeight - viewportHeight));
+        _catalogScrollToSelection = false;
     }
 
     /// <summary>
@@ -1380,6 +1538,10 @@ public class GameFlowManager : MonoBehaviour
         _catalogDetailStyle = MakeStyle(22, TextAnchor.UpperLeft, scale);
         _catalogDetailStyle.fontStyle = FontStyle.Normal;
         _catalogDetailStyle.wordWrap = true;
+        _selectionDetailStyle = new GUIStyle(_catalogDetailStyle)
+        {
+            alignment = TextAnchor.UpperCenter,
+        };
         _popupStyle = MakeStyle(52, TextAnchor.MiddleCenter, scale);
         _debugStyle = MakeStyle(18, TextAnchor.UpperRight, scale);
         _debugStyle.fontStyle = FontStyle.Normal;
