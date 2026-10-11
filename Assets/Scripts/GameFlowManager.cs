@@ -27,6 +27,7 @@ public class GameFlowManager : MonoBehaviour
     private const int DEFAULT_FISH_INDEX = -1;
     // 게임오버 직후 SPACE 연타로 바로 재시작되지 않게 기다리는 시간(초)
     private const float RETRY_INPUT_DELAY = 0.6f;
+    private const string BLACKHOLE_FISH_ID = "blackhole";
     private const string CREDIT_FISH_ID = "endingcredit";
     private const string MONSTER_FISH_ID = "monster";
     private const string FISH_KEY_PREFIX = "SkipStoneV2.Fish.";
@@ -222,6 +223,15 @@ public class GameFlowManager : MonoBehaviour
             UpdatePauseMenu();
             return;
         }
+        if (_endingCredit != null && _endingCredit.gameObject.activeInHierarchy)
+        {
+            if (_endingCredit.CanSkip && _input.JumpPressed)
+            {
+                ThrowCreditFish();
+                return;
+            }
+            return;
+        }
         if (_state == State.GameOver)
         {
             if ((_input.RestartPressed || _input.JumpPressed)
@@ -245,15 +255,6 @@ public class GameFlowManager : MonoBehaviour
             {
                 _catalogOpen = false;
                 LockCursor(true);
-            }
-            return;
-        }
-        if (_endingCredit != null && _endingCredit.gameObject.activeInHierarchy)
-        {
-            if (_endingCredit.CanSkip && _input.JumpPressed)
-            {
-                ThrowCreditFish();
-                return;
             }
             return;
         }
@@ -334,6 +335,10 @@ public class GameFlowManager : MonoBehaviour
         // 도감이나 메뉴를 캡처하는 동안에는 그 화면을 계속 그려 캡처에 담는다.
         if (_screenThrowPending && !_catalogOpen && !_pauseOpen) return;
         if (_fishSpawner.ScreenCapture.IsCapturing && _fishSpawner.ScreenCapture.HasFrame) return;
+
+        // 물고기 획득 알림은 시네마 중이거나 정산 중이어도 항상 화면에 표시한다.
+        DrawFishPopup();
+
         if (_pauseOpen)
         {
             EnsureStyles();
@@ -389,14 +394,6 @@ public class GameFlowManager : MonoBehaviour
             color.a = 1f - t * t;
             float rise = 30f * s * t;
             ShadowLabel(new Rect(0f, height * _popupHeight - rise, width, 80f * s), _popupText, _popupStyle, color);
-        }
-        float fishPopupAge = Time.unscaledTime - _fishPopupTime;
-        if (_state != State.GameOver && _fishPopupText != null && fishPopupAge < POPUP_DURATION)
-        {
-            float t = fishPopupAge / POPUP_DURATION;
-            float top = Mathf.Max(height * 0.38f, height * _popupHeight + 100f * s);
-            ShadowLabel(new Rect(0f, top - 30f * s * t, width, 60f * s),
-                _fishPopupText, _centerSubStyle, new Color(1f, 0.85f, 0.3f, 1f - t * t));
         }
 
         if (_showDebug)
@@ -1080,6 +1077,25 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 물고기 획득 알림 팝업 텍스트를 화면에 렌더링한다.
+    /// _fishPopupText와 _fishPopupTime을 사용하며, 시간 경과에 따라 떠오르고 페이드아웃되는 라벨을 그린다.
+    /// </summary>
+    private void DrawFishPopup()
+    {
+        float fishPopupAge = Time.unscaledTime - _fishPopupTime;
+        if (_fishPopupText == null || fishPopupAge >= POPUP_DURATION) return;
+
+        EnsureStyles();
+        float s = _styleScale;
+        float width = Screen.width;
+        float height = Screen.height;
+        float t = fishPopupAge / POPUP_DURATION;
+        float top = Mathf.Max(height * 0.38f, height * _popupHeight + 100f * s);
+        ShadowLabel(new Rect(0f, top - 30f * s * t, width, 60f * s),
+            _fishPopupText, _centerSubStyle, new Color(1f, 0.85f, 0.3f, 1f - t * t));
+    }
+
+    /// <summary>
     /// 준비 화면에서 일시정지 메뉴를 열고 첫 버튼을 고른 뒤 마우스로도 누를 수 있게 커서를 푼다.
     /// 입력값 없이 _pauseOpen, _resetConfirmOpen, _pauseSelection과 커서 잠금 상태를 변경한다.
     /// </summary>
@@ -1418,6 +1434,13 @@ public class GameFlowManager : MonoBehaviour
             screenshot = ScreenCapture.CaptureScreenshotAsTexture();
             PrepareCreditFishForThrow();
             yield return ShrinkPanelAndThrow(screenshot);
+
+            // 화면 축소 연출이 완료된 직후 크레딧 물고기 획득 팝업을 표시한다.
+            FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
+            if (creditFish != null)
+            {
+                ShowFishPopup($"{GetCatalogDisplayName(creditFish)}을(를) 얻은!");
+            }
         }
         finally
         {
@@ -1471,7 +1494,34 @@ public class GameFlowManager : MonoBehaviour
         }
         _showHud = true;
         SetCinematicLetterbox(false);
+
+        // 크레딧 감상이 끝난 직후 크레딧 물고기 획득 팝업을 표시한다.
+        FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
+        if (creditFish != null)
+        {
+            ShowFishPopup($"{GetCatalogDisplayName(creditFish)}을(를) 얻은!");
+        }
+
         HandleGameOver(GameOverReason.Stopped);
+    }
+
+    /// <summary>
+    /// 지정된 식별자(ID)와 일치하는 물고기 타입을 FishSpawner 목록에서 찾아 반환한다.
+    /// id를 사용하며, 일치하는 FishType 또는 null을 반환한다.
+    /// </summary>
+    private FishType GetFishTypeById(string id)
+    {
+        if (_fishSpawner == null || _fishSpawner.FishTypes == null) return null;
+
+        for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
+        {
+            FishType fish = _fishSpawner.FishTypes[i];
+            if (fish != null && fish.Id == id)
+            {
+                return fish;
+            }
+        }
+        return null;
     }
 
     /// <summary>
@@ -1527,15 +1577,16 @@ public class GameFlowManager : MonoBehaviour
         if (_endingCinemaRunning) return;
         _endingCinemaRunning = true;
 
-        foreach (FishType fish in _fishSpawner.FishTypes)
+        FishType blackholeFish = GetFishTypeById(BLACKHOLE_FISH_ID);
+        if (blackholeFish != null)
         {
-            if (fish.Id != "blackhole") continue;
-            _fishSpawner.HandlePlacedFishCaught(fish, _playerController.transform.position);
-            if (!_newFish.Contains(fish))
+            _fishSpawner.HandlePlacedFishCaught(blackholeFish, _playerController.transform.position);
+            if (!_newFish.Contains(blackholeFish))
             {
-                _newFish.Add(fish);
+                _newFish.Add(blackholeFish);
             }
-            break;
+            // 블랙홀 접촉 즉시 획득 팝업을 표시한다.
+            ShowFishPopup($"{GetCatalogDisplayName(blackholeFish)}을(를) 얻은!");
         }
 
         _state = State.GameOver;
@@ -1553,7 +1604,6 @@ public class GameFlowManager : MonoBehaviour
             _playerController.enabled = false;
         }
 
-        SetCinematicLetterbox(true);
         _endingCinemaCoroutine = StartCoroutine(PlayEndingCinemaRoutine());
     }
 
@@ -1563,6 +1613,10 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private IEnumerator PlayEndingCinemaRoutine()
     {
+        // 0. 블랙홀 흡입 및 획득 안내 여운 대기 후 시네마틱 레터박스 시작
+        yield return new WaitForSeconds(1f);
+        SetCinematicLetterbox(true);
+
         // 1. 우주 환경 전환 및 시네머신 카메라 제어권 확보
         if (_environmentController != null)
         {
@@ -1697,8 +1751,12 @@ public class GameFlowManager : MonoBehaviour
             Destroy(_endingAlienInstance);
         }
 
-
         UnlockMonsterFish();
+        FishType monsterFish = GetFishTypeById(MONSTER_FISH_ID);
+        if (monsterFish != null)
+        {
+            ShowFishPopup($"{GetCatalogDisplayName(monsterFish)}을(를) 얻은!");
+        }
 
         // 7. 정적 (1.5초) - 외계인을 먹은 돌만 남은 채 정적 유지
         yield return new WaitForSeconds(1.5f);
