@@ -72,6 +72,7 @@ public class GameFlowManager : MonoBehaviour
     private FishType _catalogSelectedFish;
     private JObject _catalogEntries;
     private Vector2 _catalogScroll;
+    private Vector2 _catalogDetailScroll;
     private Vector2 _resultScroll;
     private readonly List<int> _ownedOptions = new List<int>();
     private readonly List<int> _catalogOptions = new List<int>();
@@ -100,6 +101,8 @@ public class GameFlowManager : MonoBehaviour
     private string _popupText;
     private Color _popupColor;
     private float _popupTime = -10f;
+    private string _fishPopupText;
+    private float _fishPopupTime = -10f;
     private GUIStyle _bigStyle;
     private GUIStyle _mediumStyle;
     private GUIStyle _smallStyle;
@@ -323,9 +326,9 @@ public class GameFlowManager : MonoBehaviour
             return;
         }
 
-        ShadowLabel(new Rect(24f * s, 16f * s, 600f * s, 64f * s), $"SKIP  {_playerController.SkipCount}", _bigStyle, Color.white);
+        ShadowLabel(new Rect(24f * s, 16f * s, 600f * s, 64f * s), $"건너뛰기  {_playerController.SkipCount}", _bigStyle, Color.white);
         ShadowLabel(new Rect(24f * s, 76f * s, 600f * s, 44f * s), $"{_playerController.Distance:0.0} m", _mediumStyle, Color.white);
-        ShadowLabel(new Rect(24f * s, 118f * s, 800f * s, 36f * s), $"BEST  {_bestSkips} skips / {_bestDistance:0.0} m", _smallStyle, new Color(1f, 1f, 1f, 0.75f));
+        ShadowLabel(new Rect(24f * s, 118f * s, 800f * s, 36f * s), $"최상의  {_bestSkips} 건너뛰기 / {_bestDistance:0.0} m", _smallStyle, new Color(1f, 1f, 1f, 0.75f));
 
         if (_state == State.Ready)
         {
@@ -339,7 +342,7 @@ public class GameFlowManager : MonoBehaviour
         {
             // 미끄러지는 동안은 남은 밀기 힘만큼 진하게 연타 안내를 띄운다.
             Color slideColor = new Color(1f, 1f, 1f, 0.35f + 0.65f * _playerController.SlidePower);
-            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("MASH {Jump}!"), _centerStyle, slideColor);
+            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("{Jump}을 마구 누르는!"), _centerStyle, slideColor);
         }
         else if (_playerController.CanJudge && _playerController.TimeToWaterImpact <= _spaceHintLeadTime)
         {
@@ -361,14 +364,22 @@ public class GameFlowManager : MonoBehaviour
             float rise = 30f * s * t;
             ShadowLabel(new Rect(0f, height * _popupHeight - rise, width, 80f * s), _popupText, _popupStyle, color);
         }
+        float fishPopupAge = Time.unscaledTime - _fishPopupTime;
+        if (_state != State.GameOver && _fishPopupText != null && fishPopupAge < POPUP_DURATION)
+        {
+            float t = fishPopupAge / POPUP_DURATION;
+            float top = Mathf.Max(height * 0.38f, height * _popupHeight + 100f * s);
+            ShadowLabel(new Rect(0f, top - 30f * s * t, width, 60f * s),
+                _fishPopupText, _centerSubStyle, new Color(1f, 0.85f, 0.3f, 1f - t * t));
+        }
 
         if (_showDebug)
         {
             string debug =
-                $"speed {_playerController.Speed:0.0} m/s\n" +
-                $"tilt {_playerController.CurrentPitch:0} / {_playerController.TargetPitch:0} deg  roll {_playerController.TargetRoll:0}\n" +
-                $"spin {_playerController.SpinRate:0.0} rad/s  stab {_playerController.Stability:0.00}\n" +
-                $"seed {_playerController.FishSeed}";
+                $"속력 {_playerController.Speed:0.0} m/s\n" +
+                $"기울기 {_playerController.CurrentPitch:0} / {_playerController.TargetPitch:0} 도  구르기 {_playerController.TargetRoll:0}\n" +
+                $"회전 {_playerController.SpinRate:0.0} rad/s  안정 {_playerController.Stability:0.00}\n" +
+                $"씨앗 {_playerController.FishSeed}";
             ShadowLabel(new Rect(width - 420f * s, 16f * s, 400f * s, 140f * s), debug, _debugStyle, new Color(1f, 1f, 1f, 0.8f));
         }
     }
@@ -543,6 +554,7 @@ public class GameFlowManager : MonoBehaviour
         _playerController.ResetToStart();
         _cameraController.SnapBehindTarget();
         _popupTime = -10f;
+        _fishPopupTime = -10f;
         _perfectCount = 0;
         _goodCount = 0;
         _missCount = 0;
@@ -609,7 +621,7 @@ public class GameFlowManager : MonoBehaviour
     {
         _rumble.Pulse(0.4f, 0.24f);
         _newFish.Add(fish);
-        ShowPopup($"{GetCatalogDisplayName(fish)} 획득했다!", new Color(1f, 0.85f, 0.3f));
+        ShowFishPopup($"{GetCatalogDisplayName(fish)}을(를) 얻은!");
     }
 
     /// <summary>
@@ -651,7 +663,7 @@ public class GameFlowManager : MonoBehaviour
     {
         if (Time.unscaledTime - _popupTime > 0.4f)
         {
-            ShowPopup($"SKIP {count}", Color.white);
+            ShowPopup($"건너뛰기 {count}", Color.white);
         }
     }
 
@@ -666,20 +678,20 @@ public class GameFlowManager : MonoBehaviour
             PlayFishInteraction();
         }
 
-        string direction = timingError < 0f ? "EARLY" : "LATE";
+        string direction = timingError < 0f ? "이른" : "늦은";
         switch (judge)
         {
             case SkipJudge.Perfect:
                 _perfectCount++;
-                ShowPopup("PERFECT!", JudgeColor(judge));
+                ShowPopup("완벽한!", JudgeColor(judge));
                 break;
             case SkipJudge.Good:
                 _goodCount++;
-                ShowPopup($"GOOD  {direction}", JudgeColor(judge));
+                ShowPopup($"좋은  {direction}", JudgeColor(judge));
                 break;
             case SkipJudge.Miss:
                 _missCount++;
-                ShowPopup($"MISS  TOO {direction}", JudgeColor(judge));
+                ShowPopup($"놓친  너무 {direction}", JudgeColor(judge));
                 break;
         }
     }
@@ -690,7 +702,7 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void HandleScreenUnlocked()
     {
-        ShowPopup("SCREEN 획득했다!", new Color(1f, 0.85f, 0.3f));
+        ShowFishPopup("화면을(를) 얻은!");
     }
 
     /// <summary>
@@ -755,7 +767,7 @@ public class GameFlowManager : MonoBehaviour
         if (fish.Id == "ice") _fishSelectionPreview.InvalidateTexture(_fishSpawner.IceFish);
         if (fish.Id == "wall") _ownedFishSelectionPreview.InvalidateTexture(_fishSpawner.WallFish);
         if (fish.Id == "ice") _ownedFishSelectionPreview.InvalidateTexture(_fishSpawner.IceFish);
-        ShowPopup($"{GetCatalogDisplayName(fish)} 획득했다!", new Color(1f, 0.85f, 0.3f));
+        ShowFishPopup($"{GetCatalogDisplayName(fish)}을(를) 얻은!");
     }
 
     /// <summary>
@@ -790,20 +802,20 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void DrawReady(float width, float height, float scale)
     {
-        ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale), _input.ReplaceBindingName("{Jump} TO THROW"), _centerStyle, Color.white);
+        ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale), _input.ReplaceBindingName("{Jump} 던지기 위하여"), _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 80f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.IsUsingGamepad
-                ? "{Attitude} tilt    {Steer} / {CurveTriggers} curve    {Jump} water jump"
-                : "ARROWS tilt    A/D curve    {Jump} when it hits the water"), _centerSubStyle, Color.white);
+                ? "{Attitude} 기울이는    {Steer} / {CurveTriggers} 굽히는    {Jump} 물 점프    {Restart} 새 물고기"
+                : "방향키 기울이는    A/D 굽히는    {Jump} 물에 닿을 때    {Restart} 새 물고기"), _centerSubStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 112f * scale, width, 40f * scale),
-            _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel} menu" : "ESC menu"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+            _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel} 차림표" : "ESC 차림표"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
         if (_hasThrown)
         {
             ShadowLabel(new Rect(0f, height * 0.18f + 144f * scale, width, 40f * scale),
                 _input.ReplaceBindingName("{Restart}   날씨 · 시간 · 장소 재설정"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         }
         ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 40f * scale),
-            _input.ReplaceBindingName("<  {Previous}   THROW   {Next}  >    {Catalog} 도감"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
+            _input.ReplaceBindingName("<  {Previous}   던지는   {Next}  >    {Catalog} 도감"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         DrawFishPreviews(width, height, scale);
     }
 
@@ -856,13 +868,13 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void DrawShop(float width, float height, float scale)
     {
-        ShadowLabel(new Rect(0f, height * 0.12f, width, 80f * scale), "GAME OVER", _centerStyle, Color.white);
-        string result = $"{ReasonText(_gameOverReason)}    {_playerController.SkipCount} skips / {_playerController.Distance:0.0} m";
+        ShadowLabel(new Rect(0f, height * 0.12f, width, 80f * scale), "GAME 너머", _centerStyle, Color.white);
+        string result = $"{ReasonText(_gameOverReason)}    {_playerController.SkipCount} 건너뛰기 / {_playerController.Distance:0.0} m";
         ShadowLabel(new Rect(0f, height * 0.12f + 80f * scale, width, 40f * scale), result, _centerSubStyle, Color.white);
-        string timing = $"PERFECT {_perfectCount}    GOOD {_goodCount}    MISS {_missCount}";
+        string timing = $"완벽한 {_perfectCount}    좋은 {_goodCount}    놓친 {_missCount}";
         ShadowLabel(new Rect(0f, height * 0.12f + 115f * scale, width, 40f * scale), timing, _centerSubStyle, new Color(1f, 0.92f, 0.7f));
 
-        ShadowLabel(new Rect(0f, height * 0.39f, width, 40f * scale), $"새로 획득한 종류  {_newFish.Count}", _centerSubStyle, Color.white);
+        ShadowLabel(new Rect(0f, height * 0.39f, width, 40f * scale), $"잠금 해제된! {_newFish.Count}", _centerSubStyle, Color.white);
         Rect viewport = new Rect(width * 0.08f, height * 0.45f, width * 0.84f, height * 0.3f);
         int columns = Mathf.Max(1, Mathf.FloorToInt(viewport.width / (240f * scale)));
         float contentWidth = viewport.width - 24f * scale;
@@ -872,7 +884,7 @@ public class GameFlowManager : MonoBehaviour
         _resultScroll = GUI.BeginScrollView(viewport, _resultScroll,
             new Rect(0f, 0f, contentWidth, Mathf.Max(viewport.height, rows * cellHeight)));
         if (_newFish.Count == 0)
-            ShadowLabel(new Rect(0f, 0f, contentWidth, 38f * scale), "새로 획득한 종류가 없습니다", _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+            ShadowLabel(new Rect(0f, 0f, contentWidth, 38f * scale), "잠금 해제된 것 없는", _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
         for (int i = 0; i < _newFish.Count; i++)
         {
             FishType fish = _newFish[i];
@@ -898,7 +910,7 @@ public class GameFlowManager : MonoBehaviour
         float buttonWidth = 620f * scale;
         float buttonHeight = 60f * scale;
         float left = (width - buttonWidth) * 0.5f;
-        if (GUI.Button(new Rect(left, height * 0.8f, buttonWidth, buttonHeight), _input.ReplaceBindingName("RETRY   ({Jump} / {Restart})"), _buttonStyle))
+        if (GUI.Button(new Rect(left, height * 0.8f, buttonWidth, buttonHeight), _input.ReplaceBindingName("다시 시도하는   ({Jump} / {Restart})"), _buttonStyle))
         {
             Restart();
         }
@@ -923,7 +935,7 @@ public class GameFlowManager : MonoBehaviour
     {
         string id = fish == null ? "default" : fish.Id;
         string displayName = _catalogEntries[id]?.Value<string>("displayName");
-        return string.IsNullOrWhiteSpace(displayName) ? fish == null ? "FISH" : fish.DisplayName : displayName;
+        return string.IsNullOrWhiteSpace(displayName) ? fish == null ? "물고기" : fish.DisplayName : displayName;
     }
 
     /// <summary>
@@ -961,11 +973,12 @@ public class GameFlowManager : MonoBehaviour
             bool hovered = pointerInViewport && cell.Contains(Event.current.mousePosition);
             if (hovered && !_catalogCapturePending && Event.current.type == EventType.MouseDown && Event.current.button == 0)
             {
+                if (_catalogSelectedFish != fish) _catalogDetailScroll = Vector2.zero;
                 _catalogSelectedFish = fish;
                 Event.current.Use();
             }
             bool selected = fish == _catalogSelectedFish;
-            GUI.color = new Color(1f, 1f, 1f, selected ? 0.32f : hovered ? 0.2f : owned ? 0.12f : 0.04f);
+            GUI.color = new Color(1f, 1f, 1f, selected ? 0.32f : owned ? 0.12f : 0.04f);
             GUI.DrawTexture(cell, Texture2D.whiteTexture);
             GUI.color = original;
             Rect image = new Rect(cell.x + 12f * scale, cell.y + 8f * scale, cell.width - 24f * scale, 132f * scale);
@@ -1000,8 +1013,15 @@ public class GameFlowManager : MonoBehaviour
             ? string.Empty : entry.Value<string>(selectedOwned ? "description" : "unlockHint");
         ShadowLabel(new Rect(details.x + 24f * scale, details.y + 14f * scale, details.width - 48f * scale, 36f * scale),
             heading, _smallStyle, new Color(1f, 0.92f, 0.7f));
-        ShadowLabel(new Rect(details.x + 24f * scale, details.y + 54f * scale, details.width - 48f * scale, 76f * scale),
-            text, _catalogDetailStyle, Color.white);
+        Rect detailViewport = new Rect(details.x + 24f * scale, details.y + 54f * scale,
+            details.width - 48f * scale, 76f * scale);
+        float textWidth = detailViewport.width - 24f * scale;
+        float textHeight = Mathf.Max(detailViewport.height,
+            _catalogDetailStyle.CalcHeight(new GUIContent(text), textWidth) + 2f);
+        _catalogDetailScroll = GUI.BeginScrollView(detailViewport, _catalogDetailScroll,
+            new Rect(0f, 0f, textWidth, textHeight));
+        ShadowLabel(new Rect(0f, 0f, textWidth, textHeight), text, _catalogDetailStyle, Color.white);
+        GUI.EndScrollView();
         GUI.enabled = !_catalogCapturePending;
         if (GUI.Button(new Rect(width * 0.5f - 130f * scale, height - 70f * scale, 260f * scale, 48f * scale), _input.ReplaceBindingName("닫기 ({Catalog})"), _buttonStyle))
         {
@@ -1020,6 +1040,16 @@ public class GameFlowManager : MonoBehaviour
         _popupText = text;
         _popupColor = color;
         _popupTime = Time.unscaledTime;
+    }
+
+    /// <summary>
+    /// 획득 안내를 판정 팝업과 독립된 영역에 표시하도록 설정한다.
+    /// text를 사용하며, _fishPopupText와 _fishPopupTime을 변경한다.
+    /// </summary>
+    private void ShowFishPopup(string text)
+    {
+        _fishPopupText = text;
+        _fishPopupTime = Time.unscaledTime;
     }
 
     /// <summary>
@@ -1228,11 +1258,11 @@ public class GameFlowManager : MonoBehaviour
     {
         switch (reason)
         {
-            case GameOverReason.Sunk: return "Sank";
-            case GameOverReason.Stopped: return "Stopped";
-            case GameOverReason.HitGround: return "Hit the ground";
-            case GameOverReason.OutOfBounds: return "Out of bounds";
-            default: return reason.ToString();
+            case GameOverReason.Sunk: return "가라앉은";
+            case GameOverReason.Stopped: return "멈추어진";
+            case GameOverReason.HitGround: return "땅을 때린";
+            case GameOverReason.OutOfBounds: return "경계 밖의";
+            default: return "끝나버린";
         }
     }
 
@@ -1280,6 +1310,13 @@ public class GameFlowManager : MonoBehaviour
             wordWrap = false,
         };
         style.normal.textColor = Color.white;
+        style.hover = style.normal;
+        style.active = style.normal;
+        style.focused = style.normal;
+        style.onNormal = style.normal;
+        style.onHover = style.normal;
+        style.onActive = style.normal;
+        style.onFocused = style.normal;
         return style;
     }
 
@@ -1290,11 +1327,15 @@ public class GameFlowManager : MonoBehaviour
     private static void ShadowLabel(Rect rect, string text, GUIStyle style, Color color)
     {
         Color original = style.normal.textColor;
+        Color originalHover = style.hover.textColor;
         style.normal.textColor = new Color(0f, 0f, 0f, 0.6f * color.a);
+        style.hover.textColor = style.normal.textColor;
         GUI.Label(new Rect(rect.x + 2f, rect.y + 2f, rect.width, rect.height), text, style);
         style.normal.textColor = color;
+        style.hover.textColor = color;
         GUI.Label(rect, text, style);
         style.normal.textColor = original;
+        style.hover.textColor = originalHover;
     }
 
     /// <summary>

@@ -4,7 +4,7 @@ using UnityEngine;
 
 public sealed class ProceduralObstacleSpawner : MonoBehaviour
 {
-    private const float BOOST_FREQUENCY_RATIO = 1f / 20f;
+    private const float BOOST_FREQUENCY_RATIO = 1f / 40f;
 
     [Header("거리 구역")]
     [Min(0f)][SerializeField] private float _iceStartDistance = 1500f;
@@ -101,6 +101,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
         _water.position = _waterStartPosition;
         _seed = Random.Range(0, int.MaxValue);
         _hasCenter = false;
+        SpawnObstacles(_startPosition);
     }
 
     /// <summary>
@@ -137,16 +138,18 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// playerPosition과 현재 중심 셀로 주변 셀을 갱신한다.
-    /// 범위 밖 장애물을 반환하고 각 시드 기반 위치의 시작점 거리로 벽 또는 유빙을 배치한다.
+    /// playerPosition과 현재 중심 셀로 주변 장애물과 점프대를 갱신한다.
+    /// 범위 밖 오브젝트를 풀로 반환하고 새로 들어온 셀의 오브젝트를 배치한다.
     /// </summary>
     private void RefreshCells(Vector3 playerPosition)
     {
         _releaseCells.Clear();
-        foreach (Vector2Int cell in _active.Keys)
+        foreach (KeyValuePair<Vector2Int, CuttableWall> entry in _active)
         {
-            if (Mathf.Abs(cell.x - _center.x) > _cellRadius || Mathf.Abs(cell.y - _center.y) > _cellRadius)
-                _releaseCells.Add(cell);
+            Vector3 offset = entry.Value.transform.position - playerPosition;
+            offset.y = 0f;
+            if (offset.sqrMagnitude > _blackHoleStartDistance * _blackHoleStartDistance)
+                _releaseCells.Add(entry.Key);
         }
         foreach (Vector2Int cell in _releaseCells)
         {
@@ -168,9 +171,26 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
         for (int x = -_cellRadius; x <= _cellRadius; x++)
         {
             for (int z = -_cellRadius; z <= _cellRadius; z++)
+                TrySpawnBoost(_center + new Vector2Int(x, z), playerPosition);
+        }
+        SpawnObstacles(playerPosition);
+    }
+
+    /// <summary>
+    /// playerPosition과 생성 시드로 플레이어 주변 3000m의 모든 셀을 판정한다.
+    /// 시작점 +Z 1500m 경계와 밀도 조건에 맞는 벽과 유빙을 활성 목록에 저장한다.
+    /// </summary>
+    private void SpawnObstacles(Vector3 playerPosition)
+    {
+        int minX = Mathf.FloorToInt((playerPosition.x - _blackHoleStartDistance) / _cellSize);
+        int maxX = Mathf.FloorToInt((playerPosition.x + _blackHoleStartDistance) / _cellSize);
+        int minZ = Mathf.FloorToInt((playerPosition.z - _blackHoleStartDistance) / _cellSize);
+        int maxZ = Mathf.FloorToInt((playerPosition.z + _blackHoleStartDistance) / _cellSize);
+        for (int x = minX; x <= maxX; x++)
+        {
+            for (int z = minZ; z <= maxZ; z++)
             {
-                Vector2Int cell = _center + new Vector2Int(x, z);
-                TrySpawnBoost(cell, playerPosition);
+                Vector2Int cell = new Vector2Int(x, z);
                 if (_active.ContainsKey(cell)) continue;
                 System.Random random = new System.Random(unchecked(_seed ^ cell.x * 73856093 ^ cell.y * 19349663));
                 if (random.NextDouble() > _density) continue;
@@ -180,13 +200,12 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
                     (cell.y + 0.5f + ((float)random.NextDouble() - 0.5f) * 0.5f) * _cellSize);
                 Vector3 startOffset = position - _startPosition;
                 startOffset.y = 0f;
-                float distance = startOffset.magnitude;
-                if (distance > _blackHoleStartDistance) continue;
-                Vector3 offset = position - playerPosition;
-                offset.y = 0f;
-                if (offset.sqrMagnitude < _safeRadius * _safeRadius) continue;
+                Vector3 playerOffset = position - playerPosition;
+                playerOffset.y = 0f;
+                if (playerOffset.sqrMagnitude > _blackHoleStartDistance * _blackHoleStartDistance) continue;
+                if (startOffset.sqrMagnitude < _safeRadius * _safeRadius) continue;
 
-                bool ice = distance > _iceStartDistance;
+                bool ice = position.z > _startPosition.z + _iceStartDistance;
                 Vector2 widths = ice ? _iceWidthRange : _wallWidthRange;
                 Vector2 heights = ice ? _iceHeightRange : _wallHeightRange;
                 Vector3 scale = new Vector3(
@@ -207,7 +226,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
 
     /// <summary>
     /// cell과 playerPosition으로 안전 거리와 생성 구역을 확인해 점프대를 배치한다.
-    /// 벽과 유빙 밀도의 1/20 확률로 프리팹을 생성하거나 재사용하고 활성 셀에 기록한다.
+    /// 벽과 유빙 밀도의 1/40 확률로 프리팹을 생성하거나 재사용하고 활성 셀에 기록한다.
     /// </summary>
     private void TrySpawnBoost(Vector2Int cell, Vector3 playerPosition)
     {

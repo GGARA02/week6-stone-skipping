@@ -927,13 +927,13 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 시작 위치에서 가장 멀리 간 수평 거리를 갱신한다.
-    /// Rigidbody 위치를 사용하며, Distance를 변경한다.
+    /// 시작 위치에서 +Z 방향으로 가장 멀리 간 거리를 갱신한다.
+    /// Rigidbody 위치와 시작 위치의 Z 좌표를 사용하며, Distance를 변경한다.
     /// </summary>
     private void UpdateDistance()
     {
-        Vector3 offset = Horizontal(_playerRB.position - _startPosition);
-        Distance = Mathf.Max(Distance, offset.magnitude);
+        float forwardDistance = _playerRB.position.z - _startPosition.z;
+        Distance = Mathf.Max(Distance, forwardDistance);
     }
 
     /// <summary>
@@ -968,14 +968,16 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 물리와 조작을 즉시 정지하고 한 번만 게임오버 이벤트를 보낸다.
-    /// reason을 사용하며 비행·접촉 상태와 Rigidbody 충돌을 끄고 정산 이유를 전달한다.
+    /// 기존 속도와 회전을 유지하면서 조작을 차단하고 한 번만 게임오버 이벤트를 보낸다.
+    /// reason을 사용하며 게임오버 상태와 대기 입력을 변경하고 정산 이유를 전달한다.
     /// </summary>
     public void GameOver(GameOverReason reason)
     {
         if (_isGameOver) return;
-        StopImmediately();
-        _playerRB.detectCollisions = false;
+        _isGameOver = true;
+        _jumpPending = false;
+        _slidePushCount = 0;
+        _steer = 0f;
         OnGameOver?.Invoke(reason);
     }
 
