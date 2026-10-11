@@ -206,6 +206,9 @@ public class PlayerController : MonoBehaviour
     public event Action<float> OnWallHit;
 
     public bool IsThrown => _isThrown;
+    public bool IsControlling => Managers.Input.JumpHeld
+        || Managers.Input.ReadSteer(_stickDeadZone) != 0f
+        || Managers.Input.ReadAttitude(_stickDeadZone) != Vector2.zero;
     public bool IsGameOver => _isGameOver;
     public bool InContact => _inContact;
     public int SkipCount { get; private set; }

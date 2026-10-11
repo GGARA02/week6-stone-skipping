@@ -342,7 +342,7 @@ public class GameFlowManager : MonoBehaviour
         {
             // 미끄러지는 동안은 남은 밀기 힘만큼 진하게 연타 안내를 띄운다.
             Color slideColor = new Color(1f, 1f, 1f, 0.35f + 0.65f * _playerController.SlidePower);
-            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("{Jump}을 마구 누르는!"), _centerStyle, slideColor);
+            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), "발열 시간!", _centerStyle, slideColor);
         }
         else if (_playerController.CanJudge && _playerController.TimeToWaterImpact <= _spaceHintLeadTime)
         {
@@ -352,6 +352,11 @@ public class GameFlowManager : MonoBehaviour
                 ? new Color(1f, 0.85f, 0.25f, 1f)
                 : new Color(1f, 1f, 1f, 0.35f + 0.5f * approach);
             ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("{Jump}"), _centerStyle, hintColor);
+        }
+        else if (_state == State.Flying && !_endingCinemaRunning && !_playerController.IsControlling)
+        {
+            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s),
+                _input.ReplaceBindingName("{Restart} 키를 눌러 재시작"), _popupStyle, Color.white);
         }
 
         // 게임오버 화면에서는 제목과 겹치지 않도록 팝업을 그리지 않는다.
