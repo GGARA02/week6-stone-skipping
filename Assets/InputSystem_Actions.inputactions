@@ -78,6 +78,51 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "Steer",
+                    "type": "Value",
+                    "id": "a8b475bf-8bae-4aba-b220-a68715ebdc91",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Attitude",
+                    "type": "Value",
+                    "id": "a8b475bf-8bae-4aba-b220-a68715ebdc92",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "CurveTriggers",
+                    "type": "Value",
+                    "id": "a8b475bf-8bae-4aba-b220-a68715ebdc93",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Restart",
+                    "type": "Button",
+                    "id": "a8b475bf-8bae-4aba-b220-a68715ebdc94",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Catalog",
+                    "type": "Button",
+                    "id": "a8b475bf-8bae-4aba-b220-a68715ebdc95",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Sprint",
                     "type": "Button",
                     "id": "641cd816-40e6-41b4-8c3d-04687c349290",
@@ -88,6 +133,28 @@
                 }
             ],
             "bindings": [
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc01", "path": "<Gamepad>/leftStick", "groups": "Gamepad", "action": "Steer" },
+                { "name": "AD", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc02", "path": "2DVector", "action": "Steer", "isComposite": true },
+                { "name": "left", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc03", "path": "<Keyboard>/a", "groups": "Keyboard&Mouse", "action": "Steer", "isPartOfComposite": true },
+                { "name": "right", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc04", "path": "<Keyboard>/d", "groups": "Keyboard&Mouse", "action": "Steer", "isPartOfComposite": true },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc05", "path": "<Gamepad>/rightStick", "groups": "Gamepad", "action": "Attitude" },
+                { "name": "Arrows", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc06", "path": "2DVector", "action": "Attitude", "isComposite": true },
+                { "name": "up", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc07", "path": "<Keyboard>/upArrow", "groups": "Keyboard&Mouse", "action": "Attitude", "isPartOfComposite": true },
+                { "name": "down", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc08", "path": "<Keyboard>/downArrow", "groups": "Keyboard&Mouse", "action": "Attitude", "isPartOfComposite": true },
+                { "name": "left", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc09", "path": "<Keyboard>/leftArrow", "groups": "Keyboard&Mouse", "action": "Attitude", "isPartOfComposite": true },
+                { "name": "right", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc10", "path": "<Keyboard>/rightArrow", "groups": "Keyboard&Mouse", "action": "Attitude", "isPartOfComposite": true },
+                { "name": "Triggers", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc11", "path": "2DVector(mode=2)", "action": "CurveTriggers", "isComposite": true },
+                { "name": "left", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc12", "path": "<Gamepad>/leftTrigger", "groups": "Gamepad", "action": "CurveTriggers", "isPartOfComposite": true },
+                { "name": "right", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc13", "path": "<Gamepad>/rightTrigger", "groups": "Gamepad", "action": "CurveTriggers", "isPartOfComposite": true },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc14", "path": "<Keyboard>/r", "groups": "Keyboard&Mouse", "action": "Restart" },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc15", "path": "<Gamepad>/buttonNorth", "groups": "Gamepad", "action": "Restart" },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc16", "path": "<Gamepad>/start", "groups": "Gamepad", "action": "Restart" },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc17", "path": "<Keyboard>/tab", "groups": "Keyboard&Mouse", "action": "Catalog" },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc18", "path": "<Gamepad>/select", "groups": "Gamepad", "action": "Catalog" },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc19", "path": "<Keyboard>/q", "groups": "Keyboard&Mouse", "action": "Previous" },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc20", "path": "<Gamepad>/leftShoulder", "groups": "Gamepad", "action": "Previous" },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc21", "path": "<Keyboard>/e", "groups": "Keyboard&Mouse", "action": "Next" },
+                { "name": "", "id": "b8b475bf-8bae-4aba-b220-a68715ebdc22", "path": "<Gamepad>/rightShoulder", "groups": "Gamepad", "action": "Next" },
                 {
                     "name": "",
                     "id": "978bfe49-cc26-4a3d-ab7b-7d7a29327403",

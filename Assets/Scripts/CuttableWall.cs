@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 using UnityEngine;
 
 public sealed class CuttableWall : MonoBehaviour
@@ -16,12 +14,10 @@ public sealed class CuttableWall : MonoBehaviour
     private Mesh _originalMesh;
     private Collider _originalCollider;
     private Mesh _remainingMesh;
-    private readonly List<GameObject> _pieces = new List<GameObject>();
     public FishType PieceType => _pieceType;
 
     void OnDestroy()
     {
-        ClearPieces();
         if (_remainingMesh != null) Destroy(_remainingMesh);
     }
 
@@ -43,32 +39,16 @@ public sealed class CuttableWall : MonoBehaviour
 
     /// <summary>
     /// 보관한 원본 메쉬와 충돌체를 사용해 새 throw의 온전한 벽으로 복원한다.
-    /// 입력값은 없으며 이전 절단 조각과 밑둥 메쉬를 해제하고 재절단 가능한 상태로 되돌린다.
+    /// 입력값은 없으며 밑둥 메쉬를 해제하고 재절단 가능한 상태로 되돌리되 분리된 조각은 유지한다.
     /// </summary>
     public void ResetWall()
     {
-        ClearPieces();
         _meshFilter.sharedMesh = _originalMesh;
         _remainingCollider.enabled = false;
         _remainingCollider.sharedMesh = null;
         _originalCollider.enabled = true;
         if (_remainingMesh != null) Destroy(_remainingMesh);
         _remainingMesh = null;
-    }
-
-    /// <summary>
-    /// 이 벽에서 생성한 조각 목록을 사용해 이전 throw의 물고기 조각을 제거한다.
-    /// 이미 포획된 조각은 건너뛰며 나머지를 즉시 비활성화하고 목록을 비운다.
-    /// </summary>
-    private void ClearPieces()
-    {
-        foreach (GameObject piece in _pieces)
-        {
-            if (piece == null) continue;
-            piece.SetActive(false);
-            Destroy(piece);
-        }
-        _pieces.Clear();
     }
 
     /// <summary>
@@ -168,8 +148,9 @@ public sealed class CuttableWall : MonoBehaviour
         body.useGravity = true;
         body.interpolation = RigidbodyInterpolation.Interpolate;
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-        piece.AddComponent<Fish>().InitializeWall(_spawner, _pieceType, mesh);
-        _pieces.Add(piece);
+        Fish fish = piece.AddComponent<Fish>();
+        fish.InitializeWall(_spawner, _pieceType, mesh);
+        _spawner.RegisterCutPiece(fish);
         body.AddForce(separation * EJECTION_SPEED + Vector3.up * UPWARD_SPEED, ForceMode.VelocityChange);
     }
 }

@@ -1,7 +1,6 @@
 using System;
 
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 using TMPro;
@@ -79,16 +78,11 @@ public class EndingCreditUI : MonoBehaviour
 
     /// <summary>
     /// 스페이스바 또는 패드 버튼 입력을 받아 크레딧을 즉시 스킵한다.
-    /// Keyboard와 Gamepad 입력을 사용하며, 스킵 조건 만족 시 SkipCredits를 호출한다.
+    /// 중앙 Jump 액션을 사용하며, 스킵 조건 만족 시 SkipCredits를 호출한다.
     /// </summary>
     private void HandleSkipInput()
     {
-        Keyboard keyboard = Keyboard.current;
-        Gamepad gamepad = Gamepad.current;
-        bool skipPressed = (keyboard != null && keyboard.spaceKey.wasPressedThisFrame)
-            || (gamepad != null && gamepad.buttonSouth.wasPressedThisFrame);
-
-        if (skipPressed)
+        if (Managers.Input.JumpPressed)
         {
             SkipCredits();
         }

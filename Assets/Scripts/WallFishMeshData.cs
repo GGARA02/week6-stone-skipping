@@ -11,21 +11,22 @@ public sealed class WallFishMeshData
     [SerializeField] private int[] _triangles;
 
     /// <summary>
-    /// mesh와 scale을 사용해 마지막 접촉 조각을 손에 들 크기로 복사한다.
-    /// 벽의 비균일 스케일과 비율을 보존하고 긴 높이 축을 투척물의 길이 축으로 돌려 저장한다.
+    /// mesh와 scale을 사용해 조각의 비균일 스케일과 비율을 보존한 메시 데이터를 복사한다.
+    /// prepareForThrow가 참이면 크기와 방향을 투척용으로 보정하고 거짓이면 기존 형상을 유지한다.
     /// </summary>
-    public WallFishMeshData(Mesh mesh, Vector3 scale)
+    public WallFishMeshData(Mesh mesh, Vector3 scale, bool prepareForThrow = true)
     {
         _vertices = mesh.vertices;
         _normals = mesh.normals;
         _uv = mesh.uv;
         _triangles = mesh.triangles;
         Vector3 size = Vector3.Scale(mesh.bounds.size, scale);
-        float factor = 3f / Mathf.Max(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z));
-        Quaternion rotation = Quaternion.Euler(90f, 0f, 0f);
+        float factor = prepareForThrow ? 3f / Mathf.Max(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z)) : 1f;
+        Quaternion rotation = prepareForThrow ? Quaternion.Euler(90f, 0f, 0f) : Quaternion.identity;
+        Vector3 center = prepareForThrow ? mesh.bounds.center : Vector3.zero;
         for (int i = 0; i < _vertices.Length; i++)
         {
-            _vertices[i] = rotation * Vector3.Scale(_vertices[i] - mesh.bounds.center, scale) * factor;
+            _vertices[i] = rotation * Vector3.Scale(_vertices[i] - center, scale) * factor;
             _normals[i] = rotation * new Vector3(_normals[i].x / scale.x, _normals[i].y / scale.y, _normals[i].z / scale.z).normalized;
         }
     }

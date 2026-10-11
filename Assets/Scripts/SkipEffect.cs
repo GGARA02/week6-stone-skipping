@@ -79,6 +79,8 @@ public class SkipEffect : MonoBehaviour
         _player.OnWaterContact += HandleWaterContact;
         _player.OnSkip += HandleSkip;
         _player.OnObstacleHit += HandleObstacleHit;
+        _player.OnJudge += HandleJudge;
+        _player.OnSlidePush += HandleSlidePush;
     }
 
     void OnDestroy()
@@ -86,10 +88,15 @@ public class SkipEffect : MonoBehaviour
         _player.OnWaterContact -= HandleWaterContact;
         _player.OnSkip -= HandleSkip;
         _player.OnObstacleHit -= HandleObstacleHit;
+        _player.OnJudge -= HandleJudge;
+        _player.OnSlidePush -= HandleSlidePush;
     }
 
     void Update()
     {
+        _rumble.SetContinuous(_player.isActiveAndEnabled && _player.IsThrown && _player.IsSliding
+            && !_player.IsGameOver && Time.timeScale > 0f
+            ? Mathf.Lerp(0.12f, 0.3f, Mathf.Clamp01(_player.Speed / _splashFullSpeed)) : 0f);
         if (!_player.InContact)
         {
             _sprayAccumulator = 0f;
@@ -227,29 +234,54 @@ public class SkipEffect : MonoBehaviour
 
     /// <summary>
     /// 카메라 흔들림, 화면 번쩍임, 게임패드 진동을 시작한다. 튕김, 충돌, 물고기 포획에 쓴다.
-    /// strength(0~1)와 color를 사용하며, 카메라 흔들림, _flashColor, _flashTime, 진동을 변경한다.
+    /// strength(0~1), color와 rumbleScale을 사용하며, 화면 효과와 배율이 적용된 진동을 변경한다.
     /// </summary>
-    public void PlayImpact(float strength, Color color)
+    public void PlayImpact(float strength, Color color, float rumbleScale = 1f)
     {
         _cameraController.Punch(strength);
-        _rumble.Pulse(strength, Mathf.Lerp(0.08f, 0.3f, strength));
+        _rumble.Pulse(strength * rumbleScale, Mathf.Lerp(0.08f, 0.3f, strength));
         _flashColor = color;
         _flashTime = Time.unscaledTime;
     }
 
     /// <summary>
-    /// 튕길 때 물고기 속도에 비례한 세기로 진동한다. SPACE로 튕긴 경우(GOOD 이상)에만 화면을 흔들고 번쩍이며, PERFECT면 금색이다.
-    /// count, judge, 물고기 속도를 사용하며, 진동을 울리거나 PlayImpact를 호출한다.
+    /// 자동 튕김은 속도에 비례해 진동하고 GOOD 이상은 화면을 흔들고 번쩍인다.
+    /// count, judge와 속도를 사용하며 판정 진동은 중복 재생하지 않고 화면 상태를 변경한다.
     /// </summary>
     private void HandleSkip(int count, SkipJudge judge)
     {
         float strength = Mathf.Lerp(0.2f, 1f, Mathf.Clamp01(_player.Speed / Mathf.Max(_splashFullSpeed, 0.01f)));
         if (judge != SkipJudge.Perfect && judge != SkipJudge.Good)
         {
-            _rumble.Pulse(strength, Mathf.Lerp(0.08f, 0.3f, strength));
+            if (judge == SkipJudge.None) _rumble.Pulse(strength * 0.5f, Mathf.Lerp(0.08f, 0.3f, strength));
             return;
         }
-        PlayImpact(strength, judge == SkipJudge.Perfect ? _perfectFlashColor : _skipFlashColor);
+        _cameraController.Punch(strength);
+        _flashColor = judge == SkipJudge.Perfect ? _perfectFlashColor : _skipFlashColor;
+        _flashTime = Time.unscaledTime;
+    }
+
+    /// <summary>
+    /// judge에 따라 MISS는 약하고 짧게, GOOD은 중간, PERFECT는 강하고 길게 진동한다.
+    /// timingError는 사용하지 않으며 패드의 일시 진동 상태를 변경한다.
+    /// </summary>
+    private void HandleJudge(SkipJudge judge, float timingError)
+    {
+        switch (judge)
+        {
+            case SkipJudge.Miss: _rumble.Pulse(0.125f, 0.08f); break;
+            case SkipJudge.Good: _rumble.Pulse(0.275f, 0.16f); break;
+            case SkipJudge.Perfect: _rumble.Pulse(0.5f, 0.28f); break;
+        }
+    }
+
+    /// <summary>
+    /// 슬라이딩 밀기 입력마다 남은 추진력에 비례해 짧은 진동을 더한다.
+    /// 플레이어의 SlidePower를 사용하며 일시 진동 상태를 변경한다.
+    /// </summary>
+    private void HandleSlidePush()
+    {
+        _rumble.Pulse(Mathf.Lerp(0.2f, 0.5f, _player.SlidePower), 0.09f);
     }
 
     /// <summary>

@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
@@ -45,7 +44,8 @@ public class GameFlowManager : MonoBehaviour
     private FishSpawner _fishSpawner;
     [SerializeField]
     private EnvironmentController _environmentController;
-    private InputSystem_Actions _inputActions;
+    private InputManager _input;
+    private Rumble _rumble;
 
     [Header("흐름")]
     private State _state;
@@ -115,11 +115,10 @@ public class GameFlowManager : MonoBehaviour
     {
         LockCursor(true);
 
-        _inputActions = new InputSystem_Actions();
-        _inputActions.UI.Enable();
-        _inputActions.Player.Enable();
+        _input = Managers.Input;
+        _rumble = GetComponent<Rumble>();
 
-        _playerController.Initialize(_inputActions, _fishSpawner);
+        _playerController.Initialize(_fishSpawner);
         _playerController.OnSkip += HandleSkip;
         _playerController.OnJudge += HandleJudge;
         _playerController.OnSlidePush += HandleSlidePush;
@@ -163,7 +162,6 @@ public class GameFlowManager : MonoBehaviour
             _endingCredit.OnEndingCompleted -= HandleEndingCompleted;
             _endingCredit.OnEndingSkipped -= HandleEndingSkipped;
         }
-        _inputActions.Dispose();
         _fishSelectionPreview.Dispose();
         _ownedFishSelectionPreview.Dispose();
     }
@@ -174,9 +172,7 @@ public class GameFlowManager : MonoBehaviour
         if (_endingCinemaRunning) return;
 
         if (_screenThrowPending || _catalogCapturePending || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f) return;
-        Keyboard keyboard = Keyboard.current;
-        Gamepad gamepad = Gamepad.current;
-        if (_state == State.Ready && keyboard != null && keyboard.tabKey.wasPressedThisFrame)
+        if (_state == State.Ready && _input.CatalogPressed)
         {
             _catalogOpen = !_catalogOpen;
             LockCursor(!_catalogOpen);
@@ -184,12 +180,12 @@ public class GameFlowManager : MonoBehaviour
         }
         if (_catalogOpen)
         {
-            if (_inputActions.Player.Jump.WasPressedThisFrame())
+            if (_input.JumpPressed)
             {
                 StartCoroutine(CaptureCatalogAndThrow());
                 return;
             }
-            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+            if (_input.CancelPressed)
             {
                 _catalogOpen = false;
                 LockCursor(true);
@@ -198,22 +194,20 @@ public class GameFlowManager : MonoBehaviour
         }
         if (_endingCredit != null && _endingCredit.gameObject.activeInHierarchy)
         {
-            if (_inputActions.Player.Jump.WasPressedThisFrame())
+            if (_input.JumpPressed)
             {
                 ThrowCreditFish();
                 return;
             }
             return;
         }
-        if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+        if (_input.CancelPressed)
         {
             LockCursor(Cursor.lockState != CursorLockMode.Locked);
         }
-        bool restartPressed = (keyboard != null && keyboard.rKey.wasPressedThisFrame)
-            || (gamepad != null && (gamepad.buttonNorth.wasPressedThisFrame || gamepad.startButton.wasPressedThisFrame));
-        if (restartPressed)
+        if (_input.RestartPressed)
         {
-            if (_state == State.Flying && keyboard != null && keyboard.rKey.wasPressedThisFrame)
+            if (_state == State.Flying && _input.RestartFromKeyboardPressed)
             {
                 _playerController.GameOver(GameOverReason.Stopped);
             }
@@ -225,7 +219,7 @@ public class GameFlowManager : MonoBehaviour
         }
 
         // SPACE와 게임패드 A는 Jump 액션에 묶여 있다.
-        bool jumpPressed = _inputActions.Player.Jump.WasPressedThisFrame();
+        bool jumpPressed = _input.JumpPressed;
         if (_state == State.GameOver)
         {
             if (jumpPressed && Time.unscaledTime - _gameOverTime >= RETRY_INPUT_DELAY) Restart();
@@ -233,11 +227,11 @@ public class GameFlowManager : MonoBehaviour
         }
         if (_state != State.Ready) return;
 
-        if ((keyboard != null && keyboard.qKey.wasPressedThisFrame) || (gamepad != null && gamepad.leftShoulder.wasPressedThisFrame))
+        if (_input.PreviousPressed)
         {
             CycleProjectile(-1);
         }
-        if ((keyboard != null && keyboard.eKey.wasPressedThisFrame) || (gamepad != null && gamepad.rightShoulder.wasPressedThisFrame))
+        if (_input.NextPressed)
         {
             CycleProjectile(1);
         }
@@ -247,7 +241,7 @@ public class GameFlowManager : MonoBehaviour
             Throw();
             return;
         }
-        if (!_inputActions.UI.Click.WasPressedThisFrame()) return;
+        if (!_input.ClickPressed) return;
 
         // 커서가 풀려 있을 때의 클릭은 다시 잠그는 용도로만 쓴다.
         if (Cursor.lockState != CursorLockMode.Locked)
@@ -475,6 +469,7 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void Restart(bool clearNewFish = true)
     {
+        _rumble.StopMotors();
         if (clearNewFish)
         {
             _newFish.Clear();
@@ -557,6 +552,7 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void HandleFishRegistered(FishType fish)
     {
+        _rumble.Pulse(0.4f, 0.24f);
         _newFish.Add(fish);
         ShowPopup($"{GetCatalogDisplayName(fish)} 획득했다!", new Color(1f, 0.85f, 0.3f));
     }
@@ -713,6 +709,7 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void HandleGameOver(GameOverReason reason)
     {
+        _rumble.StopMotors();
         _state = State.GameOver;
         _gameOverReason = reason;
         _gameOverTime = Time.unscaledTime;

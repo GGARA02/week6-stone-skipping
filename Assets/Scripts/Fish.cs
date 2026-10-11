@@ -30,8 +30,10 @@ public class Fish : MonoBehaviour
     private float _delay;
     private float _airTime;
     private float _waterY;
+    private float _previousY;
     private bool _jumped;
     private bool _caught;
+    private bool _landed;
     private bool _isWall;
     private Mesh _wallMesh;
     private bool _isEjected;
@@ -44,10 +46,24 @@ public class Fish : MonoBehaviour
     public FishType Type => _type;
     public Transform Body => _body;
     public bool IsEjected => _isEjected;
+    public bool IsCutPiece => _isWall;
 
     void Update()
     {
-        if (_isWall || Time.timeScale == 0f) return;
+        if (_landed || Time.timeScale == 0f) return;
+        if (_isWall)
+        {
+            if (_caught) return;
+            float currentY = transform.position.y;
+            bool enteredWater = _previousY >= _waterY - 0.5f && currentY < _waterY - 0.5f;
+            _previousY = currentY;
+            if (enteredWater)
+            {
+                _landed = true;
+                _spawner.HandleFishLanded(this);
+            }
+            return;
+        }
         if (!_jumped)
         {
             _delay -= Time.deltaTime;
@@ -69,13 +85,14 @@ public class Fish : MonoBehaviour
 
         if (_velocity.y < 0f && _position.y < _waterY - 0.5f)
         {
+            _landed = true;
             _spawner.HandleFishLanded(this);
         }
     }
 
     void OnTriggerEnter(Collider other)
     {
-        if (_isEjected || _caught || !_jumped || Time.timeScale == 0f || other.attachedRigidbody != _spawner.PlayerBody) return;
+        if (_isWall || _isEjected || _caught || _landed || !_jumped || Time.timeScale == 0f || other.attachedRigidbody != _spawner.PlayerBody) return;
 
         if (_fisherQte != null)
         {
@@ -93,8 +110,8 @@ public class Fish : MonoBehaviour
     }
 
     /// <summary>
-    /// spawner, type와 소유할 mesh로 절단된 벽을 포획 가능한 물고기로 준비한다.
-    /// 점프 이동은 끄고 접촉 시 도감 등록과 마지막 메쉬 저장을 허용한다.
+    /// spawner, type와 소유할 mesh로 절단된 벽 또는 유빙의 입수 대기 조각을 준비한다.
+    /// 점프 이동과 즉시 포획은 막고 실제 입수 시 다음 run의 모양 및 출현 등록을 허용한다.
     /// </summary>
     public void InitializeWall(FishSpawner spawner, FishType type, Mesh mesh)
     {
@@ -104,6 +121,22 @@ public class Fish : MonoBehaviour
         _isWall = true;
         _jumped = true;
         _wallMesh = mesh;
+        _waterY = spawner.WaterY;
+        _previousY = transform.position.y;
+    }
+
+    /// <summary>
+    /// sourceMesh를 복제해 자연 출현 개체의 몸과 포획용 볼록 트리거를 준비한다.
+    /// 복제 메시를 소유하여 도감 및 장애물의 공유 메시와 독립적으로 해제한다.
+    /// </summary>
+    public void PrepareMeshSpawn(Mesh sourceMesh)
+    {
+        _wallMesh = Instantiate(sourceMesh);
+        GetComponent<MeshFilter>().sharedMesh = _wallMesh;
+        MeshCollider collider = gameObject.AddComponent<MeshCollider>();
+        collider.convex = true;
+        collider.sharedMesh = _wallMesh;
+        collider.isTrigger = true;
     }
 
     /// <summary>
@@ -133,6 +166,8 @@ public class Fish : MonoBehaviour
         _airTime = 0f;
         _jumped = false;
         _caught = false;
+        _landed = false;
+        _isWall = false;
         _isEjected = false;
         _isFalling = false;
         transform.position = start;

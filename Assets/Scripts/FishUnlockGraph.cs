@@ -76,12 +76,12 @@ public sealed class FishUnlockGraph
 
     /// <summary>
     /// type의 자연 출현에 그래프 해금이 허용되는지 반환한다.
-    /// 일반 종류는 초기 또는 연결 해금 상태를 사용하고 특수 종류는 기존 사출 경로만 허용한다.
+    /// 일반 종류는 초기 또는 연결 해금 상태를 사용하며 별도 등록이 필요한 특수 종류는 제외한다.
     /// </summary>
     public bool AllowsNaturalSpawn(FishType type)
     {
         if (!_connections.ContainsKey(type.Id)) return false;
-        if (_specialFish.Contains(type.Id)) return type.RequiresEjection;
+        if (_specialFish.Contains(type.Id)) return false;
         return _unlockedFish.Contains(type.Id);
     }
 

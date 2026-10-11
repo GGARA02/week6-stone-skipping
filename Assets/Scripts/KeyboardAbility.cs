@@ -126,12 +126,11 @@ public class KeyboardAbility : FishAbility
     void Update()
     {
         float flopLift = _isFlopping ? Flop(Time.time) : 0f;
-        Keyboard keyboard = Keyboard.current;
         float dt = Time.deltaTime;
         foreach (int i in _attached)
         {
             Key key = _keycaps[i].Key;
-            bool pressed = keyboard != null && key != Key.None && keyboard[key].isPressed;
+            bool pressed = Managers.Input.IsKeyHeld(key);
             float speed = pressed ? _pressSpeed : _releaseSpeed;
             _depths[i] = Mathf.MoveTowards(_depths[i], pressed ? _pressDepth : 0f, speed * dt);
             // 눌린 키캡은 물결을 따르지 않고 끝까지 내려가 있어야 꾸물거리는 중에도 누른 것이 보인다.
