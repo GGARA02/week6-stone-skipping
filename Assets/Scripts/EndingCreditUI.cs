@@ -109,16 +109,16 @@ public class EndingCreditUI : MonoBehaviour
     /// </summary>
     private void CreateSkipPrompt()
     {
-        // 버튼 전체를 감싸는 루트 컨테이너를 생성하고 우측 하단에 배치한다.
+        // 버튼 전체를 감싸는 루트 컨테이너를 생성하고 하단 중앙에 배치한다.
         GameObject rootObj = new GameObject("SkipPromptButton", typeof(RectTransform));
         rootObj.transform.SetParent(transform, false);
 
         RectTransform rootRect = rootObj.GetComponent<RectTransform>();
-        rootRect.anchorMin = new Vector2(1f, 0f);
-        rootRect.anchorMax = new Vector2(1f, 0f);
-        rootRect.pivot = new Vector2(1f, 0.5f);
-        rootRect.anchoredPosition = new Vector2(-40f, 45f);
-        rootRect.sizeDelta = new Vector2(250f, 50f);
+        rootRect.anchorMin = new Vector2(0.5f, 0f);
+        rootRect.anchorMax = new Vector2(0.5f, 0f);
+        rootRect.pivot = new Vector2(0.5f, 0.5f);
+        rootRect.anchoredPosition = new Vector2(0f, 45f);
+        rootRect.sizeDelta = new Vector2(600f, 50f);
 
         _promptRect = rootRect;
 
