@@ -1,7 +1,6 @@
 using System;
 
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
 public enum SkipJudge
@@ -31,7 +30,6 @@ public class PlayerController : MonoBehaviour
     [FormerlySerializedAs("_stone")]
     [SerializeField]
     private FishMeshGenerator _fish;
-    private InputSystem_Actions _inputActions;
     private Rigidbody _playerRB;
     private FishSpawner _fishSpawner;
     private Transform _fishTransform;
@@ -262,7 +260,7 @@ public class PlayerController : MonoBehaviour
         // 던지는 데 쓴 SPACE 입력을 첫 타이밍 입력으로 세지 않는다.
         if (Time.frameCount == _throwFrame) return;
 
-        if (!_inputActions.Player.Jump.WasPressedThisFrame()) return;
+        if (!Managers.Input.JumpPressed) return;
 
         // 미끄러지는 동안은 타이밍 판정 대신 누른 횟수만큼 밀어준다.
         if (_isSliding)
@@ -356,13 +354,12 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 입력과 물, 물고기 메시 참조를 준비하고 시작 위치를 기록한 뒤 던지기 전 상태로 되돌린다.
-    /// input과 fishSpawner를 사용하며, 물 높이와 시작 포즈, 물고기 로컬 변환과 사출용 스포너를 저장한다.
+    /// 물과 물고기 메시 참조를 준비하고 시작 위치를 기록한 뒤 던지기 전 상태로 되돌린다.
+    /// fishSpawner를 사용하며, 물 높이와 시작 포즈, 물고기 로컬 변환과 사출용 스포너를 저장한다.
     /// </summary>
-    public void Initialize(InputSystem_Actions input, FishSpawner fishSpawner)
+    public void Initialize(FishSpawner fishSpawner)
     {
         _fishSpawner = fishSpawner;
-        _inputActions = input;
         _playerRB = GetComponent<Rigidbody>();
         _fishTransform = _fish.transform;
         _fishLocalMatrix = transform.worldToLocalMatrix * _fishTransform.localToWorldMatrix;
@@ -513,19 +510,7 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     private void ReadControls(float dt)
     {
-        // Move 액션은 WASD와 방향키가 묶여 있어서, 커브는 A/D 키만 직접 읽는다.
-        float steer = 0f;
-        Keyboard keyboard = Keyboard.current;
-        if (keyboard != null)
-        {
-            steer += (keyboard.dKey.isPressed ? 1f : 0f) - (keyboard.aKey.isPressed ? 1f : 0f);
-        }
-        Gamepad gamepad = Gamepad.current;
-        if (gamepad != null)
-        {
-            steer += ApplyDeadZone(gamepad.leftStick.ReadValue()).x + gamepad.rightTrigger.ReadValue() - gamepad.leftTrigger.ReadValue();
-        }
-        _steer = Mathf.Clamp(steer, -1f, 1f);
+        _steer = Managers.Input.ReadSteer(_stickDeadZone);
         ReadAttitudeInput(dt);
     }
 
@@ -535,34 +520,12 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     private void ReadAttitudeInput(float dt)
     {
-        Vector2 input = Vector2.zero;
-        Keyboard keyboard = Keyboard.current;
-        if (keyboard != null)
-        {
-            input.y += (keyboard.upArrowKey.isPressed ? 1f : 0f) - (keyboard.downArrowKey.isPressed ? 1f : 0f);
-            input.x += (keyboard.rightArrowKey.isPressed ? 1f : 0f) - (keyboard.leftArrowKey.isPressed ? 1f : 0f);
-        }
-        Gamepad gamepad = Gamepad.current;
-        if (gamepad != null)
-        {
-            input += ApplyDeadZone(gamepad.rightStick.ReadValue());
-        }
-        input = Vector2.ClampMagnitude(input, 1f);
+        Vector2 input = Managers.Input.ReadAttitude(_stickDeadZone);
 
         _targetPitch = Mathf.Clamp(_targetPitch + input.y * _pitchControlRate * dt, _pitchLimits.x, _pitchLimits.y);
         _targetRoll = Mathf.Clamp(_targetRoll + input.x * _rollControlRate * dt, -_rollLimit, _rollLimit);
     }
 
-    /// <summary>
-    /// 스틱이 살짝 기울어진 정도는 무시하고 나머지를 0~1로 다시 늘린다.
-    /// stick과 _stickDeadZone을 사용하며, 보정된 스틱 값을 반환한다.
-    /// </summary>
-    private Vector2 ApplyDeadZone(Vector2 stick)
-    {
-        float magnitude = stick.magnitude;
-        if (magnitude <= _stickDeadZone) return Vector2.zero;
-        return stick / magnitude * ((magnitude - _stickDeadZone) / (1f - _stickDeadZone));
-    }
     /// <summary>
     /// 던지기 전 떠 있는 물고기를 방향키로 맞춘 자세로 돌려 보여준다.
     /// 목표 자세와 진행 방향을 사용하며, Rigidbody와 transform 회전을 변경한다.

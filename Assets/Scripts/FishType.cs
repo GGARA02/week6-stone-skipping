@@ -80,9 +80,7 @@ public class FishType
     [SerializeField]
     private Color _color = new Color(0.35f, 0.5f, 0.62f);
 
-    [Header("사출물 출현 정책")]
-    [Tooltip("사출 후 입수한 다음 판부터 자연 출현한다")]
-    [SerializeField] private bool _requiresEjection;
+    [Header("사출 및 개체 제한")]
     [Tooltip("바다에 등록된 뒤에도 다시 사출할 수 있다")]
     [SerializeField] private bool _allowRepeatEjection = true;
     [Tooltip("출수 대기와 사출 중인 개체도 포함한다. 0이면 제한하지 않는다")]
@@ -142,7 +140,6 @@ public class FishType
     public int Value => _value;
     public Color Color => _color;
     public bool IsRevealed => _isRevealed;
-    public bool RequiresEjection => _requiresEjection;
     public bool AllowRepeatEjection => _allowRepeatEjection;
     public int MaxConcurrent => _maxConcurrent;
     public bool StopAfterCatch => _stopAfterCatch;
@@ -164,7 +161,7 @@ public class FishType
 
     /// <summary>
     /// 입력값 없이 절단 조각의 Wall 종류를 생성해 반환한다.
-    /// 자연 출현을 끄고 미등록 외형과 이름을 숨기는 고정 도감 ID를 설정한다.
+    /// 미등록 외형과 이름을 숨기는 고정 도감 ID 및 투척 배율을 설정한다.
     /// </summary>
     public static FishType CreateWall()
     {
@@ -180,7 +177,7 @@ public class FishType
 
     /// <summary>
     /// 입력값 없이 절단된 유빙의 ICE FLOE 종류를 생성해 반환한다.
-    /// 자연 출현을 끄고 섭취 전에는 미등록 항목으로 숨기는 고정 도감 ID를 설정한다.
+    /// 섭취 전에는 미등록 항목으로 숨기는 고정 도감 ID 및 투척 배율을 설정한다.
     /// </summary>
     public static FishType CreateIce()
     {

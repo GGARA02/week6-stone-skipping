@@ -150,6 +150,7 @@
     "unlockHint": "물수제비 중 바다에서 나타나는 자동차를 맞혀 보세요."
   },
   "pickpocket": {
+    "requiresSeaRegistration": true,
     "spawnWeight": 1,
     "displayName": "도둑",
     "description": "바게트를 노리다 번번이 자동차에 날아가던 소매치기입니다. 이번엔 아예 차에 올라타 봤지만, 결국 또 날아갔습니다.",
@@ -174,12 +175,14 @@
     "unlockHint": "유빙 근처에 정박한 쇄빙선을 맞혀 보세요."
   },
   "aide": {
+    "requiresSeaRegistration": true,
     "spawnWeight": 2,
     "displayName": "부관짱",
     "description": "다정한 조언으로 함장님을 보좌하던 부관입니다. 함장님은 그녀를 날려 보내는 게 아니라 넓은 세상을 보여 주는 거라고 굳게 믿고 있습니다.",
     "unlockHint": "배를 침몰시키세요."
   },
   "w02ball": {
+    "requiresSeaRegistration": true,
     "spawnWeight": 1,
     "displayName": "공",
     "description": "한때 한 게임의 주인공이던 공입니다. 화산을 타고 화려하게 날아오른 데까지는 주인공다웠지만, 착지는 바다였습니다.",
@@ -204,13 +207,17 @@
     "unlockHint": "빈 양동이로 수면의 구멍에서 물을 채워 보세요."
   },
   "wall": {
-    "spawnWeight": 0,
+    "requiresSeaRegistration": true,
+    "rearmOnCutWaterEntry": true,
+    "spawnWeight": 0.2,
     "displayName": "벽",
     "description": "물수제비 앞을 가로막다 잘려 나간 벽의 조각입니다. 길을 막던 시절은 끝났고, 이제는 그 길 위로 던져지는 신세입니다.",
     "unlockHint": "장애물을 잘라내세요."
   },
   "ice": {
-    "spawnWeight": 0,
+    "requiresSeaRegistration": true,
+    "rearmOnCutWaterEntry": true,
+    "spawnWeight": 0.2,
     "displayName": "유빙",
     "description": "먼 바다의 유빙에서 떨어져 나온 조각입니다. 빙산의 일각이라는 말이 있지만, 이 조각은 일각의 일각입니다.",
     "unlockHint": "유빙을 잘라내세요."

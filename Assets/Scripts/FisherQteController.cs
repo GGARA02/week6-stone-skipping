@@ -1,7 +1,6 @@
 using System.Collections;
 
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class FisherQteController : MonoBehaviour
 {
@@ -68,8 +67,7 @@ public class FisherQteController : MonoBehaviour
             return;
         }
         if (Time.frameCount == _startedFrame) return;
-        Keyboard keyboard = Keyboard.current;
-        if (keyboard == null || !keyboard.spaceKey.wasPressedThisFrame) return;
+        if (!Managers.Input.JumpPressed) return;
         StartCoroutine(Resolve(Mathf.Abs(symbolPosition - 0.5f) <= _successZoneWidth * 0.5f));
     }
 
