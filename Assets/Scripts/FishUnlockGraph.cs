@@ -18,6 +18,7 @@ public sealed class FishUnlockGraph
 
     [Header("해금 데이터")]
     private readonly PlayerProgress _progress;
+    private readonly FishDiscoveryConditions _discoveryConditions;
     private readonly Dictionary<string, string[]> _connections = new Dictionary<string, string[]>();
     private readonly HashSet<string> _initialFish = new HashSet<string>();
     private readonly HashSet<string> _specialFish = new HashSet<string>();
@@ -38,6 +39,8 @@ public sealed class FishUnlockGraph
             _connections.Add(node.Name, node.Value.ToObject<string[]>());
         }
         ValidateConnections();
+        _discoveryConditions = new FishDiscoveryConditions(
+            data["discoveryConditions"] as JObject ?? new JObject(), progress, _connections.Keys);
     }
 
     /// <summary>
@@ -50,14 +53,24 @@ public sealed class FishUnlockGraph
     }
 
     /// <summary>
-    /// type의 습득 기록과 이번 판의 해금 목록으로 도감 상태를 반환한다.
-    /// 기본 짱돌인 null은 획득, 초기 및 연결 해금 종류는 발견, 나머지는 미발견으로 구분한다.
+    /// type의 습득 기록, 이번 판의 해금 목록과 즉시 적용되는 발견 조건으로 도감 상태를 반환한다.
+    /// 기본 짱돌은 획득으로 처리하고 발견 조건은 자연 출현 허용에 반영하지 않는다.
     /// </summary>
     public FishCatalogState GetCatalogState(FishType type)
     {
         if (type == null || type.Id == "default" || _progress.IsFishRegistered(type))
             return FishCatalogState.Acquired;
-        return _unlockedFish.Contains(type.Id) ? FishCatalogState.Discovered : FishCatalogState.Undiscovered;
+        return _unlockedFish.Contains(type.Id) || _discoveryConditions.CanDiscover(type.Id)
+            ? FishCatalogState.Discovered : FishCatalogState.Undiscovered;
+    }
+
+    /// <summary>
+    /// 현재 이동 거리 distance를 발견 조건에 전달해 거리 기준 초과를 저장한다.
+    /// 도감 공개용 진행 기록만 변경하며 이번 판의 자연 출현 목록은 유지한다.
+    /// </summary>
+    public void RecordDiscoveryDistance(float distance)
+    {
+        _discoveryConditions.RecordDistance(distance);
     }
 
     /// <summary>

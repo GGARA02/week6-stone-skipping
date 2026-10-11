@@ -1,94 +1,100 @@
 {
   "initialFish": [
     "mackerel",
-    "flyingfish",
-    "flounder",
-    "puffer",
-    "starfish",
-    "babyshark",
-    "can"
+    "flounder"
   ],
   "specialFish": [
-    "volcano",
-    "balksoul",
-    "monster",
-    "alkagi",
     "pickpocket",
-    "blackhole",
-    "ship_normal",
-    "aide",
-    "w02ball",
     "bucket_full",
     "water_block",
+    "volcano",
+    "w02ball",
+    "balksoul",
+    "ship_normal",
+    "aide",
     "wall",
     "ice",
+    "boost",
+    "blackhole",
+    "monster",
+    "alkagi",
     "screen",
     "catalog",
-    "boost",
     "endingcredit",
     "menu"
   ],
+  "discoveryConditions": {
+    "pickpocket": {
+      "afterAcquiringFish": "car"
+    },
+    "bucket_full": {
+      "afterAcquiringFish": "bucket_empty"
+    },
+    "water_block": {
+      "afterAcquiringFish": "bucket_empty"
+    },
+    "volcano": {
+      "always": true
+    },
+    "w02ball": {
+      "afterAcquiringFish": "volcano"
+    },
+    "balksoul": {
+      "afterAcquiringFish": "w02ball"
+    },
+    "ship_normal": {
+      "always": true
+    },
+    "aide": {
+      "afterAcquiringFish": "ship_normal"
+    },
+    "wall": {
+      "always": true
+    },
+    "ice": {
+      "distanceExceeded": 1500
+    },
+    "blackhole": {
+      "always": true
+    }
+  },
   "connections": {
     "default": [],
     "mackerel": [
-      "tire"
-    ],
-    "flyingfish": [
-      "crab"
+      "flyingfish",
+      "starfish"
     ],
     "flounder": [
-      "baguette"
+      "puffer",
+      "can"
     ],
-    "puffer": [
-      "car"
+    "flyingfish": [
+      "baguette",
+      "crab"
     ],
     "starfish": [
-      "car"
-    ],
-    "babyshark": [
-      "tire"
+      "tire",
+      "babyshark"
     ],
     "tire": [
       "bonfire",
       "deer"
     ],
+    "puffer": [
+      "car"
+    ],
     "can": [
       "deer"
     ],
-    "balksoul": [],
     "baguette": [
       "hopak",
       "kinghopak"
     ],
-    "hopak": [
-      "board"
+    "crab": [
+      "bucket_empty"
     ],
-    "kinghopak": [],
-    "33fisher": [
-      "umbrella"
-    ],
-    "alkagi": [],
-    "deer": [
-      "board"
-    ],
-    "monster": [
-      "alkagi"
-    ],
-    "umbrella": [
-      "ship_normal"
-    ],
-    "volcano": [],
-    "whale_dark": [],
-    "whale_white": [],
-    "week4arrow": [
-      "whale_dark",
-      "whale_white"
-    ],
-    "board": [
-      "keyboard"
-    ],
-    "bonfire": [
-      "week4arrow"
+    "babyshark": [
+      "tire"
     ],
     "car": [
       "33fisher"
@@ -96,13 +102,16 @@
     "pickpocket": [
       "umbrella"
     ],
-    "blackhole": [],
-    "crab": [
-      "bucket_empty"
+    "bonfire": [
+      "week4arrow"
     ],
-    "ship_normal": [],
-    "aide": [],
-    "w02ball": [],
+    "deer": [
+      "board"
+    ],
+    "hopak": [
+      "board"
+    ],
+    "kinghopak": [],
     "bucket_empty": [
       "week4arrow"
     ],
@@ -112,15 +121,40 @@
     "water_block": [
       "whale_white"
     ],
+    "board": [
+      "keyboard"
+    ],
+    "33fisher": [
+      "umbrella"
+    ],
+    "week4arrow": [
+      "whale_dark",
+      "whale_white"
+    ],
+    "whale_dark": [],
+    "whale_white": [],
+    "keyboard": [],
+    "umbrella": [
+      "ship_normal"
+    ],
+    "volcano": [],
+    "w02ball": [],
+    "balksoul": [],
+    "ship_normal": [],
+    "aide": [],
     "wall": [],
     "ice": [],
-    "screen": [],
-    "catalog": [],
     "boost": [
       "kinghopak"
     ],
+    "blackhole": [],
+    "monster": [
+      "alkagi"
+    ],
+    "alkagi": [],
+    "screen": [],
+    "catalog": [],
     "endingcredit": [],
-    "keyboard": [],
     "menu": []
   }
 }

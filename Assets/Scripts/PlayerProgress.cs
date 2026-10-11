@@ -9,9 +9,13 @@ public class PlayerProgress : MonoBehaviour
     private const string WALL_MESH_KEY = "SkipStoneV2.WallMesh";
     private const string ICE_MESH_KEY = "SkipStoneV2.IceMesh";
     private const string SEA_MESH_KEY_PREFIX = "SkipStoneV2.SeaMesh.";
+    private const string DISCOVERY_DISTANCE_KEY = "SkipStoneV2.Discovery.Distance";
+    private const string BEST_DISTANCE_KEY = "SkipStoneV2.BestDistance";
 
     public float PowerMultiplier => 1.4f;
     public float SpinMultiplier => 2f;
+    public float DiscoveryDistance => Mathf.Max(
+        PlayerPrefs.GetFloat(DISCOVERY_DISTANCE_KEY, 0f), PlayerPrefs.GetFloat(BEST_DISTANCE_KEY, 0f));
     public event Action<FishType> OnFishRegistered;
 
     /// <summary>
@@ -21,6 +25,26 @@ public class PlayerProgress : MonoBehaviour
     public bool IsFishRegistered(FishType fish)
     {
         return GetFishCount(fish) > 0;
+    }
+
+    /// <summary>
+    /// fishId의 저장된 획득 횟수를 확인해 한 번이라도 습득했는지 반환한다.
+    /// 발견 조건의 선행 ID 조회에 사용하며 저장 데이터는 변경하지 않는다.
+    /// </summary>
+    public bool IsFishRegistered(string fishId)
+    {
+        return PlayerPrefs.GetInt(FISH_KEY_PREFIX + fishId, 0) > 0;
+    }
+
+    /// <summary>
+    /// distance가 threshold를 처음 초과하면 해당 도감 발견용 이동 거리를 즉시 저장한다.
+    /// 기존 최고 거리와 발견 기록을 확인하며 이미 달성한 기준은 다시 저장하지 않는다.
+    /// </summary>
+    public void RecordDiscoveryDistance(float distance, float threshold)
+    {
+        if (distance <= threshold || DiscoveryDistance > threshold) return;
+        PlayerPrefs.SetFloat(DISCOVERY_DISTANCE_KEY, distance);
+        PlayerPrefs.Save();
     }
 
     /// <summary>
