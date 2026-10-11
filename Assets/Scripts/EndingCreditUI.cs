@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,7 +12,7 @@ public class EndingCreditUI : MonoBehaviour
     private const float PULSE_SPEED = 4f;
     private const float MIN_SCALE = 0.92f;
     private const float MAX_SCALE = 1.12f;
-    private const string SKIP_PROMPT_TEXT = "<b>Press <color=#FFD700>[ SPACE ]</color></b> <color=#FFFFFF>to Skip Credits >></color>";
+    private const string SKIP_PROMPT_TEXT = "<b>Press <color=#FFD700>[ SPACE ]</color> <color=#FFFFFF>to Skip Credits ▼▼</color></b>";
 
     [Header("Settings")]
     private float _timer;
@@ -19,11 +20,16 @@ public class EndingCreditUI : MonoBehaviour
 
     [Header("Skip UI")]
     [SerializeField] private TMP_Text _skipMessage;
+    private float _skipPromptDelay = 9f;
     private RectTransform _promptRect;
+    private Coroutine _showPromptCoroutine;
+    private bool _canSkip;
     private float _pulseTimer;
 
     public event Action OnEndingCompleted;
     public event Action OnEndingSkipped;
+
+    public bool CanSkip => _canSkip;
 
     void Awake()
     {
@@ -34,8 +40,29 @@ public class EndingCreditUI : MonoBehaviour
     {
         _timer = 0f;
         _skipRequested = false;
+        _canSkip = false;
         _pulseTimer = 0f;
-        _promptRect.localScale = Vector3.one;
+
+        if (_promptRect != null)
+        {
+            _promptRect.localScale = Vector3.one;
+            _promptRect.gameObject.SetActive(false);
+        }
+
+        if (_showPromptCoroutine != null)
+        {
+            StopCoroutine(_showPromptCoroutine);
+        }
+        _showPromptCoroutine = StartCoroutine(ShowSkipPromptRoutine());
+    }
+
+    void OnDisable()
+    {
+        if (_showPromptCoroutine != null)
+        {
+            StopCoroutine(_showPromptCoroutine);
+            _showPromptCoroutine = null;
+        }
     }
 
     void Update()
@@ -43,7 +70,10 @@ public class EndingCreditUI : MonoBehaviour
         if (_skipRequested) return;
         HandleSkipInput();
         UpdateTimer();
-        UpdatePulseEffect();
+        if (_canSkip)
+        {
+            UpdatePulseEffect();
+        }
     }
 
     /// <summary>
@@ -62,7 +92,7 @@ public class EndingCreditUI : MonoBehaviour
     /// </summary>
     public void SkipCredits()
     {
-        if (_skipRequested) return;
+        if (!_canSkip || _skipRequested) return;
         _skipRequested = true;
         OnEndingSkipped?.Invoke();
     }
@@ -82,9 +112,29 @@ public class EndingCreditUI : MonoBehaviour
     /// </summary>
     private void HandleSkipInput()
     {
+        if (!_canSkip) return;
+
         if (Managers.Input.JumpPressed)
         {
             SkipCredits();
+        }
+    }
+
+    /// <summary>
+    /// 설정된 대기 시간 동안 대기한 후 스킵 안내 UI를 활성화하고 스킵 키 입력을 허용한다.
+    /// _skipPromptDelay를 사용하며, _canSkip 상태와 _promptRect의 활성화 상태를 변경한다.
+    /// </summary>
+    private IEnumerator ShowSkipPromptRoutine()
+    {
+        // 크레딧이 올라오기 시작한 후 설정된 초 동안 대기한다.
+        yield return new WaitForSecondsRealtime(_skipPromptDelay);
+
+        _canSkip = true;
+        _showPromptCoroutine = null;
+
+        if (_promptRect != null)
+        {
+            _promptRect.gameObject.SetActive(true);
         }
     }
 
@@ -168,6 +218,9 @@ public class EndingCreditUI : MonoBehaviour
         {
             _skipMessage.font = referenceText.font;
         }
+
+        // 초기에는 스킵 대기 시간 동안 보이지 않도록 비활성화한다.
+        rootObj.SetActive(false);
     }
 
     /// <summary>

@@ -22,6 +22,9 @@ public class LockOnCamera : MonoBehaviour
     [Tooltip("투척물 중심 위로 올리는 높이. 투척물 반경의 절반이 더해진다")]
     [SerializeField, Min(0f)] private float _height = 1.5f;
     [SerializeField, Min(0f)] private float _minHeightAboveWater = 2f;
+    [Tooltip("자리를 따라가는 부드러움(초). 클수록 튕김과 방향 변화에 덜 흔들린다")]
+    [SerializeField, Min(0f)] private float _positionSmoothTime = 0.3f;
+    private Vector3 _positionVelocity;
 
     void Awake()
     {
@@ -80,7 +83,7 @@ public class LockOnCamera : MonoBehaviour
 
     /// <summary>
     /// 투척물을 기준으로 대상 반대쪽 뒤, 위에 카메라를 둔다. 큰 투척물은 반경만큼 더 물러난다.
-    /// _focalPoint, _target 위치, 투척물 반경과 배치 설정, 수면 높이를 사용하며 transform 위치를 변경한다.
+    /// _focalPoint, _target 위치, 투척물 반경과 배치 설정, 수면 높이, _positionSmoothTime을 사용하며 transform 위치와 _positionVelocity를 변경한다.
     /// </summary>
     private void PlaceBehindFocus()
     {
@@ -92,7 +95,16 @@ public class LockOnCamera : MonoBehaviour
         Vector3 position = focus + away * (_distance + radius) + Vector3.up * (_height + radius * 0.5f);
         // 카메라가 물속으로 들어가지 않게 한다.
         position.y = Mathf.Max(position.y, _player.WaterContactPoint.y + _minHeightAboveWater);
-        transform.position = position;
+
+        // 켜지는 순간에는 바로 자리를 잡고, 켜진 뒤에는 튕김과 방향 변화를 부드럽게 따라간다.
+        if (!_camera.enabled)
+        {
+            _positionVelocity = Vector3.zero;
+            transform.position = position;
+            return;
+        }
+        transform.position = Vector3.SmoothDamp(transform.position, position, ref _positionVelocity,
+            _positionSmoothTime, Mathf.Infinity, Time.unscaledDeltaTime);
     }
 
     /// <summary>

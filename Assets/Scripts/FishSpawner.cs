@@ -125,6 +125,7 @@ public class FishSpawner : MonoBehaviour
 
     void Awake()
     {
+        _fishPrefabs = Array.FindAll(_fishPrefabs, prefab => prefab.Type.Id != "arrow");
         JObject catalogEntries = JObject.Parse(Resources.Load<TextAsset>("FishCatalog").text);
         _seaSpawnRegistry = GetComponent<SeaSpawnRegistry>();
         if (_seaSpawnRegistry == null) _seaSpawnRegistry = gameObject.AddComponent<SeaSpawnRegistry>();
@@ -141,6 +142,7 @@ public class FishSpawner : MonoBehaviour
         if (_screenCapture == null) _screenCapture = gameObject.AddComponent<ScreenFishCapture>();
         Fish screenFish = _screenCapture.Initialize(_progress, FishType.CreateScreen());
         _catalogCapture = gameObject.AddComponent<ScreenFishCapture>();
+        _catalogCapture.PanelSize = _screenCapture.PanelSize;
         Fish catalogFish = _catalogCapture.Initialize(_progress, FishType.CreateCatalog());
         int count = _fishPrefabs.Length;
         Array.Resize(ref _fishPrefabs, count + 2);
@@ -389,6 +391,7 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void RegisterPrefab(Fish prefab)
     {
+        if (prefab.Type.Id == "arrow") return;
         foreach (Fish registered in _fishPrefabs)
         {
             if (registered.Type.Id == prefab.Type.Id) return;

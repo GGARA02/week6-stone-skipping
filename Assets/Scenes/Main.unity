@@ -15759,11 +15759,11 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 5.5, y: 5.5, z: 5.5}
+  m_Size: {x: 5, y: 5, z: 5}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &747180395
 GameObject:
@@ -20822,8 +20822,8 @@ GameObject:
   - component: {fileID: 879980380}
   - component: {fileID: 879980379}
   - component: {fileID: 879980378}
-  - component: {fileID: 879980377}
   - component: {fileID: 879980376}
+  - component: {fileID: 879980377}
   m_Layer: 0
   m_Name: CM LockOnCamera
   m_TagString: Untagged
@@ -20848,7 +20848,7 @@ MonoBehaviour:
   Gain: 1
   Use2DDistance: 0
   UseCameraSpace: 1
-  SignalCombinationMode: 0
+  SignalCombinationMode: 1
   ReactionSettings:
     m_SecondaryNoise: {fileID: 0}
     AmplitudeGain: 1
@@ -20869,9 +20869,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LockOnCamera
   _focalPoint: {fileID: 1936740317}
   _followCamera: {fileID: 1997670920}
-  _distance: 20
+  _distance: 10
   _height: 4
   _minHeightAboveWater: 2
+  _positionSmoothTime: 0.05
 --- !u!114 &879980378
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21725,8 +21726,10 @@ GameObject:
   m_Component:
   - component: {fileID: 1997670922}
   - component: {fileID: 1997670921}
-  - component: {fileID: 1997670920}
   - component: {fileID: 1997670923}
+  - component: {fileID: 1997670920}
+  - component: {fileID: 1997670925}
+  - component: {fileID: 1997670924}
   m_Layer: 0
   m_Name: CM FollowCamera
   m_TagString: Untagged
@@ -21748,6 +21751,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CameraController
   _focalPoint: {fileID: 1936740317}
   _water: {fileID: 1272931870}
+  _fishSpawner: {fileID: 403970198}
   _distanceRange: {x: 16, y: 26}
   _fullSpeed: 60
   _lookAhead: 14
@@ -21765,8 +21769,15 @@ MonoBehaviour:
   _baseFov: 60
   _maxExtraFov: 12
   _shakeDuration: 0.25
-  _shakeAmplitude: 0.35
   _punchFov: 6
+  _judgeImpulse: {fileID: 1997670925}
+  _wallImpulse: {fileID: 1997670924}
+  _perfectImpulseForce: 1
+  _goodImpulseForce: 0.5
+  _catchImpulseForce: 0.1
+  _wallImpulseMinSpeed: 2
+  _wallImpulseFullSpeed: 30
+  _wallImpulseMaxForce: 1.5
   _qteShoulderSide: 1.5
   _qteShoulderHeight: 2
   _qteShoulderDistance: 3
@@ -21848,13 +21859,119 @@ MonoBehaviour:
   Gain: 1
   Use2DDistance: 0
   UseCameraSpace: 1
-  SignalCombinationMode: 0
+  SignalCombinationMode: 1
   ReactionSettings:
     m_SecondaryNoise: {fileID: 0}
     AmplitudeGain: 1
     FrequencyGain: 1
     Duration: 1
     m_NoiseOffsets: {x: 0, y: 0, z: 0}
+--- !u!114 &1997670924
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1997670919}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 180ecf9b41d478f468eb3e9083753217, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineImpulseSource
+  ImpulseDefinition:
+    ImpulseChannel: 1
+    ImpulseShape: 3
+    CustomImpulseShape:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    ImpulseDuration: 0.5
+    ImpulseType: 0
+    DissipationRate: 0.25
+    RawSignal: {fileID: 0}
+    AmplitudeGain: 1
+    FrequencyGain: 1
+    RepeatMode: 0
+    Randomize: 1
+    TimeEnvelope:
+      AttackShape:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      DecayShape:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      AttackTime: 0
+      SustainTime: 0.2
+      DecayTime: 0.7
+      ScaleWithImpact: 1
+      HoldForever: 0
+    ImpactRadius: 100
+    DirectionMode: 0
+    DissipationMode: 2
+    DissipationDistance: 100
+    PropagationSpeed: 343
+  DefaultVelocity: {x: 0, y: -1.5, z: 0}
+--- !u!114 &1997670925
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1997670919}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 180ecf9b41d478f468eb3e9083753217, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineImpulseSource
+  ImpulseDefinition:
+    ImpulseChannel: 1
+    ImpulseShape: 1
+    CustomImpulseShape:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    ImpulseDuration: 0.5
+    ImpulseType: 0
+    DissipationRate: 0.25
+    RawSignal: {fileID: 0}
+    AmplitudeGain: 1
+    FrequencyGain: 1
+    RepeatMode: 0
+    Randomize: 1
+    TimeEnvelope:
+      AttackShape:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      DecayShape:
+        serializedVersion: 2
+        m_Curve: []
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      AttackTime: 0
+      SustainTime: 0.2
+      DecayTime: 0.7
+      ScaleWithImpact: 1
+      HoldForever: 0
+    ImpactRadius: 100
+    DirectionMode: 0
+    DissipationMode: 2
+    DissipationDistance: 100
+    PropagationSpeed: 343
+  DefaultVelocity: {x: 0, y: -1, z: 0}
 --- !u!1 &2050219158
 GameObject:
   m_ObjectHideFlags: 0

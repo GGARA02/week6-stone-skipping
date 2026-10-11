@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// 물에 닿을 때 물보라와 물결을 만들고, 튕길 때 카메라 흔들림과 화면 번쩍임을 준다.
+// 물에 닿을 때 물보라와 물결을 만들고, 튕길 때 카메라 FOV 펀치와 화면 번쩍임을 준다.
 // 물결은 WaterV2 셰이더가 전역 배열 _SkipRippleData로 읽는다.
 public class SkipEffect : MonoBehaviour
 {
@@ -233,8 +233,8 @@ public class SkipEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// 카메라 흔들림, 화면 번쩍임, 게임패드 진동을 시작한다. 튕김, 충돌, 물고기 포획에 쓴다.
-    /// strength(0~1), color와 rumbleScale을 사용하며, 화면 효과와 배율이 적용된 진동을 변경한다.
+    /// 카메라 FOV 펀치, 화면 번쩍임, 게임패드 진동을 시작한다. 튕김, 충돌, 물고기 포획에 쓴다.
+    /// strength(0~1), color와 rumbleScale을 사용하며, FOV와 화면 효과, 배율이 적용된 진동을 변경한다.
     /// </summary>
     public void PlayImpact(float strength, Color color, float rumbleScale = 1f)
     {
@@ -245,7 +245,7 @@ public class SkipEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// 자동 튕김은 속도에 비례해 진동하고 GOOD 이상은 화면을 흔들고 번쩍인다.
+    /// 자동 튕김은 속도에 비례해 진동하고 GOOD 이상은 FOV 펀치와 번쩍임을 준다.
     /// count, judge와 속도를 사용하며 판정 진동은 중복 재생하지 않고 화면 상태를 변경한다.
     /// </summary>
     private void HandleSkip(int count, SkipJudge judge)

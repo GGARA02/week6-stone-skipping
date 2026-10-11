@@ -203,6 +203,7 @@ public class PlayerController : MonoBehaviour
     private float _stopTimer;
     public event Action<GameOverReason> OnGameOver;
     public event Action<float> OnObstacleHit;
+    public event Action<float> OnWallHit;
 
     public bool IsThrown => _isThrown;
     public bool IsGameOver => _isGameOver;
@@ -336,6 +337,11 @@ public class PlayerController : MonoBehaviour
         }
 
         OnObstacleHit?.Invoke(collision.relativeVelocity.magnitude);
+        // 유빙도 CuttableWall을 쓰므로 조각 종류로 벽만 골라낸다.
+        if (collision.collider.TryGetComponent(out CuttableWall wall) && wall.PieceType.Id == "wall")
+        {
+            OnWallHit?.Invoke(collision.relativeVelocity.magnitude);
+        }
         if (collision.gameObject.CompareTag("Finish"))
         {
             GameOver(GameOverReason.HitGround);
