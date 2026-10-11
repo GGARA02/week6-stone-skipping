@@ -6733,6 +6733,7 @@ GameObject:
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
   - component: {fileID: 330585549}
+  - component: {fileID: 330585550}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -6891,6 +6892,55 @@ MonoBehaviour:
   _shakeDuration: 0.25
   _shakeAmplitude: 0.35
   _punchFov: 6
+  _qteShoulderSide: 1.5
+  _qteShoulderHeight: 2
+  _qteShoulderDistance: 3
+  _qteConfrontationGap: 3
+  _qteFov: 55
+  _qteReturnDuration: 0.6
+--- !u!114 &330585550
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9dfa5b682dcd46bda6128250e975f58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera
+  Priority:
+    Enabled: 0
+    m_Value: 0
+  OutputChannel: 1
+  StandbyUpdate: 2
+  m_StreamingVersion: 20241001
+  m_LegacyPriority: 0
+  Target:
+    TrackingTarget: {fileID: 0}
+    LookAtTarget: {fileID: 0}
+    CustomLookAtTarget: 0
+  Lens:
+    FieldOfView: 40
+    OrthographicSize: 10
+    NearClipPlane: 0.1
+    FarClipPlane: 5000
+    Dutch: 0
+    ModeOverride: 0
+    PhysicalProperties:
+      GateFit: 2
+      SensorSize: {x: 21.946, y: 16.002}
+      LensShift: {x: 0, y: 0}
+      FocusDistance: 10
+      Iso: 200
+      ShutterSpeed: 0.005
+      Aperture: 16
+      BladeCount: 5
+      Curvature: {x: 2, y: 11}
+      BarrelClipping: 0.25
+      Anamorphism: 0
+  BlendHint: 0
 --- !u!1 &332944209
 GameObject:
   m_ObjectHideFlags: 0
@@ -8257,11 +8307,14 @@ MonoBehaviour:
   _fishGenerator: {fileID: 747180400}
   _progress: {fileID: 403970199}
   _fishSpawner: {fileID: 403970198}
+  _environmentController: {fileID: 0}
   _showHud: 1
   _showDebug: 1
   _spaceHintLeadTime: 0.6
   _popupHeight: 0.13
   _spaceHintHeight: 0.8
+  _panelShrinkDuration: 0.65
+  _endingCredit: {fileID: 0}
 --- !u!4 &403970196
 Transform:
   m_ObjectHideFlags: 0
@@ -8321,6 +8374,7 @@ MonoBehaviour:
   _progress: {fileID: 403970199}
   _effect: {fileID: 403970197}
   _water: {fileID: 1272931870}
+  _environment: {fileID: 0}
   _fishPrefabs:
   - {fileID: 5171124836081562686, guid: 1a074aa25beef1243be45ae817445d3a, type: 3}
   - {fileID: 1220799323297022026, guid: 988e3a6ad0e696148a880ee859a9242d, type: 3}
@@ -8357,10 +8411,13 @@ MonoBehaviour:
   _leadTimeRange: {x: 1, y: 2}
   _maxSideOffset: 9
   _jumpHeightRange: {x: 3, y: 8}
+  _fisherJumpHeightMultiplier: 2
   _crossSpeedRange: {x: 2, y: 5}
   _maxFish: 16
   _minFishSpeed: 10
   _catchFlashColor: {r: 1, g: 0.85, b: 0.3, a: 0.3}
+  _skyFallHeight: 30
+  _skyFallSpeed: 8
   _fishRippleScale: 2.5
 --- !u!114 &403970199
 MonoBehaviour:
@@ -8374,9 +8431,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ce0fb90ede28bd4595899a60965c430, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerProgress
-  _upgradeCosts: 3200000078000000fa000000c201000020030000
-  _powerPerLevel: 0.08
-  _spinPerLevel: 0.2
 --- !u!114 &403970200
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8403,6 +8457,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 760ba2da837ea6d44a8f9d0e29685964, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScreenFishCapture
+  _panelSize: {x: 9.7, y: 0.08, z: 5.4562497}
   _duration: 1.7
   _suctionStrength: 2.4
   _suctionRadius: 0.65
@@ -8421,7 +8476,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 44f7da2375d8b7245a520129296993c0, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProceduralObstacleSpawner
   _iceStartDistance: 1500
   _blackHoleStartDistance: 3000
@@ -41896,9 +41951,17 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 8175516881334673423, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
-      propertyPath: m_Name
-      value: Placed_BlackHole
+    - target: {fileID: 69755025683854722, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 25
+      objectReference: {fileID: 0}
+    - target: {fileID: 69755025683854722, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 25
+      objectReference: {fileID: 0}
+    - target: {fileID: 69755025683854722, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 25
       objectReference: {fileID: 0}
     - target: {fileID: 69755025683854722, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
       propertyPath: m_LocalPosition.x
@@ -41912,18 +41975,6 @@ PrefabInstance:
       propertyPath: m_LocalPosition.z
       value: 1180
       objectReference: {fileID: 0}
-    - target: {fileID: 69755025683854722, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 25
-      objectReference: {fileID: 0}
-    - target: {fileID: 69755025683854722, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 25
-      objectReference: {fileID: 0}
-    - target: {fileID: 69755025683854722, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 25
-      objectReference: {fileID: 0}
     - target: {fileID: 652048137601599211, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
       propertyPath: m_UseGravity
       value: 0
@@ -41931,6 +41982,10 @@ PrefabInstance:
     - target: {fileID: 652048137601599211, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
       propertyPath: m_IsKinematic
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8175516881334673423, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
+      propertyPath: m_Name
+      value: Placed_BlackHole
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 652048137601599212, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}
@@ -41957,7 +42012,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: aaa6393dbe3e46778d763a90a8c14403, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlacedFish
   _spawner: {fileID: 403970198}
   _fishPrefab: {fileID: 652048137601599212, guid: 431ca29e7ea489748a1c05b49c27ff63, type: 3}

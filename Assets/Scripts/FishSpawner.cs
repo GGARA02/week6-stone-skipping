@@ -135,6 +135,7 @@ public class FishSpawner : MonoBehaviour
         if (_screenCapture == null) _screenCapture = gameObject.AddComponent<ScreenFishCapture>();
         Fish screenFish = _screenCapture.Initialize(_progress, FishType.CreateScreen());
         _catalogCapture = gameObject.AddComponent<ScreenFishCapture>();
+        _catalogCapture.PanelSize = _screenCapture.PanelSize;
         Fish catalogFish = _catalogCapture.Initialize(_progress, FishType.CreateCatalog());
         int count = _fishPrefabs.Length;
         Array.Resize(ref _fishPrefabs, count + 2);
