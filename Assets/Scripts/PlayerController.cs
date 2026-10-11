@@ -45,12 +45,6 @@ public class PlayerController : MonoBehaviour
     [Tooltip("던질 때 스핀 속도 (rad/s)")]
     [SerializeField]
     private float _throwSpin = 30f;
-    [Tooltip("판마다 시작 앞뒤 기울기를 이 범위에서 랜덤으로 정한다(도)")]
-    [SerializeField]
-    private Vector2 _randomPitchRange = new Vector2(0f, 30f);
-    [Tooltip("판마다 시작 좌우 기울기를 ±이 범위에서 랜덤으로 정한다(도)")]
-    [SerializeField]
-    private float _randomRollRange = 25f;
     [Tooltip("판마다 스핀 세기에 곱하는 랜덤 배율 범위. 방향(시계/반시계)도 랜덤이다")]
     [SerializeField]
     private Vector2 _randomSpinRange = new Vector2(0.7f, 1.3f);
@@ -60,24 +54,13 @@ public class PlayerController : MonoBehaviour
     private Vector3 _velocity;
     private ThrowModifiers _modifiers = ThrowModifiers.ForFish(1f, 1f);
 
-    [Header("조작 (A/D·왼쪽 스틱 커브, 방향키·오른쪽 스틱 자세)")]
+    [Header("조작 (A/D·왼쪽 스틱 커브)")]
     [Tooltip("커브: 진행 방향이 초당 휘는 각도(도)")]
     [SerializeField]
     private float _steerRate = 15f;
     [Tooltip("커브: 커브 방향으로 물고기를 기울이는 각도(도)")]
     [SerializeField]
     private float _bankAngle = 12f;
-    [Tooltip("위/아래: 초당 앞뒤 기울기 변화(도). 위를 누르면 앞쪽이 들린다")]
-    [SerializeField]
-    private float _pitchControlRate = 80f;
-    [Tooltip("음수면 앞쪽이 숙여져 물에 박히기 쉽다")]
-    [SerializeField]
-    private Vector2 _pitchLimits = new Vector2(-10f, 55f);
-    [Tooltip("좌/우: 초당 좌우 기울기 변화(도). 누른 쪽이 내려간다")]
-    [SerializeField]
-    private float _rollControlRate = 100f;
-    [SerializeField]
-    private float _rollLimit = 60f;
     [SerializeField]
     private float _stickDeadZone = 0.15f;
     private Vector3 _heading = Vector3.forward;
@@ -247,10 +230,9 @@ public class PlayerController : MonoBehaviour
     void Update()
     {
         if (Time.timeScale == 0f || _isGameOver) return;
-        // 던지기 전에는 방향키로 자세를 맞추고, 떠 있는 물고기에 바로 보여준다.
+        // 던지기 전에는 물고기를 이번 판의 초기 자세로 보여준다.
         if (!_isThrown)
         {
-            ReadAttitudeInput(Time.deltaTime);
             ApplyAimPose();
             return;
         }
@@ -289,7 +271,7 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            ReadControls(dt);
+            ReadControls();
         }
 
         SampleWater();
@@ -375,8 +357,8 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 물고기를 시작 위치에 멈춘 상태로 되돌리고 판정, 기록, 접촉 상태를 초기화한 뒤 시작 자세와 스핀을 랜덤으로 정한다.
-    /// 시작 포즈와 랜덤 범위를 사용하며, Rigidbody 속도와 위치, 목표 자세, 스핀 배율, SkipCount, Distance를 변경한다.
+    /// 물고기를 시작 위치로 되돌리고 판정, 기록과 접촉 상태를 초기화하며 앞쪽을 5~15도 들어 올린다.
+    /// 시작 포즈와 랜덤 범위를 사용하며 앞뒤 목표 기울기를 다시 뽑고 좌우 기울기는 0도로 고정한다.
     /// </summary>
     public void ResetToStart()
     {
@@ -402,8 +384,8 @@ public class PlayerController : MonoBehaviour
         _velocity = Vector3.zero;
         _heading = ThrowHeading();
 
-        _targetPitch = UnityEngine.Random.Range(_randomPitchRange.x, _randomPitchRange.y);
-        _targetRoll = UnityEngine.Random.Range(-_randomRollRange, _randomRollRange);
+        _targetPitch = UnityEngine.Random.Range(5f, 15f);
+        _targetRoll = 0f;
         float spinSign = UnityEngine.Random.value < 0.5f ? -1f : 1f;
         _spinScale = spinSign * UnityEngine.Random.Range(_randomSpinRange.x, _randomSpinRange.y);
 
@@ -415,6 +397,7 @@ public class PlayerController : MonoBehaviour
         _playerRB.position = _startPosition;
         _playerRB.rotation = _startRotation;
         transform.SetPositionAndRotation(_startPosition, _startRotation);
+        ApplyAimPose();
     }
 
     /// <summary>
@@ -507,29 +490,16 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 비행 중 커브 방향과 목표 자세를 갱신한다. 커브는 A/D 또는 왼쪽 스틱과 트리거로 받는다.
-    /// dt와 키보드, 게임패드 입력을 사용하며, _steer, _targetPitch, _targetRoll을 변경한다.
+    /// 비행 중 A/D 또는 게임패드 왼쪽 스틱과 트리거의 커브 입력을 읽는다.
+    /// InputManager와 스틱 데드존을 사용하며 _steer를 변경하고 수동 기울기는 입력받지 않는다.
     /// </summary>
-    private void ReadControls(float dt)
+    private void ReadControls()
     {
         _steer = Managers.Input.ReadSteer(_stickDeadZone);
-        ReadAttitudeInput(dt);
     }
 
     /// <summary>
-    /// 방향키와 오른쪽 스틱으로 목표 자세를 바꾼다. 위/아래는 앞뒤 기울기, 좌/우는 좌우 기울기다.
-    /// dt와 키보드, 게임패드 입력을 사용하며, _targetPitch와 _targetRoll을 변경한다.
-    /// </summary>
-    private void ReadAttitudeInput(float dt)
-    {
-        Vector2 input = Managers.Input.ReadAttitude(_stickDeadZone);
-
-        _targetPitch = Mathf.Clamp(_targetPitch + input.y * _pitchControlRate * dt, _pitchLimits.x, _pitchLimits.y);
-        _targetRoll = Mathf.Clamp(_targetRoll + input.x * _rollControlRate * dt, -_rollLimit, _rollLimit);
-    }
-
-    /// <summary>
-    /// 던지기 전 떠 있는 물고기를 방향키로 맞춘 자세로 돌려 보여준다.
+    /// 던지기 전 떠 있는 물고기를 진행 방향과 이번 판의 초기 기울기에 맞춰 보여준다.
     /// 목표 자세와 진행 방향을 사용하며, Rigidbody와 transform 회전을 변경한다.
     /// </summary>
     private void ApplyAimPose()
