@@ -173,6 +173,8 @@ public class PlayerController : MonoBehaviour
     public float Speed => _velocity.magnitude;
     public Vector3 Velocity => _velocity;
     public Vector3 WaterContactPoint => new Vector3(_submergedCenter.x, _waterY, _submergedCenter.z);
+    // 물 박스 콜라이더의 범위. 수면 판정은 높이만 쓰므로 이 범위 밖을 물 밖으로 보는 판정은 GameFlowManager가 한다.
+    public Bounds WaterBounds => _water.GetComponent<Collider>().bounds;
     public float TargetPitch => _targetPitch;
     public float TargetRoll => _targetRoll;
     public int FishSeed => _fish.CurrentSeed;

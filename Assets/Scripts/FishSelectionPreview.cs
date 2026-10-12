@@ -18,6 +18,10 @@ public sealed class FishSelectionPreview : IDisposable
     private const float EFFECT_FRAME_MARGIN = 0.6f;
     private const float TRAIL_BRIGHTNESS = 1f;
 
+    private static readonly Color UNOWNED_TRAIL_COLOR = new Color(0.6f, 0.6f, 0.6f);
+    // 보유·미획득 미리보기가 같은 위치를 쓰므로 켜 둔 효과 모델 번호를 함께 세어 서로 겹치지 않게 한다.
+    private static int _effectModelCount;
+
     private readonly Dictionary<Fish, RenderTexture> _textures = new Dictionary<Fish, RenderTexture>();
     private readonly Dictionary<Fish, AnimatedModel> _animatedModels = new Dictionary<Fish, AnimatedModel>();
     private readonly GameObject _root;
@@ -25,7 +29,6 @@ public sealed class FishSelectionPreview : IDisposable
     private readonly Material _material;
     private readonly Material _trailMaterial;
     private readonly bool _useOriginalMaterials;
-    private int _effectModelCount;
 
     public RenderTexture DefaultFishTexture { get; private set; }
 
@@ -91,7 +94,7 @@ public sealed class FishSelectionPreview : IDisposable
     /// prefab의 메시, 원본 머티리얼과 변환 계층을 사용해 투척 자세의 미리보기를 렌더링한다.
     /// OnGUI 밖에서 호출하며, prefab별 투명 배경 RenderTexture를 캐시에 저장한다.
     /// animated이고 원본 머티리얼을 쓰면 모델과 카메라 구도를 _animatedModels에 남겨 RefreshAnimatedTextures로 다시 그린다.
-    /// 이때 prefab에 Week4ArrowAbility가 있으면 트레일을 복사한 효과 모델로 남긴다.
+    /// animated이고 prefab에 Week4ArrowAbility가 있으면 회색 미리보기여도 트레일을 복사한 효과 모델로 남긴다.
     /// </summary>
     public void PrepareTexture(Fish prefab, bool animated = false)
     {
@@ -120,8 +123,9 @@ public sealed class FishSelectionPreview : IDisposable
         }
 
         // 회색 미획득 미리보기는 움직일 것이 없으므로 원본 머티리얼일 때만 모델을 남긴다.
+        // 트레일로만 형상이 보이는 화살은 회색이어도 흔들어야 보이므로 효과 모델로 남긴다.
         bool keepModel = animated && _useOriginalMaterials;
-        Week4ArrowAbility arrow = keepModel ? prefab.GetComponent<Week4ArrowAbility>() : null;
+        Week4ArrowAbility arrow = animated ? prefab.GetComponent<Week4ArrowAbility>() : null;
         if (arrow != null)
         {
             _textures.Add(prefab, RenderEffectModel(model, prefab, transforms, arrow.BobHeight));
@@ -232,7 +236,7 @@ public sealed class FishSelectionPreview : IDisposable
 
     /// <summary>
     /// prefab의 트레일을 transforms로 복사한 계층에 붙여 model을 크기 조정 없이 렌더링한다.
-    /// 트레일은 _trailMaterial로 그리고, 트레일 위치를 가운데에 두고 bobHeight만큼 위아래 여유를 둔 구도를 쓴다.
+    /// 트레일은 _trailMaterial로 그리되 미획득 미리보기면 회색으로 칠하고, 트레일 위치를 가운데에 두고 bobHeight만큼 위아래 여유를 둔 구도를 쓴다.
     /// model을 켜 둔 채 전용 위치에 두고 투명 배경 RenderTexture를 반환한다.
     /// </summary>
     private RenderTexture RenderEffectModel(GameObject model, Fish prefab, Dictionary<Transform, Transform> transforms,
@@ -250,6 +254,12 @@ public sealed class FishSelectionPreview : IDisposable
             TrailRenderer trail = UnityEngine.Object.Instantiate(source, CopyTransform(source.transform.parent, transforms), false);
             trail.gameObject.layer = PREVIEW_LAYER;
             trail.sharedMaterial = _trailMaterial;
+            // 미획득 미리보기는 다른 항목처럼 회색으로 그린다.
+            if (!_useOriginalMaterials)
+            {
+                trail.startColor = UNOWNED_TRAIL_COLOR;
+                trail.endColor = UNOWNED_TRAIL_COLOR;
+            }
             center = trail.transform.position;
         }
         _camera.orthographicSize = bobHeight + EFFECT_FRAME_MARGIN;

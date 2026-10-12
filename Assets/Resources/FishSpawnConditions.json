@@ -23,7 +23,8 @@
     "screen",
     "catalog",
     "endingcredit",
-    "menu"
+    "menu",
+    "skybox"
   ],
   "discoveryConditions": {
     "pickpocket": {
@@ -67,6 +68,9 @@
     },
     "alkagi": {
       "afterCompletingCatalog": true
+    },
+    "skybox": {
+      "afterAcquiringFish": "blackhole"
     }
   },
   "connections": {
@@ -166,6 +170,7 @@
     "screen": [],
     "catalog": [],
     "endingcredit": [],
-    "menu": []
+    "menu": [],
+    "skybox": []
   }
 }
