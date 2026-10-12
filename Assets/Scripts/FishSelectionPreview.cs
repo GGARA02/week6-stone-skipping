@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
+using UnityEngine.Rendering.Universal;
+
 /// <summary>
 /// 생성 메시와 물고기 프리팹의 메시와 머티리얼로 선택 미리보기 텍스처를 보관한다.
 /// 게임 동작, 충돌체와 애니메이션은 생성하지 않는다. 물처럼 셰이더가 움직이는 항목만 모델을 남겨 다시 그린다.
@@ -52,6 +54,9 @@ public sealed class FishSelectionPreview : IDisposable
         _camera.nearClipPlane = 0.01f;
         _camera.farClipPlane = 100f;
         _camera.aspect = (float)TEXTURE_WIDTH / TEXTURE_HEIGHT;
+        UniversalAdditionalCameraData cameraData = _camera.GetUniversalAdditionalCameraData();
+        cameraData.requiresDepthTexture = true;
+        cameraData.requiresColorTexture = true;
         _material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
         _material.SetColor("_BaseColor", new Color(0.6f, 0.6f, 0.6f, 0.55f));
         _material.SetFloat("_Surface", 1f);
@@ -133,10 +138,29 @@ public sealed class FishSelectionPreview : IDisposable
                 visualRoot, arrow));
             return;
         }
-        _textures.Add(prefab, RenderModel(model, keepModel));
+
+        BlackHoleLensing blackHoleLensing = prefab.GetComponent<BlackHoleLensing>();
+        Renderer previewHorizon = null;
+        Renderer previewDisk = null;
+        if (blackHoleLensing != null && blackHoleLensing.EventHorizon != null && blackHoleLensing.AccretionDisk != null)
+        {
+            if (transforms.TryGetValue(blackHoleLensing.EventHorizon.transform, out Transform horizonParent))
+                previewHorizon = horizonParent.GetComponentInChildren<Renderer>();
+            if (transforms.TryGetValue(blackHoleLensing.AccretionDisk.transform, out Transform diskParent))
+                previewDisk = diskParent.GetComponentInChildren<Renderer>();
+        }
+
+        Action onPrepareRender = null;
+        if (previewHorizon != null && previewDisk != null)
+        {
+            Material diskMaterial = blackHoleLensing.AccretionDisk.sharedMaterial;
+            onPrepareRender = () => BlackHoleLensing.ApplyLensingProperties(previewHorizon, previewDisk, diskMaterial, _camera);
+        }
+
+        _textures.Add(prefab, RenderModel(model, keepModel, onPrepareRender));
         if (keepModel)
         {
-            _animatedModels.Add(prefab, new AnimatedModel(model, _camera.transform.position, _camera.orthographicSize));
+            _animatedModels.Add(prefab, new AnimatedModel(model, _camera.transform.position, _camera.orthographicSize, onPrepareRender: onPrepareRender));
         }
     }
 
@@ -160,6 +184,7 @@ public sealed class FishSelectionPreview : IDisposable
                     Vector3.up * animated.Arrow.GetBobOffset(Time.time));
             }
             else animated.Model.SetActive(true);
+            animated.OnPrepareRender?.Invoke();
             _camera.transform.position = animated.CameraPosition;
             _camera.orthographicSize = animated.OrthographicSize;
             _camera.targetTexture = _textures[pair.Key];
@@ -205,9 +230,9 @@ public sealed class FishSelectionPreview : IDisposable
 
     /// <summary>
     /// model의 메시 경계로 크기와 카메라를 맞춰 미리보기를 렌더링한다.
-    /// keepModel이면 렌더링 전용 모델을 끄기만 하고, 아니면 제거한 뒤 투명 배경 RenderTexture를 반환한다.
+    /// model, keepModel, onPrepareRender를 사용하며, keepModel이면 렌더링 전용 모델을 끄기만 하고, 아니면 제거한 뒤 투명 배경 RenderTexture를 반환한다.
     /// </summary>
-    private RenderTexture RenderModel(GameObject model, bool keepModel = false)
+    private RenderTexture RenderModel(GameObject model, bool keepModel = false, Action onPrepareRender = null)
     {
         model.transform.localRotation = Quaternion.Euler(12f, 65f, 0f);
         Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
@@ -224,6 +249,7 @@ public sealed class FishSelectionPreview : IDisposable
         bounds = new Bounds(_root.transform.position, bounds.size * scale);
         _camera.transform.position = bounds.center - Vector3.forward * (bounds.extents.z + 10f);
         _camera.orthographicSize = Mathf.Max(bounds.extents.y, bounds.extents.x / _camera.aspect, 0.01f) * 1.2f;
+        onPrepareRender?.Invoke();
         RenderTexture texture = new RenderTexture(TEXTURE_WIDTH, TEXTURE_HEIGHT, 24, RenderTextureFormat.ARGB32);
         texture.Create();
         _camera.targetTexture = texture;
@@ -323,19 +349,21 @@ public sealed class FishSelectionPreview : IDisposable
         public float OrthographicSize { get; }
         public Transform VisualRoot { get; }
         public Week4ArrowAbility Arrow { get; }
+        public Action OnPrepareRender { get; }
 
         /// <summary>
         /// model과 cameraPosition, orthographicSize를 받아 다시 그릴 때 쓸 모델과 카메라 구도를 저장한다.
-        /// Week4 화살이면 흔들 visualRoot와 아이들 모션을 계산할 arrow도 저장하며, 저장한 값은 바꾸지 않는다.
+        /// Week4 화살이면 흔들 visualRoot와 아이들 모션을 계산할 arrow도 저장하며, 렌더 직전 속성 갱신 콜백 onPrepareRender도 저장한다.
         /// </summary>
         public AnimatedModel(GameObject model, Vector3 cameraPosition, float orthographicSize,
-            Transform visualRoot = null, Week4ArrowAbility arrow = null)
+            Transform visualRoot = null, Week4ArrowAbility arrow = null, Action onPrepareRender = null)
         {
             Model = model;
             CameraPosition = cameraPosition;
             OrthographicSize = orthographicSize;
             VisualRoot = visualRoot;
             Arrow = arrow;
+            OnPrepareRender = onPrepareRender;
         }
     }
 }

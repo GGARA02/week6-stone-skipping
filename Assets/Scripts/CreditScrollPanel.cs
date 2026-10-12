@@ -22,12 +22,12 @@ public class CreditScrollPanel : MonoBehaviour
         "",
         "개발팀",
         "개발진",
-        "특별한 감사들"
+        "도움을 주신 분들"
     };
     [Tooltip("크레딧 섹션 내용 목록 (기여자 목록은 SO에서 불러오므로 비워둠)")]
     private string[] _creditContents = new string[]
     {
-        "놀아줘서 고맙다!",
+        "플레이해 주셔서 감사합니다!",
         "──  Space to Skip  ──",
         "B팀 2조",
         "김철환   전효상   박상현   황병부",
@@ -59,7 +59,7 @@ public class CreditScrollPanel : MonoBehaviour
     [Tooltip("부모 패널에 RectMask2D를 자동 적용하여 보드 크기 밖으로 나가는 글자를 자를지 여부")]
     [SerializeField] private bool _autoApplyRectMask2D = true;
     [Tooltip("2D UI 모드에서 하단 스킵 문구와 겹치지 않도록 마스크를 띄울 여백(px)")]
-    private float _maskPaddingBottom = 80f;
+    private float _maskPaddingBottom = 120f;
     [Tooltip("2D UI 모드에서 상단 경계와 여백을 둘 마스크 여백(px)")]
     private float _maskPaddingTop = 50f;
     [Tooltip("마스크 상하단 경계면의 부드러운 페이드아웃 효과 크기(px)")]
@@ -194,7 +194,7 @@ public class CreditScrollPanel : MonoBehaviour
             string content = _creditContents[i];
 
             // 특별한 감사들 섹션
-            if (title == "특별한 감사들")
+            if (title == "도움을 주신 분들")
             {
                 builder.Append(centerMarginOpen);
                 builder.Append("<align=center>");

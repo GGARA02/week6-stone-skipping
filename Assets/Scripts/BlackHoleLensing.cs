@@ -23,6 +23,8 @@ public class BlackHoleLensing : MonoBehaviour
     private MaterialPropertyBlock _properties;
 
     public static bool IsActive => _activeInstances > 0;
+    public Renderer EventHorizon => _eventHorizon;
+    public Renderer AccretionDisk => _accretionDisk;
 
     void OnEnable()
     {
@@ -42,6 +44,32 @@ public class BlackHoleLensing : MonoBehaviour
         _eventHorizon.GetPropertyBlock(_properties);
         _properties.SetFloat("_DiskEnabled", 0f);
         _eventHorizon.SetPropertyBlock(_properties);
+    }
+
+    /// <summary>
+    /// 지정한 사건의 지평선과 강착원반 렌더러 및 카메라를 바탕으로 프로퍼티 블록을 갱신한다.
+    /// eventHorizon, accretionDisk, diskMaterial, camera, properties를 사용하며, eventHorizon의 MaterialPropertyBlock을 변경한다.
+    /// </summary>
+    public static void ApplyLensingProperties(Renderer eventHorizon, Renderer accretionDisk, Material diskMaterial, Camera camera, MaterialPropertyBlock properties = null)
+    {
+        if (eventHorizon == null || accretionDisk == null)
+            return;
+
+        if (properties == null)
+            properties = new MaterialPropertyBlock();
+
+        eventHorizon.GetPropertyBlock(properties);
+        properties.SetColor("_LensBackgroundColor", camera != null ? camera.backgroundColor : Color.clear);
+        properties.SetFloat("_DiskEnabled", accretionDisk.enabled && accretionDisk.gameObject.activeInHierarchy ? 1f : 0f);
+        properties.SetMatrix("_DiskWorldToLocal", accretionDisk.transform.worldToLocalMatrix);
+        if (diskMaterial != null)
+        {
+            properties.SetVector("_DiskInnerColor", diskMaterial.GetColor("_InnerColor"));
+            properties.SetVector("_DiskOuterColor", diskMaterial.GetColor("_OuterColor"));
+            foreach (var property in _diskFloatProperties)
+                properties.SetFloat(property.Target, diskMaterial.GetFloat(property.Source));
+        }
+        eventHorizon.SetPropertyBlock(properties);
     }
 
     /// <summary>
@@ -67,15 +95,6 @@ public class BlackHoleLensing : MonoBehaviour
         if (_eventHorizon == null || _accretionDisk == null)
             return;
 
-        Material material = _accretionDisk.sharedMaterial;
-        _eventHorizon.GetPropertyBlock(_properties);
-        _properties.SetColor("_LensBackgroundColor", camera.backgroundColor);
-        _properties.SetFloat("_DiskEnabled", _accretionDisk.enabled && _accretionDisk.gameObject.activeInHierarchy ? 1f : 0f);
-        _properties.SetMatrix("_DiskWorldToLocal", _accretionDisk.transform.worldToLocalMatrix);
-        _properties.SetVector("_DiskInnerColor", material.GetColor("_InnerColor"));
-        _properties.SetVector("_DiskOuterColor", material.GetColor("_OuterColor"));
-        foreach (var property in _diskFloatProperties)
-            _properties.SetFloat(property.Target, material.GetFloat(property.Source));
-        _eventHorizon.SetPropertyBlock(_properties);
+        ApplyLensingProperties(_eventHorizon, _accretionDisk, _accretionDisk.sharedMaterial, camera, _properties);
     }
 }
