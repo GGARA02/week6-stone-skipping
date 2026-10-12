@@ -440,7 +440,8 @@ public class GameFlowManager : MonoBehaviour
         for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
         {
             FishType fish = _fishSpawner.FishTypes[i];
-            if (fish.Id != "screen" && fish.Id != "catalog" && fish.Id != "menu"
+            if ((!_progress.IsFishRegistered(fish)
+                    || (fish.Id != "screen" && fish.Id != "catalog" && fish.Id != "menu"))
                 && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)
             {
                 FishSelectionPreview previews = _progress.IsFishRegistered(fish) ? _ownedFishSelectionPreview : _fishSelectionPreview;
@@ -995,6 +996,7 @@ public class GameFlowManager : MonoBehaviour
     {
         if (!CanThrowSelectedFish())
         {
+            FindFirstObjectByType<ShipAideController>()?.ClearSelection();
             SetProjectileVisualsVisible(false);
             _fishSpawner.SetPlayerFish(null);
             return;
@@ -1437,10 +1439,11 @@ public class GameFlowManager : MonoBehaviour
             GUI.color = original;
             Rect image = new Rect(cell.x + 12f * scale, cell.y + 8f * scale, cell.width - 24f * scale, 132f * scale);
             Texture texture = fish == null ? _ownedFishSelectionPreview.DefaultFishTexture
+                : !owned ? _fishSelectionPreview.GetTexture(_fishSpawner.FishPrefabs[index])
                 : fish.Id == "screen" ? _fishSpawner.ScreenCapture.Image
                 : fish.Id == "catalog" ? _fishSpawner.CatalogCapture.Image
                 : fish.Id == "menu" ? _fishSpawner.MenuCapture.Image
-                : (owned ? _ownedFishSelectionPreview : _fishSelectionPreview).GetTexture(_fishSpawner.FishPrefabs[index]);
+                : _ownedFishSelectionPreview.GetTexture(_fishSpawner.FishPrefabs[index]);
             if (revealed && texture != null) GUI.DrawTexture(image, texture, ScaleMode.ScaleToFit, true);
             else ShadowLabel(image, "?", _centerStyle, new Color(1f, 1f, 1f, 0.5f));
             // 처음 얻은 뒤 아직 하이라이트되지 않은 종류는 칸 위쪽에 강조 문구를 띄운다.
@@ -2081,7 +2084,7 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 엔딩 크레딧 정상 완료 이벤트를 받아 크레딧 물고기를 획득하고 투척 없이 재시작 대기 상태로 전환한다.
+    /// 엔딩 크레딧 정상 완료 이벤트를 받아 획득 처리 없이 정산 상태로 전환한다.
     /// 입력값은 없으며, CompleteEndingCredit을 호출한다.
     /// </summary>
     private void HandleEndingCompleted()
@@ -2160,26 +2163,17 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 엔딩 크레딧을 정리하고 크레딧 물고기를 해금 및 선택한 뒤 게임오버(정산) 상태로 전환한다.
-    /// 새로 획득한 물고기 목록을 확인할 수 있도록 GameOver 화면을 표시한다.
+    /// 끝까지 감상한 엔딩 크레딧을 닫고 게임오버(정산) 상태로 전환한다.
+    /// 입력값 없이 HUD와 레터박스를 복원하며 크레딧 획득 기록과 선택 항목은 변경하지 않는다.
     /// </summary>
     private void CompleteEndingCredit()
     {
-        UnlockCreditFish();
-        SelectCreditFish();
         if (_endingCredit != null)
         {
             _endingCredit.gameObject.SetActive(false);
         }
         _showHud = true;
         SetCinematicLetterbox(false);
-
-        // 크레딧 감상이 끝난 직후 크레딧 물고기 획득 팝업을 표시한다.
-        FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
-        if (creditFish != null)
-        {
-            ShowFishPopup($"{GetCatalogDisplayName(creditFish)} 획득!");
-        }
 
         HandleGameOver(GameOverReason.Stopped);
     }
@@ -2237,10 +2231,6 @@ public class GameFlowManager : MonoBehaviour
                     _progress.AddFish(fish);
                     PlayerPrefs.SetInt(FISH_KEY_PREFIX + CREDIT_FISH_ID, 1);
                     PlayerPrefs.Save();
-                    if (!_newFish.Contains(fish))
-                    {
-                        _newFish.Add(fish);
-                    }
                     return;
                 }
             }
@@ -2260,10 +2250,6 @@ public class GameFlowManager : MonoBehaviour
         if (blackholeFish != null)
         {
             _fishSpawner.HandlePlacedFishCaught(blackholeFish, _playerController.transform.position);
-            if (!_newFish.Contains(blackholeFish))
-            {
-                _newFish.Add(blackholeFish);
-            }
             // 블랙홀 접촉 즉시 획득 팝업을 표시한다.
             ShowFishPopup($"{GetCatalogDisplayName(blackholeFish)} 획득!");
         }
@@ -2473,16 +2459,13 @@ public class GameFlowManager : MonoBehaviour
         if (monsterType != null && _progress != null)
         {
             _progress.AddFish(monsterType);
-            if (!_newFish.Contains(monsterType))
-            {
-                _newFish.Add(monsterType);
-            }
         }
         else
         {
+            bool firstAcquisition = PlayerPrefs.GetInt(FISH_KEY_PREFIX + MONSTER_FISH_ID, 0) == 0;
             PlayerPrefs.SetInt(FISH_KEY_PREFIX + MONSTER_FISH_ID, 1);
             PlayerPrefs.Save();
-            if (monsterType != null && !_newFish.Contains(monsterType))
+            if (firstAcquisition && monsterType != null && !_newFish.Contains(monsterType))
             {
                 _newFish.Add(monsterType);
             }

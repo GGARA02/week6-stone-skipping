@@ -226,6 +226,18 @@ public class ShipAideController : MonoBehaviour
     }
 
     /// <summary>
+    /// 미획득 투척물 선택 시 기존 부관의 선택 연결과 표시를 해제한다.
+    /// 입력값 없이 선택 능력, 말풍선 추적과 침몰 상태를 정리하고 초상화 패널과 말풍선을 숨긴다.
+    /// </summary>
+    public void ClearSelection()
+    {
+        DisconnectSelection();
+        _panel.anchoredPosition = _panelHome;
+        _panel.gameObject.SetActive(false);
+        _projectileBubble.gameObject.SetActive(false);
+    }
+
+    /// <summary>
     /// 선택 능력과 연결된 컨트롤러 참조를 해제한다.
     /// 현재 선택을 사용해 투척물 추적, 침몰 애니메이션과 최초 비행 상태를 정리한다.
     /// </summary>

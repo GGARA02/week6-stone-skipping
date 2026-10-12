@@ -27,9 +27,9 @@ public class EnvironmentController : MonoBehaviour
     }
 
     private const int SH_COEFFICIENT_COUNT = 9;
-    private const float CLEAR_DAY_THRESHOLD = 0.3f;
-    private const float CLEAR_NIGHT_THRESHOLD = 0.6f;
-    private const float RAIN_DAY_THRESHOLD = 0.8f;
+    private const float CLEAR_DAY_THRESHOLD = 0.5f;
+    private const float CLEAR_NIGHT_THRESHOLD = 0.7f;
+    private const float RAIN_DAY_THRESHOLD = 0.9f;
     // 셰이더가 다른 스카이박스는 값을 섞을 수 없어 비중이 이 값을 넘을 때 바꾼다.
     private const float SKYBOX_SWITCH_WEIGHT = 0.5f;
 
@@ -244,7 +244,7 @@ public class EnvironmentController : MonoBehaviour
 
     /// <summary>
     /// 우주 하늘을 끄고, 이번 판의 기본 날씨를 정하고, 고른 물고기의 하늘, 날씨와 선택 시 볼륨까지 더해 바로 적용한다.
-    /// fish(기본 물고기면 null)와 randomWeather를 사용하며, 기본 환경을 낮 30%, 밤 30%, 비 오는 낮 20%, 비 오는 밤 20%로 정한다.
+    /// fish(기본 물고기면 null)와 randomWeather를 사용하며, 기본 환경을 낮 50%, 밤 20%, 비 오는 낮 20%, 비 오는 밤 10%로 정한다.
     /// randomWeather가 false면 기본 날씨를 맑은 낮으로 둔다.
     /// 우주 하늘 여부, 물고기 하늘, 기본 날씨, 목표 날씨, 현재 날씨 비중, 물고기 볼륨을 변경한다.
     /// </summary>

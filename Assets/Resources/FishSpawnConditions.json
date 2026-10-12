@@ -71,6 +71,18 @@
     },
     "skybox": {
       "afterAcquiringFish": "blackhole"
+    },
+    "screen": {
+      "afterAcquiringFish": "blackhole"
+    },
+    "endingcredit": {
+      "afterAcquiringFish": "blackhole"
+    },
+    "catalog": {
+      "afterAcquiringFish": "monster"
+    },
+    "menu": {
+      "afterAcquiringFish": "monster"
     }
   },
   "connections": {
