@@ -112,13 +112,13 @@
     "spawnWeight": 0,
     "displayName": "물 양동이",
     "description": "물 양동이입니다. 어떤 세계에서는 낙사를 막아 주는 생명줄이었지만, 여기서는 그냥 무거운 물수제비입니다.",
-    "unlockHint": "빈 양동이로 좋음 이상을 3번 성공하세요."
+    "unlockHint": "빈 양동이로 Good 이상을 3번 성공하세요."
   },
   "water_block": {
     "spawnWeight": 0,
     "displayName": "물",
     "description": "물 한 블록입니다. 바다에서 떠 왔다가 다시 바다로 던져지는, 세상에서 가장 짧고 무의미한 여행을 하는 중입니다.",
-    "unlockHint": "빈 양동이로 좋음 이상을 3번 성공하세요."
+    "unlockHint": "빈 양동이로 Good 이상을 3번 성공하세요."
   },
   "ice_block": {
     "spawnWeight": 0,
