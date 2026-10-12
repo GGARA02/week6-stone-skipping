@@ -164,9 +164,10 @@ public class CatalogAbility : FishAbility
         GameObject debris = Instantiate(prefab.gameObject, spawnPos, Random.rotation);
         debris.SetActive(true);
 
-        // 파편으로만 동작하도록 기존 스크립트와 콜라이더를 끈다.
+        // 파편으로만 동작하도록 콜라이더와 비주얼 외 일반 스크립트를 끈다.
         foreach (MonoBehaviour mb in debris.GetComponentsInChildren<MonoBehaviour>())
         {
+            if (mb is BlackHoleLensing) continue;
             mb.enabled = false;
         }
         foreach (Collider col in debris.GetComponentsInChildren<Collider>())
