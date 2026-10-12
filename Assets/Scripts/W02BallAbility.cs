@@ -120,8 +120,8 @@ public class W02BallAbility : FishAbility
     }
 
     /// <summary>
-    /// 던진 동안 Perfect 성공을 세고, 설정 횟수에 도달하면 진화한다. 진화 연출은 볼크소울을 처음 획득할 때만 나온다.
-    /// context, judge, _perfectCountToEvolve와 볼크소울 도감 등록 여부를 사용하며, _perfectCount를 변경하고 진화 연출을 시작하거나 던진 외형을 바로 바꾼다.
+    /// 던진 동안 Perfect 성공을 세고, 설정 횟수에 도달하면 진화한다. 진화는 볼크소울을 처음 획득할 때만 일어난다.
+    /// context, judge, _perfectCountToEvolve와 볼크소울 도감 등록 여부를 사용하며, _perfectCount를 변경하고 진화 연출을 시작한다.
     /// </summary>
     public override void OnJudgeSuccess(ThrowContext context, SkipJudge judge)
     {
@@ -129,12 +129,8 @@ public class W02BallAbility : FishAbility
         _perfectCount++;
         if (_perfectCount < _perfectCountToEvolve) return;
 
-        // 이미 획득했으면 연출과 등록 없이 외형만 바로 바꾼다.
-        if (context.Spawner.Progress.IsFishRegistered(_evolvedPrefab.Type))
-        {
-            context.Shape.GenerateFish(_evolvedPrefab);
-            return;
-        }
+        // 이미 획득했으면 진화 연출을 한 번 본 것이므로 공 모습을 그대로 유지한다.
+        if (context.Spawner.Progress.IsFishRegistered(_evolvedPrefab.Type)) return;
         // 진화하면 이 개체가 제거되므로 연출은 플레이어에서 돌린다.
         context.Player.StartCoroutine(PlayEvolution(context));
     }

@@ -28,9 +28,16 @@ public class GameFlowManager : MonoBehaviour
     private const int DEFAULT_FISH_INDEX = -1;
     // 게임오버 직후 SPACE 연타로 바로 재시작되지 않게 기다리는 시간(초)
     private const float RETRY_INPUT_DELAY = 0.6f;
+    private const float CATALOG_NAVIGATION_DELAY = 0.3f;
+    private const float CATALOG_NAVIGATION_INTERVAL = 0.12f;
+    private const string BLACKHOLE_FISH_ID = "blackhole";
     private const string CREDIT_FISH_ID = "endingcredit";
     private const string MONSTER_FISH_ID = "monster";
     private const string FISH_KEY_PREFIX = "SkipStoneV2.Fish.";
+    private const float CINEMATIC_ASPECT = 21f / 9f;
+    private const int NOTE_TEXTURE_SIZE = 256;
+    // 리듬 노트 고리 두께 (반지름 대비 비율)
+    private const float NOTE_RING_THICKNESS = 0.1f;
 
     [Header("참조")]
     [SerializeField]
@@ -74,8 +81,12 @@ public class GameFlowManager : MonoBehaviour
     private JObject _catalogEntries;
     private Vector2 _catalogScroll;
     private Vector2 _catalogDetailScroll;
+    private Vector2Int _catalogNavigateDirection;
+    private float _catalogNavigateTime;
+    private bool _catalogScrollToSelection;
     private Vector2 _resultScroll;
     private readonly List<int> _ownedOptions = new List<int>();
+    private readonly List<int> _selectionOptions = new List<int>();
     private readonly List<int> _catalogOptions = new List<int>();
     private readonly Dictionary<string, int> _catalogOrder = new Dictionary<string, int>();
     private readonly List<FishType> _newFish = new List<FishType>();
@@ -99,6 +110,22 @@ public class GameFlowManager : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField]
     private float _spaceHintHeight = 0.8f;
+    [Tooltip("SPACE 리듬 노트 중심 위치 (화면 비율, 왼쪽 위가 0). 물고기가 화면 가운데 있으므로 중앙 왼쪽에 둔다")]
+    [SerializeField]
+    private Vector2 _notePosition = new Vector2(0.3f, 0.5f);
+    [Tooltip("SPACE 리듬 노트 원의 반지름 (1080p 기준 픽셀)")]
+    [SerializeField]
+    private float _noteRadius = 64f;
+    [Tooltip("SPACE 안내가 뜰 때 접근 원의 크기 (노트 원 대비 배율). 수면에 닿는 순간 1배가 되어 노트 원과 겹친다")]
+    [SerializeField]
+    private float _approachStartScale = 3f;
+    [Tooltip("판정 성공 시 노트 원이 퍼지며 사라지는 시간(초)")]
+    [SerializeField]
+    private float _noteHitDuration = 0.25f;
+    private Texture2D _noteDiscTexture;
+    private Texture2D _noteRingTexture;
+    private Color _noteHitColor;
+    private float _noteHitTime = -10f;
     private string _popupText;
     private Color _popupColor;
     private float _popupTime = -10f;
@@ -110,13 +137,17 @@ public class GameFlowManager : MonoBehaviour
     private GUIStyle _centerStyle;
     private GUIStyle _centerSubStyle;
     private GUIStyle _popupStyle;
+    private GUIStyle _noteStyle;
     private GUIStyle _debugStyle;
     private GUIStyle _buttonStyle;
     private GUIStyle _previewStyle;
     private GUIStyle _catalogDetailStyle;
+    private GUIStyle _selectionDetailStyle;
     private float _styleScale = -1f;
     private FishSelectionPreview _fishSelectionPreview;
     private FishSelectionPreview _ownedFishSelectionPreview;
+    private readonly List<Renderer> _hiddenProjectileRenderers = new List<Renderer>();
+    private readonly List<Canvas> _hiddenProjectileCanvases = new List<Canvas>();
 
     [Header("재시작 안내")]
     [Range(0f, 1f)]
@@ -138,9 +169,24 @@ public class GameFlowManager : MonoBehaviour
     [Header("화면 투척 전환")]
     [SerializeField, Min(0.1f)] private float _panelShrinkDuration = 0.65f;
     private bool _screenThrowPending;
+    private RenderTexture _menuPopupFrame;
+    private Rect _menuPopupRect;
 
     [Header("엔딩 크레딧 UI")]
     [SerializeField] private EndingCreditUI _endingCredit;
+
+    [Header("시네마틱 연출")]
+    [Tooltip("엔딩 시네마 동안 21:9 레터박스 연출을 엔딩 크레딧까지 유지할지 여부")]
+    [SerializeField] private bool _maintainCinemaDuringCredits = true;
+    [Tooltip("21:9 레터박스 전환 시간 (초)")]
+    [SerializeField] private float _cinemaTransitionDuration = 0.6f;
+    private GameObject _letterboxOverlay;
+    private RectTransform _topLetterboxBar;
+    private RectTransform _bottomLetterboxBar;
+    private RectTransform _leftLetterboxBar;
+    private RectTransform _rightLetterboxBar;
+    private Coroutine _letterboxCoroutine;
+    private Rect _originalCameraRect = new Rect(0f, 0f, 1f, 1f);
 
     void Start()
     {
@@ -168,6 +214,10 @@ public class GameFlowManager : MonoBehaviour
             _endingCredit.OnEndingCompleted += HandleEndingCompleted;
             _endingCredit.OnEndingSkipped += HandleEndingSkipped;
             _endingCredit.gameObject.SetActive(false);
+        }
+        if (Camera.main != null)
+        {
+            _originalCameraRect = Camera.main.rect;
         }
         _cameraController.Initialize(_fishGenerator);
 
@@ -197,10 +247,24 @@ public class GameFlowManager : MonoBehaviour
         _fishSpawner.OnFishCaught -= HandleFishCaught;
         _progress.OnFishRegistered -= HandleFishRegistered;
         _fishSpawner.ScreenCapture.OnUnlocked -= HandleScreenUnlocked;
+        // 노트 텍스처는 HUD를 처음 그릴 때 만들어지므로 한 번도 그리지 않았으면 없다.
+        if (_noteRingTexture != null)
+        {
+            Destroy(_noteDiscTexture);
+            Destroy(_noteRingTexture);
+        }
         if (_endingCredit != null)
         {
             _endingCredit.OnEndingCompleted -= HandleEndingCompleted;
             _endingCredit.OnEndingSkipped -= HandleEndingSkipped;
+        }
+        if (Camera.main != null)
+        {
+            Camera.main.rect = _originalCameraRect;
+        }
+        if (_letterboxOverlay != null)
+        {
+            Destroy(_letterboxOverlay);
         }
         _fishSelectionPreview.Dispose();
         _ownedFishSelectionPreview.Dispose();
@@ -224,6 +288,15 @@ public class GameFlowManager : MonoBehaviour
             UpdatePauseMenu();
             return;
         }
+        if (_endingCredit != null && _endingCredit.gameObject.activeInHierarchy)
+        {
+            if (_endingCredit.CanSkip && _input.JumpPressed)
+            {
+                ThrowCreditFish();
+                return;
+            }
+            return;
+        }
         if (_state == State.GameOver)
         {
             if ((_input.RestartPressed || _input.JumpPressed)
@@ -233,6 +306,8 @@ public class GameFlowManager : MonoBehaviour
         if (_state == State.Ready && _input.CatalogPressed)
         {
             _catalogOpen = !_catalogOpen;
+            _catalogNavigateDirection = Vector2Int.zero;
+            _catalogScrollToSelection = _catalogOpen;
             LockCursor(!_catalogOpen);
             return;
         }
@@ -248,15 +323,7 @@ public class GameFlowManager : MonoBehaviour
                 _catalogOpen = false;
                 LockCursor(true);
             }
-            return;
-        }
-        if (_endingCredit != null && _endingCredit.gameObject.activeInHierarchy)
-        {
-            if (_endingCredit.CanSkip && _input.JumpPressed)
-            {
-                ThrowCreditFish();
-                return;
-            }
+            if (_catalogOpen) UpdateCatalogNavigation();
             return;
         }
         if (_input.CancelPressed)
@@ -321,8 +388,7 @@ public class GameFlowManager : MonoBehaviour
         {
             FishType fish = _fishSpawner.FishTypes[i];
             if (fish.Id != "screen" && fish.Id != "catalog" && fish.Id != "menu"
-                && (_progress.IsFishRegistered(fish)
-                    || (_catalogOpen && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)))
+                && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)
             {
                 FishSelectionPreview previews = _progress.IsFishRegistered(fish) ? _ownedFishSelectionPreview : _fishSelectionPreview;
                 previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block");
@@ -337,9 +403,15 @@ public class GameFlowManager : MonoBehaviour
         // 도감이나 메뉴를 캡처하는 동안에는 그 화면을 계속 그려 캡처에 담는다.
         if (_screenThrowPending && !_catalogOpen && !_pauseOpen) return;
         if (_fishSpawner.ScreenCapture.IsCapturing && _fishSpawner.ScreenCapture.HasFrame) return;
+
+        // 물고기 획득 알림은 시네마 중이거나 정산 중이어도 항상 화면에 표시한다.
+        DrawFishPopup();
+
         if (_pauseOpen)
         {
             EnsureStyles();
+            // 메뉴 투척을 요청한 프레임에는 화면과 별도로 배경 없는 팝업을 렌더 텍스처에 그린다.
+            if (_menuPopupFrame != null && Event.current.type == EventType.Repaint) RenderMenuPopup(_styleScale);
             DrawPauseMenu(Screen.width, Screen.height, _styleScale);
             return;
         }
@@ -373,14 +445,15 @@ public class GameFlowManager : MonoBehaviour
             Color slideColor = new Color(1f, 1f, 1f, 0.35f + 0.65f * _playerController.SlidePower);
             ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), "발열 시간!", _centerStyle, slideColor);
         }
-        else if (_playerController.CanJudge && _playerController.TimeToWaterImpact <= _spaceHintLeadTime)
+        else
         {
-            // 닿을수록 진해지고, GOOD 이상 구간에 들어오면 금색으로 바뀐다.
-            float approach = 1f - Mathf.Clamp01(_playerController.TimeToWaterImpact / Mathf.Max(_spaceHintLeadTime, 0.01f));
-            Color hintColor = _playerController.IsInJudgeWindow
-                ? new Color(1f, 0.85f, 0.25f, 1f)
-                : new Color(1f, 1f, 1f, 0.35f + 0.5f * approach);
-            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("{Jump}"), _centerStyle, hintColor);
+            EnsureNoteTextures();
+            Vector2 noteCenter = new Vector2(width * _notePosition.x, height * _notePosition.y);
+            if (_playerController.CanJudge && _playerController.TimeToWaterImpact <= _spaceHintLeadTime)
+            {
+                DrawSpaceNote(noteCenter, s);
+            }
+            DrawSpaceNoteHit(noteCenter, s);
         }
         if (_state == State.Flying && !_endingCinemaRunning && !_playerController.IsControlling
             && Time.unscaledTime - Mathf.Max(_lastRestartHintInputTime, _input.LastInputTime) >= RESTART_HINT_IDLE_DELAY)
@@ -398,14 +471,6 @@ public class GameFlowManager : MonoBehaviour
             color.a = 1f - t * t;
             float rise = 30f * s * t;
             ShadowLabel(new Rect(0f, height * _popupHeight - rise, width, 80f * s), _popupText, _popupStyle, color);
-        }
-        float fishPopupAge = Time.unscaledTime - _fishPopupTime;
-        if (_state != State.GameOver && _fishPopupText != null && fishPopupAge < POPUP_DURATION)
-        {
-            float t = fishPopupAge / POPUP_DURATION;
-            float top = Mathf.Max(height * 0.38f, height * _popupHeight + 100f * s);
-            ShadowLabel(new Rect(0f, top - 30f * s * t, width, 60f * s),
-                _fishPopupText, _centerSubStyle, new Color(1f, 0.85f, 0.3f, 1f - t * t));
         }
 
         if (_showDebug)
@@ -475,11 +540,12 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 선택한 던질 거리(기본 물고기 또는 도감에 등록된 물고기)를 최대 강화 기준 능력치로 던진다.
+    /// 선택한 던질 거리가 획득 상태일 때만 최대 강화 기준 능력치로 던진다.
     /// _projectileIndex와 진행 상황을 사용하며, _state와 _hasThrown을 변경한다.
     /// </summary>
     private void Throw()
     {
+        if (!CanThrowSelectedFish()) return;
         FishType fish = SelectedFish();
         ThrowModifiers modifiers = fish != null
             ? fish.ToThrowModifiers(_progress.PowerMultiplier, _progress.SpinMultiplier)
@@ -522,6 +588,47 @@ public class GameFlowManager : MonoBehaviour
             _catalogCapturePending = false;
             _screenThrowPending = false;
             if (screenshot != null) Destroy(screenshot);
+        }
+    }
+
+    /// <summary>
+    /// 열린 일시정지 메뉴를 배경 없는 팝업 이미지로 그려 메뉴 fish에 등록하고, 화면 축소 없이 바로 menu 종류로 던진다.
+    /// 입력값 없이 캡처 중 입력을 막고 메뉴와 커서, 투척 외형, 환경과 게임 상태를 변경한다.
+    /// </summary>
+    private IEnumerator ThrowMenuPopup()
+    {
+        _catalogCapturePending = true;
+        _screenThrowPending = true;
+        _menuPopupFrame = RenderTexture.GetTemporary(Screen.width, Screen.height, 0, RenderTextureFormat.ARGB32);
+        try
+        {
+            // 이번 프레임 OnGUI가 팝업을 렌더 텍스처에 그린 뒤 잘라 낸다.
+            yield return new WaitForEndOfFrame();
+            _fishSpawner.MenuCapture.SavePopup(_menuPopupFrame, _menuPopupRect);
+            RenderTexture.ReleaseTemporary(_menuPopupFrame);
+            _menuPopupFrame = null;
+            for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
+            {
+                if (_fishSpawner.FishTypes[i].Id != "menu") continue;
+                _projectileIndex = i;
+                break;
+            }
+            _pauseOpen = false;
+            _resetConfirmOpen = false;
+            LockCursor(true);
+            ApplyProjectileShape();
+            if (_environmentController != null) _environmentController.ChangeFishInstant(SelectedFish());
+            Throw();
+        }
+        finally
+        {
+            if (_menuPopupFrame != null)
+            {
+                RenderTexture.ReleaseTemporary(_menuPopupFrame);
+                _menuPopupFrame = null;
+            }
+            _catalogCapturePending = false;
+            _screenThrowPending = false;
         }
     }
 
@@ -622,6 +729,7 @@ public class GameFlowManager : MonoBehaviour
             _endingAlienInstance = null;
         }
         _endingCinemaRunning = false;
+        SetCinematicLetterbox(false, immediate: true);
         if (_fishSpawner != null)
         {
             _fishSpawner.enabled = true;
@@ -649,36 +757,39 @@ public class GameFlowManager : MonoBehaviour
         _goodCount = 0;
         _missCount = 0;
         _state = State.Ready;
-        if (_environmentController != null) _environmentController.Roll(SelectedFish(), _hasThrown);
+        if (_environmentController != null) _environmentController.Roll(CanThrowSelectedFish() ? SelectedFish() : null, _hasThrown);
         LockCursor(true);
     }
 
     /// <summary>
-    /// 기본 물고기와 도감에 등록된 물고기 사이에서 던질 거리를 바꾼다. 등록되지 않은 종류는 건너뛴다.
-    /// direction(-1 또는 1)을 사용하며, _projectileIndex, 던질 거리 메시와 고른 물고기에 따른 목표 날씨를 변경한다.
+    /// direction(-1 또는 1)으로 획득하거나 발견한 물고기 사이에서 선택 항목을 바꾼다.
+    /// _projectileIndex와 외형을 변경하며 미획득 항목은 기본 환경과 도감용 미리보기를 사용한다.
     /// </summary>
     private void CycleProjectile(int direction)
     {
         RefreshOwnedOptions();
-        int option = _ownedOptions.IndexOf(_projectileIndex);
-        int index = _ownedOptions[(option + direction + _ownedOptions.Count) % _ownedOptions.Count];
+        int option = _selectionOptions.IndexOf(_projectileIndex);
+        int index = _selectionOptions[(option + direction + _selectionOptions.Count) % _selectionOptions.Count];
         if (index == _projectileIndex) return;
         _projectileIndex = index;
         ApplyProjectileShape();
-        if (_environmentController != null) _environmentController.ChangeFish(SelectedFish());
+        if (_environmentController != null) _environmentController.ChangeFish(CanThrowSelectedFish() ? SelectedFish() : null);
     }
 
     /// <summary>
-    /// JSON 항목 순서로 도감 목록을 구성하고 기본 짱돌과 획득한 종류만 투척 선택 목록에 넣는다.
-    /// 등록된 종류와 저장 기록을 사용해 _catalogOptions와 _ownedOptions를 갱신한다.
+    /// JSON 순서로 숨김 항목을 뺀 도감, 획득 목록과 미발견을 제외한 선택 목록을 구성한다.
+    /// 등록된 종류와 도감 상태를 사용해 _catalogOptions, _ownedOptions와 _selectionOptions를 갱신한다.
     /// </summary>
     private void RefreshOwnedOptions()
     {
         _ownedOptions.Clear();
+        _selectionOptions.Clear();
         _catalogOptions.Clear();
         _catalogOptions.Add(DEFAULT_FISH_INDEX);
         for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
         {
+            // 도감 완성 보상은 나머지를 다 모으기 전까지 도감에 칸도 만들지 않는다.
+            if (_fishSpawner.IsHiddenInCatalog(_fishSpawner.FishTypes[i])) continue;
             _catalogOptions.Add(i);
         }
         _catalogOptions.Sort((left, right) =>
@@ -690,6 +801,9 @@ public class GameFlowManager : MonoBehaviour
         {
             if (index == DEFAULT_FISH_INDEX || _progress.IsFishRegistered(_fishSpawner.FishTypes[index]))
                 _ownedOptions.Add(index);
+            if (index == DEFAULT_FISH_INDEX
+                || _fishSpawner.GetCatalogState(_fishSpawner.FishTypes[index]) != FishCatalogState.Undiscovered)
+                _selectionOptions.Add(index);
         }
     }
 
@@ -715,11 +829,18 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 선택한 던질 거리에 맞게 기본 물고기 또는 프리팹 메시를 만든다. 프리팹은 던지기 전부터 파닥이게 한다.
-    /// _projectileIndex를 사용하며, 던질 거리 메시, 파닥임 상태와 스포너가 아는 플레이어 물고기를 변경한다.
+    /// 선택 항목이 획득 상태이면 투척 메시를 만들고 미획득이면 실제 모델을 숨긴다.
+    /// _projectileIndex와 획득 기록을 사용하며 외형, 파닥임과 스포너의 플레이어 물고기를 변경한다.
     /// </summary>
     private void ApplyProjectileShape()
     {
+        if (!CanThrowSelectedFish())
+        {
+            SetProjectileVisualsVisible(false);
+            _fishSpawner.SetPlayerFish(null);
+            return;
+        }
+        SetProjectileVisualsVisible(true);
         FishType fish = SelectedFish();
         if (fish != null)
         {
@@ -733,6 +854,44 @@ public class GameFlowManager : MonoBehaviour
             _ownedFishSelectionPreview.PrepareDefaultFishTexture(_fishGenerator.GetComponent<MeshFilter>().sharedMesh,
                 _fishGenerator.GetComponent<MeshRenderer>().sharedMaterials);
             _fishSpawner.SetPlayerFish(null);
+        }
+    }
+
+    /// <summary>
+    /// 현재 선택 항목의 획득 기록을 확인해 투척 가능 여부를 반환한다.
+    /// 기본 짱돌은 항상 허용하며 발견 상태만으로는 투척을 허용하지 않는다.
+    /// </summary>
+    private bool CanThrowSelectedFish()
+    {
+        FishType fish = SelectedFish();
+        return fish == null || _progress.IsFishRegistered(fish);
+    }
+
+    /// <summary>
+    /// visible로 실제 투척 모델의 렌더러와 Canvas를 숨기거나 이전 활성 상태로 복원한다.
+    /// 생성기 자식의 표시 상태를 보관하며 원래 꺼진 파츠와 게임 동작은 변경하지 않는다.
+    /// </summary>
+    private void SetProjectileVisualsVisible(bool visible)
+    {
+        if (visible)
+        {
+            foreach (Renderer renderer in _hiddenProjectileRenderers) renderer.enabled = true;
+            foreach (Canvas canvas in _hiddenProjectileCanvases) canvas.enabled = true;
+            _hiddenProjectileRenderers.Clear();
+            _hiddenProjectileCanvases.Clear();
+            return;
+        }
+        foreach (Renderer renderer in _fishGenerator.GetComponentsInChildren<Renderer>(true))
+        {
+            if (!renderer.enabled) continue;
+            _hiddenProjectileRenderers.Add(renderer);
+            renderer.enabled = false;
+        }
+        foreach (Canvas canvas in _fishGenerator.GetComponentsInChildren<Canvas>(true))
+        {
+            if (!canvas.enabled) continue;
+            _hiddenProjectileCanvases.Add(canvas);
+            canvas.enabled = false;
         }
     }
 
@@ -758,7 +917,7 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// SPACE 판정 결과를 표시하고, 성공하면 선택한 프리팹의 애니메이션 또는 레이저를 재생한다.
+    /// SPACE 판정 결과를 표시하고, 성공하면 선택한 프리팹의 발 교대 애니메이션을 재생한다.
     /// judge와 timingError(초, 빠르면 음수)를 사용하며, 팝업, 판정 횟수와 프리팹 연출 상태를 변경한다.
     /// </summary>
     private void HandleJudge(SkipJudge judge, float timingError)
@@ -766,6 +925,8 @@ public class GameFlowManager : MonoBehaviour
         if (judge == SkipJudge.Perfect || judge == SkipJudge.Good)
         {
             PlayFishInteraction();
+            _noteHitTime = Time.unscaledTime;
+            _noteHitColor = JudgeColor(judge);
         }
 
         string direction = timingError < 0f ? "이른" : "늦은";
@@ -811,28 +972,17 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 선택한 물고기의 공격, 발 교대 또는 레이저 연출을 실행한다.
-    /// 현재 던질 거리의 자식 컴포넌트를 사용하며, 각 프리팹의 애니메이션과 레이저 표시 상태를 변경한다.
+    /// 판정 성공이나 미끄러짐 밀기 때 선택한 물고기의 발 교대 연출을 실행한다.
+    /// 현재 던질 거리의 자식 컴포넌트를 사용하며, 호팍 애니메이션 상태를 변경한다.
     /// </summary>
     private void PlayFishInteraction()
     {
-        BallController ballController = _fishGenerator.GetComponentInChildren<BallController>();
-        if (ballController != null)
-        {
-            ballController.PlayAttackSequence();
-        }
         HopakJumpAnimation hopakAnimation = _fishGenerator.GetComponentInChildren<HopakJumpAnimation>();
         if (hopakAnimation != null)
         {
             hopakAnimation.PlayJumpSegment();
         }
-        AlkagiLaser laser = _fishGenerator.GetComponentInChildren<AlkagiLaser>();
-        if (laser != null)
-        {
-            laser.Fire();
-        }
     }
-
     /// <summary>
     /// 물에 닿으면 파닥임을 멈추고 블랙홀의 투척별 최초 접촉 화면을 흡입한다.
     /// point와 speed는 쓰지 않으며, 캡처 시작 여부와 던질 거리의 파닥임을 변경한다.
@@ -888,15 +1038,17 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 던지기 전 안내와 지금 던질 거리를 그린다. 한 번이라도 던졌으면 재시작으로 날씨를 다시 뽑는 안내도 그린다.
-    /// 화면 크기와 scale, _hasThrown을 사용하며, 화면에 라벨을 그린다.
+    /// 화면 크기와 scale, _hasThrown 및 획득 상태를 사용해 선택 항목의 설명 또는 힌트를 중앙 정렬로 그린다.
     /// </summary>
     private void DrawReady(float width, float height, float scale)
     {
-        ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale), _input.ReplaceBindingName("{Jump} 던지기 위하여"), _centerStyle, Color.white);
+        bool canThrow = CanThrowSelectedFish();
+        ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale),
+            canThrow ? _input.ReplaceBindingName("{Jump} 던지기 위하여") : "미획득 · 획득 후 투척 가능", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 80f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.IsUsingGamepad
-                ? "{Attitude} 기울이는    {Steer} / {CurveTriggers} 굽히는    {Jump} 물 점프    {Restart} 새 물고기"
-                : "방향키 기울이는    A/D 굽히는    {Jump} 물에 닿을 때    {Restart} 새 물고기"), _centerSubStyle, Color.white);
+                ? "{Steer} / {CurveTriggers} 굽히는    {Jump} 물 점프    {Restart} 새 물고기"
+                : "A/D 굽히는    {Jump} 물에 닿을 때    {Restart} 새 물고기"), _centerSubStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 112f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel} 차림표" : "ESC 차림표"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
         if (_hasThrown)
@@ -907,16 +1059,21 @@ public class GameFlowManager : MonoBehaviour
         ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 40f * scale),
             _input.ReplaceBindingName("<  {Previous}   던지는   {Next}  >    {Catalog} 도감"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         DrawFishPreviews(width, height, scale);
+        string fishId = SelectedFish()?.Id ?? "default";
+        string details = _catalogEntries[fishId]?.Value<string>(canThrow ? "description" : "unlockHint");
+        float top = height * _spaceHintHeight + 44f * scale;
+        ShadowLabel(new Rect(width * 0.15f, top, width * 0.7f, Mathf.Max(0f, height - top - 12f * scale)),
+            details, _selectionDetailStyle, Color.white);
     }
 
     /// <summary>
-    /// 보유 선택 목록에서 현재 항목과 앞뒤 최대 두 개를 표시한다.
-    /// 화면 크기와 scale을 사용하며 보유 모델과 이름만 그린다.
+    /// 선택 목록의 현재 항목과 앞뒤 최대 두 개를 화면 크기와 scale에 맞춰 표시한다.
+    /// 획득 항목은 원본 외형을, 미획득 항목은 도감용 미리보기와 이름을 그린다.
     /// </summary>
     private void DrawFishPreviews(float width, float height, float scale)
     {
-        int optionCount = _ownedOptions.Count;
-        int selectedOption = _ownedOptions.IndexOf(_projectileIndex);
+        int optionCount = _selectionOptions.Count;
+        int selectedOption = _selectionOptions.IndexOf(_projectileIndex);
         float slotWidth = Mathf.Min(234f * scale, width * 0.16f);
         float slotHeight = slotWidth * 2f / 3f;
         float slotSpacing = width * 0.21f;
@@ -924,7 +1081,7 @@ public class GameFlowManager : MonoBehaviour
         for (int offset = -Mathf.Min(2, (optionCount - 1) / 2); offset <= Mathf.Min(2, optionCount / 2); offset++)
         {
             Rect rect = new Rect(width * 0.5f + offset * slotSpacing - slotWidth * 0.5f, top, slotWidth, slotHeight);
-            if (offset == 0)
+            if (offset == 0 && CanThrowSelectedFish())
             {
                 FishType selectedFish = SelectedFish();
                 ShadowLabel(new Rect(rect.x, rect.yMax, slotWidth, 54f * scale),
@@ -932,7 +1089,7 @@ public class GameFlowManager : MonoBehaviour
                         ? GetCatalogDisplayName(selectedFish) : "?", _previewStyle, new Color(1f, 0.92f, 0.7f));
                 continue;
             }
-            int index = _ownedOptions[(selectedOption + offset + optionCount) % optionCount];
+            int index = _selectionOptions[(selectedOption + offset + optionCount) % optionCount];
             if (index == DEFAULT_FISH_INDEX)
             {
                 GUI.DrawTexture(rect, _ownedFishSelectionPreview.DefaultFishTexture, ScaleMode.ScaleToFit, true);
@@ -942,13 +1099,15 @@ public class GameFlowManager : MonoBehaviour
             }
 
             FishType fish = _fishSpawner.FishTypes[index];
-            Texture preview = fish.Id == "screen" ? _fishSpawner.ScreenCapture.Image
+            bool owned = _progress.IsFishRegistered(fish);
+            Texture preview = !owned ? _fishSelectionPreview.GetTexture(_fishSpawner.FishPrefabs[index])
+                : fish.Id == "screen" ? _fishSpawner.ScreenCapture.Image
                 : fish.Id == "catalog" ? _fishSpawner.CatalogCapture.Image
                 : fish.Id == "menu" ? _fishSpawner.MenuCapture.Image
                 : _ownedFishSelectionPreview.GetTexture(_fishSpawner.FishPrefabs[index]);
             if (preview != null) GUI.DrawTexture(rect, preview, ScaleMode.ScaleToFit, true);
             ShadowLabel(new Rect(rect.x, rect.yMax, slotWidth, 54f * scale), GetCatalogDisplayName(fish), _previewStyle,
-                new Color(0.75f, 0.75f, 0.75f, 0.7f));
+                offset == 0 ? new Color(1f, 0.92f, 0.7f) : new Color(0.75f, 0.75f, 0.75f, 0.7f));
         }
     }
 
@@ -1029,7 +1188,7 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 전체 종류를 보유 상태와 함께 그리드로 그리고 선택한 항목의 JSON 상세 정보를 표시한다.
+    /// 전체 종류와 선택한 항목의 JSON 상세 정보를 그리며 선택 칸을 화면 안으로 스크롤한다.
     /// 화면 크기, scale과 마우스 입력을 사용하며 선택 항목과 도감·커서 상태를 변경한다.
     /// </summary>
     private void DrawCatalog(float width, float height, float scale)
@@ -1041,15 +1200,17 @@ public class GameFlowManager : MonoBehaviour
         GUI.color = original;
         ShadowLabel(new Rect(0f, 24f * scale, width, 80f * scale), "도감", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, 108f * scale, width, 40f * scale),
-            $"보유  {_ownedOptions.Count} / {_fishSpawner.FishTypes.Count + 1}    " + _input.ReplaceBindingName(_input.IsUsingGamepad
-                ? "{Catalog} / {Cancel} 닫기    {Jump} 투척" : "{Catalog} / ESC 닫기    {Jump} 투척"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
+            $"보유  {_ownedOptions.Count} / {_catalogOptions.Count}    " + _input.ReplaceBindingName(_input.IsUsingGamepad
+                ? "{Navigate} 선택    {Catalog} / {Cancel} 닫기    {Jump} 투척" : "WASD 선택    {Catalog} / ESC 닫기    {Jump} 투척"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         Rect viewport = new Rect(width * 0.08f, 170f * scale, width * 0.84f, height - 430f * scale);
         bool pointerInViewport = viewport.Contains(Event.current.mousePosition);
-        int columns = Mathf.Max(1, Mathf.FloorToInt(viewport.width / (240f * scale)));
+        int columns = GetCatalogColumns(width, scale);
         float cellWidth = (viewport.width - 24f * scale) / columns;
         float cellHeight = 220f * scale;
         int count = _catalogOptions.Count;
         int rows = Mathf.CeilToInt((float)count / columns);
+        if (_catalogScrollToSelection)
+            ScrollCatalogSelectionIntoView(viewport.height, cellHeight, columns, rows);
         _catalogScroll = GUI.BeginScrollView(viewport, _catalogScroll,
             new Rect(0f, 0f, viewport.width - 24f * scale, rows * cellHeight));
         for (int option = 0; option < count; option++)
@@ -1063,8 +1224,7 @@ public class GameFlowManager : MonoBehaviour
             bool hovered = pointerInViewport && cell.Contains(Event.current.mousePosition);
             if (hovered && !_catalogCapturePending && Event.current.type == EventType.MouseDown && Event.current.button == 0)
             {
-                if (_catalogSelectedFish != fish) _catalogDetailScroll = Vector2.zero;
-                _catalogSelectedFish = fish;
+                SelectCatalogFish(fish);
                 Event.current.Use();
             }
             bool selected = fish == _catalogSelectedFish;
@@ -1082,7 +1242,7 @@ public class GameFlowManager : MonoBehaviour
             string name = revealed ? GetCatalogDisplayName(fish) : "?";
             ShadowLabel(new Rect(cell.x, cell.y + 142f * scale, cell.width, 34f * scale), name, _previewStyle, Color.white);
             ShadowLabel(new Rect(cell.x, cell.y + 180f * scale, cell.width, 28f * scale),
-                owned ? "획득" : revealed ? "발견" : "미발견", _centerSubStyle,
+                owned ? "획득" : revealed ? "미획득" : "???", _centerSubStyle,
                 owned ? new Color(1f, 0.92f, 0.7f) : new Color(1f, 1f, 1f, 0.45f));
         }
         GUI.EndScrollView();
@@ -1098,7 +1258,7 @@ public class GameFlowManager : MonoBehaviour
         JToken entry = _catalogEntries[selectedId];
         string heading = selectedOwned
             ? $"{selectedName}    누적 획득 {(selectedFish == null ? 0 : _progress.GetFishCount(selectedFish))}개"
-            : selectedState == FishCatalogState.Undiscovered ? "?    미발견" : $"{selectedName}    해금 힌트";
+            : selectedState == FishCatalogState.Undiscovered ? "???" : $"{selectedName}    해금 힌트";
         string text = selectedState == FishCatalogState.Undiscovered
             ? string.Empty : entry.Value<string>(selectedOwned ? "description" : "unlockHint");
         ShadowLabel(new Rect(details.x + 24f * scale, details.y + 14f * scale, details.width - 48f * scale, 36f * scale),
@@ -1122,6 +1282,93 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Navigate 입력으로 도감 선택 칸을 이동하고 길게 누르면 일정 간격으로 반복한다.
+    /// 입력 방향, 화면 열 수와 JSON 순서를 사용하며 선택 항목과 반복 대기 시간을 변경한다.
+    /// </summary>
+    private void UpdateCatalogNavigation()
+    {
+        Vector2 input = _input.NavigateInput;
+        Vector2Int direction = Vector2Int.zero;
+        if (Mathf.Abs(input.y) >= Mathf.Abs(input.x) && Mathf.Abs(input.y) > 0.5f)
+            direction.y = input.y > 0f ? -1 : 1;
+        else if (Mathf.Abs(input.x) > 0.5f)
+            direction.x = input.x > 0f ? 1 : -1;
+        if (direction == Vector2Int.zero)
+        {
+            _catalogNavigateDirection = direction;
+            return;
+        }
+        bool firstInput = direction != _catalogNavigateDirection;
+        if (!firstInput && Time.unscaledTime < _catalogNavigateTime) return;
+        _catalogNavigateDirection = direction;
+        _catalogNavigateTime = Time.unscaledTime
+            + (firstInput ? CATALOG_NAVIGATION_DELAY : CATALOG_NAVIGATION_INTERVAL);
+
+        RefreshOwnedOptions();
+        int option = GetCatalogSelectedOption();
+        float scale = Mathf.Max(0.5f, Screen.height / 1080f);
+        int columns = GetCatalogColumns(Screen.width, scale);
+        int next = option;
+        if (direction.x < 0 && option % columns > 0) next--;
+        else if (direction.x > 0 && option % columns < columns - 1 && option + 1 < _catalogOptions.Count) next++;
+        else if (direction.y < 0 && option >= columns) next -= columns;
+        else if (direction.y > 0 && (option / columns + 1) * columns < _catalogOptions.Count)
+            next = Mathf.Min(option + columns, _catalogOptions.Count - 1);
+        if (next == option) return;
+        int index = _catalogOptions[next];
+        SelectCatalogFish(index == DEFAULT_FISH_INDEX ? null : _fishSpawner.FishTypes[index]);
+    }
+
+    /// <summary>
+    /// fish를 도감 선택 항목으로 설정하고 변경 시 상세 스크롤을 초기화한다.
+    /// 선택 상태를 저장하며 다음 그리기에서 선택 칸을 표시 범위에 넣도록 예약한다.
+    /// </summary>
+    private void SelectCatalogFish(FishType fish)
+    {
+        if (_catalogSelectedFish != fish) _catalogDetailScroll = Vector2.zero;
+        _catalogSelectedFish = fish;
+        _catalogScrollToSelection = true;
+    }
+
+    /// <summary>
+    /// 현재 선택 물고기를 JSON 순서의 도감 목록에서 찾아 선택 위치를 반환한다.
+    /// _catalogOptions와 선택 상태를 사용하며 해당 항목이 없으면 첫 위치를 반환한다.
+    /// </summary>
+    private int GetCatalogSelectedOption()
+    {
+        for (int option = 0; option < _catalogOptions.Count; option++)
+        {
+            int index = _catalogOptions[option];
+            FishType fish = index == DEFAULT_FISH_INDEX ? null : _fishSpawner.FishTypes[index];
+            if (fish == _catalogSelectedFish) return option;
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// width와 scale로 그리기와 입력 처리에 공통으로 사용할 도감 열 수를 반환한다.
+    /// 화면 너비의 84퍼센트와 기준 칸 너비를 사용하며 최소 한 열을 확보한다.
+    /// </summary>
+    private int GetCatalogColumns(float width, float scale)
+    {
+        return Mathf.Max(1, Mathf.FloorToInt(width * 0.84f / (240f * scale)));
+    }
+
+    /// <summary>
+    /// 선택 행을 viewportHeight 안에 표시하도록 도감 스크롤 위치를 보정한다.
+    /// cellHeight, columns, rows와 선택 위치를 사용하며 표시 범위와 갱신 예약을 변경한다.
+    /// </summary>
+    private void ScrollCatalogSelectionIntoView(float viewportHeight, float cellHeight, int columns, int rows)
+    {
+        float top = GetCatalogSelectedOption() / columns * cellHeight;
+        float bottom = top + cellHeight;
+        if (top < _catalogScroll.y) _catalogScroll.y = top;
+        else if (bottom > _catalogScroll.y + viewportHeight) _catalogScroll.y = bottom - viewportHeight;
+        _catalogScroll.y = Mathf.Clamp(_catalogScroll.y, 0f, Mathf.Max(0f, rows * cellHeight - viewportHeight));
+        _catalogScrollToSelection = false;
+    }
+
+    /// <summary>
     /// 화면 위쪽에 잠깐 떠오르는 문구를 설정한다.
     /// text와 color를 사용하며, _popupText, _popupColor, _popupTime을 변경한다.
     /// </summary>
@@ -1140,6 +1387,25 @@ public class GameFlowManager : MonoBehaviour
     {
         _fishPopupText = text;
         _fishPopupTime = Time.unscaledTime;
+    }
+
+    /// <summary>
+    /// 물고기 획득 알림 팝업 텍스트를 화면에 렌더링한다.
+    /// _fishPopupText와 _fishPopupTime을 사용하며, 시간 경과에 따라 떠오르고 페이드아웃되는 라벨을 그린다.
+    /// </summary>
+    private void DrawFishPopup()
+    {
+        float fishPopupAge = Time.unscaledTime - _fishPopupTime;
+        if (_fishPopupText == null || fishPopupAge >= POPUP_DURATION) return;
+
+        EnsureStyles();
+        float s = _styleScale;
+        float width = Screen.width;
+        float height = Screen.height;
+        float t = fishPopupAge / POPUP_DURATION;
+        float top = Mathf.Max(height * 0.38f, height * _popupHeight + 100f * s);
+        ShadowLabel(new Rect(0f, top - 30f * s * t, width, 60f * s),
+            _fishPopupText, _centerSubStyle, new Color(1f, 0.85f, 0.3f, 1f - t * t));
     }
 
     /// <summary>
@@ -1188,7 +1454,7 @@ public class GameFlowManager : MonoBehaviour
         // 키보드 Space는 언제나 메뉴 화면을 fish로 던진다. 게임패드 A는 Submit과 같은 버튼이라 RESUME을 고른 상태에서만 던지고, 그 밖에는 아래 Submit으로 버튼을 누른다.
         if (_input.JumpPressed && (!_input.IsUsingGamepad || (!_resetConfirmOpen && _pauseSelection == 0)))
         {
-            StartCoroutine(CapturePanelAndThrow(_fishSpawner.MenuCapture, "menu"));
+            StartCoroutine(ThrowMenuPopup());
             return;
         }
 
@@ -1250,9 +1516,11 @@ public class GameFlowManager : MonoBehaviour
         GUI.color = original;
 
         string cancelName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel}" : "ESC");
+        // RESUME은 메뉴를 던지는 키를 보여 준다. 키보드는 SPACE, 게임패드는 Jump와 같은 아래쪽 버튼 이름을 쓴다.
+        string throwName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Jump}" : "SPACE");
         string[] labels = _resetConfirmOpen
             ? new[] { "삭제", $"취소 ({cancelName})" }
-            : new[] { $"RESUME ({cancelName})", "모든 세이브 데이터 삭제", "EXIT" };
+            : new[] { $"재개하는 ({throwName})", "모든 세이브 데이터 삭제", "나가는" };
         float buttonWidth = 520f * scale;
         float buttonHeight = 60f * scale;
         float left = (width - buttonWidth) * 0.5f;
@@ -1267,7 +1535,7 @@ public class GameFlowManager : MonoBehaviour
         }
         else
         {
-            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale), "PAUSED", _centerStyle, Color.white);
+            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale), "일시정지된", _centerStyle, Color.white);
         }
 
         for (int i = 0; i < labels.Length; i++)
@@ -1293,6 +1561,64 @@ public class GameFlowManager : MonoBehaviour
             _input.ReplaceBindingName(_input.IsUsingGamepad
                 ? "D-PAD select    {Jump} confirm    {Cancel} close"
                 : "ARROWS select    ENTER confirm    ESC close"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+    }
+
+    /// <summary>
+    /// 일시정지 메뉴의 제목과 버튼만 배경 없이 _menuPopupFrame에 화면과 같은 위치로 그린다.
+    /// scale, _resetConfirmOpen, _pauseSelection을 사용하며, _menuPopupFrame 내용과 팝업 영역 _menuPopupRect를 변경한다.
+    /// </summary>
+    private void RenderMenuPopup(float scale)
+    {
+        float width = Screen.width;
+        float height = Screen.height;
+        string cancelName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel}" : "ESC");
+        string throwName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Jump}" : "SPACE");
+        string[] labels = _resetConfirmOpen
+            ? new[] { "삭제", $"취소 ({cancelName})" }
+            : new[] { $"재개하는 ({throwName})", "모든 세이브 데이터 삭제", "나가는" };
+        float buttonWidth = 520f * scale;
+        float buttonHeight = 60f * scale;
+        float left = (width - buttonWidth) * 0.5f;
+        float top = height * 0.4f;
+        float step = buttonHeight + 20f * scale;
+        float padding = 40f * scale;
+        // 제목부터 마지막 버튼까지 감싸고, ReadPixels로 자를 수 있게 정수 픽셀로 맞춘다.
+        Rect popup = Rect.MinMaxRect(
+            Mathf.Floor(left - padding), Mathf.Floor(top - 140f * scale - padding * 0.5f),
+            Mathf.Ceil(left + buttonWidth + padding), Mathf.Ceil(top + step * (labels.Length - 1) + buttonHeight + padding));
+        _menuPopupRect = popup;
+
+        Color original = GUI.color;
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture.active = _menuPopupFrame;
+        GL.PushMatrix();
+        try
+        {
+            GL.LoadPixelMatrix(0f, width, height, 0f);
+            GL.Clear(true, true, Color.clear);
+            GUI.color = Color.white;
+            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale),
+                _resetConfirmOpen ? "세이브 데이터 삭제" : "일시정지된", _centerStyle, Color.white);
+            for (int i = 0; i < labels.Length; i++)
+            {
+                Rect rect = new Rect(left, top + step * i, buttonWidth, buttonHeight);
+                if (i == _pauseSelection)
+                {
+                    GUI.color = new Color(1f, 0.92f, 0.7f);
+                    GUI.DrawTexture(new Rect(rect.x - 4f * scale, rect.y - 4f * scale, rect.width + 8f * scale, rect.height + 8f * scale),
+                        Texture2D.whiteTexture);
+                    GUI.color = Color.white;
+                }
+                // 마우스 위치에 따라 눌린 모양이 담기지 않도록 기본 상태로만 그린다.
+                _buttonStyle.Draw(rect, new GUIContent(labels[i]), false, false, false, false);
+            }
+        }
+        finally
+        {
+            GUI.color = original;
+            GL.PopMatrix();
+            RenderTexture.active = previous;
+        }
     }
 
     /// <summary>
@@ -1376,8 +1702,13 @@ public class GameFlowManager : MonoBehaviour
         _catalogDetailStyle = MakeStyle(22, TextAnchor.UpperLeft, scale);
         _catalogDetailStyle.fontStyle = FontStyle.Normal;
         _catalogDetailStyle.wordWrap = true;
+        _selectionDetailStyle = new GUIStyle(_catalogDetailStyle)
+        {
+            alignment = TextAnchor.UpperCenter,
+        };
         _popupStyle = MakeStyle(52, TextAnchor.MiddleCenter, scale);
         _restartHintStyle = MakeStyle(52, TextAnchor.MiddleCenter, scale);
+        _noteStyle = MakeStyle(26, TextAnchor.MiddleCenter, scale);
         _debugStyle = MakeStyle(18, TextAnchor.UpperRight, scale);
         _debugStyle.fontStyle = FontStyle.Normal;
         _buttonStyle = new GUIStyle(GUI.skin.button)
@@ -1427,6 +1758,98 @@ public class GameFlowManager : MonoBehaviour
         GUI.Label(rect, text, style);
         style.normal.textColor = original;
         style.hover.textColor = originalHover;
+    }
+
+    /// <summary>
+    /// osu! 히트 서클처럼 고정된 노트 원과, 수면에 닿는 순간 노트 원과 겹치도록 줄어드는 접근 원을 그린다.
+    /// center, s와 TimeToWaterImpact, IsInJudgeWindow, _spaceHintLeadTime, _approachStartScale을 사용하며, 화면에 노트를 그린다.
+    /// </summary>
+    private void DrawSpaceNote(Vector2 center, float s)
+    {
+        // 닿을수록 진해지고, GOOD 이상 구간에 들어오면 금색으로 바뀐다.
+        float approach = 1f - Mathf.Clamp01(_playerController.TimeToWaterImpact / Mathf.Max(_spaceHintLeadTime, 0.01f));
+        Color noteColor = _playerController.IsInJudgeWindow
+            ? new Color(1f, 0.85f, 0.25f, 1f)
+            : new Color(1f, 1f, 1f, 0.35f + 0.5f * approach);
+        float radius = _noteRadius * s;
+        float approachRadius = radius * Mathf.Lerp(Mathf.Max(_approachStartScale, 1f), 1f, approach);
+
+        DrawCircle(_noteDiscTexture, center, radius, new Color(0f, 0f, 0f, 0.45f * noteColor.a));
+        DrawCircle(_noteRingTexture, center, radius, noteColor);
+        DrawCircle(_noteRingTexture, center, approachRadius, noteColor);
+        ShadowLabel(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f),
+            _input.ReplaceBindingName("{Jump}"), _noteStyle, noteColor);
+    }
+
+    /// <summary>
+    /// 판정 성공 직후 노트 원이 판정 색으로 커지며 사라지는 연출을 그린다.
+    /// center, s와 _noteHitTime, _noteHitColor, _noteHitDuration을 사용하며, 연출 시간이 지나면 아무것도 그리지 않는다.
+    /// </summary>
+    private void DrawSpaceNoteHit(Vector2 center, float s)
+    {
+        float t = (Time.unscaledTime - _noteHitTime) / Mathf.Max(_noteHitDuration, 0.01f);
+        if (t >= 1f) return;
+
+        Color color = _noteHitColor;
+        color.a = 1f - t;
+        float radius = _noteRadius * s * (1f + 0.5f * t);
+        DrawCircle(_noteDiscTexture, center, radius, new Color(color.r, color.g, color.b, 0.35f * color.a));
+        DrawCircle(_noteRingTexture, center, radius, color);
+    }
+
+    /// <summary>
+    /// 리듬 노트에 쓰는 원판과 고리 텍스처를 처음 한 번만 만든다.
+    /// NOTE_RING_THICKNESS를 사용하며, _noteDiscTexture와 _noteRingTexture를 변경한다.
+    /// </summary>
+    private void EnsureNoteTextures()
+    {
+        if (_noteRingTexture != null) return;
+        _noteDiscTexture = CreateCircleTexture(0f);
+        _noteRingTexture = CreateCircleTexture(NOTE_RING_THICKNESS);
+    }
+
+    /// <summary>
+    /// 가장자리를 부드럽게 처리한 흰색 원 텍스처를 만든다.
+    /// thickness(반지름 대비 고리 두께, 0이면 꽉 찬 원판)와 NOTE_TEXTURE_SIZE를 사용하며, 새 Texture2D를 반환한다.
+    /// </summary>
+    private static Texture2D CreateCircleTexture(float thickness)
+    {
+        Texture2D texture = new Texture2D(NOTE_TEXTURE_SIZE, NOTE_TEXTURE_SIZE, TextureFormat.RGBA32, true)
+        {
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Trilinear,
+            hideFlags = HideFlags.HideAndDontSave,
+        };
+        Color32[] pixels = new Color32[NOTE_TEXTURE_SIZE * NOTE_TEXTURE_SIZE];
+        float half = NOTE_TEXTURE_SIZE * 0.5f;
+        float inner = 1f - thickness;
+        float edge = 1.5f / half;
+        for (int y = 0; y < NOTE_TEXTURE_SIZE; y++)
+        {
+            for (int x = 0; x < NOTE_TEXTURE_SIZE; x++)
+            {
+                float distance = new Vector2(x + 0.5f - half, y + 0.5f - half).magnitude / half;
+                // 경계에서 1.5픽셀에 걸쳐 투명도를 줄여 계단 현상을 없앤다.
+                float alpha = Mathf.Clamp01((1f - distance) / edge);
+                if (thickness > 0f) alpha *= Mathf.Clamp01((distance - inner) / edge);
+                pixels[y * NOTE_TEXTURE_SIZE + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+            }
+        }
+        texture.SetPixels32(pixels);
+        texture.Apply(true, true);
+        return texture;
+    }
+
+    /// <summary>
+    /// texture를 center 중심, radius 반지름 크기로 color를 입혀 그린다.
+    /// 그린 뒤 GUI.color를 원래 값으로 되돌린다.
+    /// </summary>
+    private static void DrawCircle(Texture2D texture, Vector2 center, float radius, Color color)
+    {
+        Color original = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f), texture);
+        GUI.color = original;
     }
 
     /// <summary>
@@ -1482,6 +1905,13 @@ public class GameFlowManager : MonoBehaviour
             screenshot = ScreenCapture.CaptureScreenshotAsTexture();
             PrepareCreditFishForThrow();
             yield return ShrinkPanelAndThrow(screenshot);
+
+            // 화면 축소 연출이 완료된 직후 크레딧 물고기 획득 팝업을 표시한다.
+            FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
+            if (creditFish != null)
+            {
+                ShowFishPopup($"{GetCatalogDisplayName(creditFish)}을(를) 얻은!");
+            }
         }
         finally
         {
@@ -1517,6 +1947,7 @@ public class GameFlowManager : MonoBehaviour
             }
         }
         _showHud = true;
+        SetCinematicLetterbox(false);
         Restart(clearNewFish: false);
     }
 
@@ -1533,7 +1964,35 @@ public class GameFlowManager : MonoBehaviour
             _endingCredit.gameObject.SetActive(false);
         }
         _showHud = true;
+        SetCinematicLetterbox(false);
+
+        // 크레딧 감상이 끝난 직후 크레딧 물고기 획득 팝업을 표시한다.
+        FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
+        if (creditFish != null)
+        {
+            ShowFishPopup($"{GetCatalogDisplayName(creditFish)}을(를) 얻은!");
+        }
+
         HandleGameOver(GameOverReason.Stopped);
+    }
+
+    /// <summary>
+    /// 지정된 식별자(ID)와 일치하는 물고기 타입을 FishSpawner 목록에서 찾아 반환한다.
+    /// id를 사용하며, 일치하는 FishType 또는 null을 반환한다.
+    /// </summary>
+    private FishType GetFishTypeById(string id)
+    {
+        if (_fishSpawner == null || _fishSpawner.FishTypes == null) return null;
+
+        for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
+        {
+            FishType fish = _fishSpawner.FishTypes[i];
+            if (fish != null && fish.Id == id)
+            {
+                return fish;
+            }
+        }
+        return null;
     }
 
     /// <summary>
@@ -1589,15 +2048,16 @@ public class GameFlowManager : MonoBehaviour
         if (_endingCinemaRunning) return;
         _endingCinemaRunning = true;
 
-        foreach (FishType fish in _fishSpawner.FishTypes)
+        FishType blackholeFish = GetFishTypeById(BLACKHOLE_FISH_ID);
+        if (blackholeFish != null)
         {
-            if (fish.Id != "blackhole") continue;
-            _fishSpawner.HandlePlacedFishCaught(fish, _playerController.transform.position);
-            if (!_newFish.Contains(fish))
+            _fishSpawner.HandlePlacedFishCaught(blackholeFish, _playerController.transform.position);
+            if (!_newFish.Contains(blackholeFish))
             {
-                _newFish.Add(fish);
+                _newFish.Add(blackholeFish);
             }
-            break;
+            // 블랙홀 접촉 즉시 획득 팝업을 표시한다.
+            ShowFishPopup($"{GetCatalogDisplayName(blackholeFish)}을(를) 얻은!");
         }
 
         _state = State.GameOver;
@@ -1624,6 +2084,10 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private IEnumerator PlayEndingCinemaRoutine()
     {
+        // 0. 블랙홀 흡입 및 획득 안내 여운 대기 후 시네마틱 레터박스 시작
+        yield return new WaitForSeconds(1f);
+        SetCinematicLetterbox(true);
+
         // 1. 우주 환경 전환 및 시네머신 카메라 제어권 확보
         if (_environmentController != null)
         {
@@ -1758,8 +2222,12 @@ public class GameFlowManager : MonoBehaviour
             Destroy(_endingAlienInstance);
         }
 
-
         UnlockMonsterFish();
+        FishType monsterFish = GetFishTypeById(MONSTER_FISH_ID);
+        if (monsterFish != null)
+        {
+            ShowFishPopup($"{GetCatalogDisplayName(monsterFish)}을(를) 얻은!");
+        }
 
         // 7. 정적 (1.5초) - 외계인을 먹은 돌만 남은 채 정적 유지
         yield return new WaitForSeconds(1.5f);
@@ -1767,6 +2235,10 @@ public class GameFlowManager : MonoBehaviour
         // 8. 엔딩 크레딧 오픈
         _endingCinemaCoroutine = null;
         _endingCinemaRunning = false;
+        if (!_maintainCinemaDuringCredits)
+        {
+            SetCinematicLetterbox(false);
+        }
         StartEndingCredit();
     }
 
@@ -1806,5 +2278,166 @@ public class GameFlowManager : MonoBehaviour
                 _newFish.Add(monsterType);
             }
         }
+    }
+
+    /// <summary>
+    /// 21:9 시네마틱 레터박스 연출을 활성화하거나 비활성화한다.
+    /// active와 immediate를 사용하며, _letterboxCoroutine을 시작하여 카메라 뷰포트와 레터박스를 전환한다.
+    /// </summary>
+    public void SetCinematicLetterbox(bool active, bool immediate = false)
+    {
+        if (_letterboxCoroutine != null)
+        {
+            StopCoroutine(_letterboxCoroutine);
+            _letterboxCoroutine = null;
+        }
+
+        EnsureLetterboxOverlay();
+        _letterboxOverlay.SetActive(true);
+
+        float duration = immediate ? 0f : _cinemaTransitionDuration;
+        _letterboxCoroutine = StartCoroutine(TransitionLetterboxRoutine(active, duration));
+    }
+
+    /// <summary>
+    /// 지정된 시간 동안 카메라 뷰포트와 레터박스 바 크기를 보간하여 부드러운 시네마틱 전환을 수행한다.
+    /// active와 duration을 사용하며, Camera.main.rect와 레터박스 트랜스폼 크기를 변경한다.
+    /// </summary>
+    private IEnumerator TransitionLetterboxRoutine(bool active, float duration)
+    {
+        float elapsed = 0f;
+        float start = active ? 0f : 1f;
+        float target = active ? 1f : 0f;
+
+        if (duration <= 0f)
+        {
+            UpdateLetterboxLayout(target);
+        }
+        else
+        {
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float smoothT = Mathf.SmoothStep(start, target, t);
+                UpdateLetterboxLayout(smoothT);
+                yield return null;
+            }
+            UpdateLetterboxLayout(target);
+        }
+
+        // 비활성화 완료 시 오버레이를 끈다.
+        if (!active && _letterboxOverlay != null)
+        {
+            _letterboxOverlay.SetActive(false);
+        }
+
+        _letterboxCoroutine = null;
+    }
+
+    /// <summary>
+    /// 상하좌우를 검은색으로 덮을 수 있는 시네마틱 레터박스 오버레이 캔버스와 바 오브젝트들을 준비한다.
+    /// 입력값 없이 _letterboxOverlay 및 각 방향의 RectTransform을 생성 및 초기화한다.
+    /// </summary>
+    private void EnsureLetterboxOverlay()
+    {
+        if (_letterboxOverlay != null) return;
+
+        _letterboxOverlay = new GameObject("CinematicLetterboxOverlay", typeof(Canvas), typeof(CanvasScaler));
+        Canvas canvas = _letterboxOverlay.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 500;
+
+        // 상단 바를 생성하고 검은색으로 채운다.
+        GameObject topObj = new GameObject("TopBar", typeof(RectTransform), typeof(Image));
+        topObj.transform.SetParent(_letterboxOverlay.transform, false);
+        _topLetterboxBar = topObj.GetComponent<RectTransform>();
+        _topLetterboxBar.anchorMin = new Vector2(0f, 1f);
+        _topLetterboxBar.anchorMax = new Vector2(1f, 1f);
+        _topLetterboxBar.pivot = new Vector2(0.5f, 1f);
+        _topLetterboxBar.sizeDelta = Vector2.zero;
+        Image topImg = topObj.GetComponent<Image>();
+        topImg.color = Color.black;
+        topImg.raycastTarget = false;
+
+        // 하단 바를 생성하고 검은색으로 채운다.
+        GameObject bottomObj = new GameObject("BottomBar", typeof(RectTransform), typeof(Image));
+        bottomObj.transform.SetParent(_letterboxOverlay.transform, false);
+        _bottomLetterboxBar = bottomObj.GetComponent<RectTransform>();
+        _bottomLetterboxBar.anchorMin = new Vector2(0f, 0f);
+        _bottomLetterboxBar.anchorMax = new Vector2(1f, 0f);
+        _bottomLetterboxBar.pivot = new Vector2(0.5f, 0f);
+        _bottomLetterboxBar.sizeDelta = Vector2.zero;
+        Image bottomImg = bottomObj.GetComponent<Image>();
+        bottomImg.color = Color.black;
+        bottomImg.raycastTarget = false;
+
+        // 좌측 바를 생성한다.
+        GameObject leftObj = new GameObject("LeftBar", typeof(RectTransform), typeof(Image));
+        leftObj.transform.SetParent(_letterboxOverlay.transform, false);
+        _leftLetterboxBar = leftObj.GetComponent<RectTransform>();
+        _leftLetterboxBar.anchorMin = new Vector2(0f, 0f);
+        _leftLetterboxBar.anchorMax = new Vector2(0f, 1f);
+        _leftLetterboxBar.pivot = new Vector2(0f, 0.5f);
+        _leftLetterboxBar.sizeDelta = Vector2.zero;
+        Image leftImg = leftObj.GetComponent<Image>();
+        leftImg.color = Color.black;
+        leftImg.raycastTarget = false;
+
+        // 우측 바를 생성한다.
+        GameObject rightObj = new GameObject("RightBar", typeof(RectTransform), typeof(Image));
+        rightObj.transform.SetParent(_letterboxOverlay.transform, false);
+        _rightLetterboxBar = rightObj.GetComponent<RectTransform>();
+        _rightLetterboxBar.anchorMin = new Vector2(1f, 0f);
+        _rightLetterboxBar.anchorMax = new Vector2(1f, 1f);
+        _rightLetterboxBar.pivot = new Vector2(1f, 0.5f);
+        _rightLetterboxBar.sizeDelta = Vector2.zero;
+        Image rightImg = rightObj.GetComponent<Image>();
+        rightImg.color = Color.black;
+        rightImg.raycastTarget = false;
+    }
+
+    /// <summary>
+    /// 진행도에 따라 카메라 뷰포트 rect와 상하좌우 레터박스 바의 크기를 갱신한다.
+    /// progress(0~1)를 사용하며, Camera.main.rect와 레터박스 RectTransform의 크기를 변경한다.
+    /// </summary>
+    private void UpdateLetterboxLayout(float progress)
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        EnsureLetterboxOverlay();
+
+        float screenAspect = (float)Screen.width / Screen.height;
+        float targetY = 0f;
+        float targetX = 0f;
+
+        if (screenAspect < CINEMATIC_ASPECT)
+        {
+            // 16:9 등 세로가 더 긴 화면에서는 상하단 레터박스를 적용한다.
+            float normalizedHeight = screenAspect / CINEMATIC_ASPECT;
+            targetY = (1f - normalizedHeight) * 0.5f;
+        }
+        else
+        {
+            // 21:9보다 넓은 화면에서는 좌우 필러박스를 적용한다.
+            float normalizedWidth = CINEMATIC_ASPECT / screenAspect;
+            targetX = (1f - normalizedWidth) * 0.5f;
+        }
+
+        float currentY = Mathf.Lerp(0f, targetY, progress);
+        float currentX = Mathf.Lerp(0f, targetX, progress);
+
+        // 카메라의 뷰포트 영역을 21:9 비율에 맞춰 조정한다.
+        cam.rect = new Rect(currentX, currentY, 1f - currentX * 2f, 1f - currentY * 2f);
+
+        // 빈 영역을 채우는 레터박스 바의 픽셀 크기를 설정한다.
+        float barHeight = Screen.height * currentY;
+        float barWidth = Screen.width * currentX;
+
+        _topLetterboxBar.sizeDelta = new Vector2(0f, barHeight);
+        _bottomLetterboxBar.sizeDelta = new Vector2(0f, barHeight);
+        _leftLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
+        _rightLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
     }
 }

@@ -52,6 +52,16 @@ public sealed class FishDiscoveryConditions
     }
 
     /// <summary>
+    /// fishId가 나머지 도감을 모두 모아야 발견되는 도감 완성 보상인지 반환한다.
+    /// JSON의 afterCompletingCatalog 값을 사용하며 상태는 변경하지 않는다.
+    /// </summary>
+    public bool RequiresCatalogCompletion(string fishId)
+    {
+        JToken condition = _conditions[fishId];
+        return condition != null && condition.Value<bool?>("afterCompletingCatalog") == true;
+    }
+
+    /// <summary>
     /// 현재 이동 거리 distance가 JSON의 거리 기준을 초과한 경우 달성 기록을 저장한다.
     /// 등록된 기준마다 progress를 갱신하며 같은 기준은 반복 저장하지 않는다.
     /// </summary>

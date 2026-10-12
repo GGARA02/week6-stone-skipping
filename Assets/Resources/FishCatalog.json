@@ -112,13 +112,13 @@
     "spawnWeight": 0,
     "displayName": "물 양동이",
     "description": "물 양동이입니다. 어떤 세계에서는 낙사를 막아 주는 생명줄이었지만, 여기서는 그냥 무거운 물수제비입니다.",
-    "unlockHint": "빈 양동이로 수면의 구멍에서 물을 채워 보세요."
+    "unlockHint": "빈 양동이로 좋음 이상을 3번 성공하세요."
   },
   "water_block": {
     "spawnWeight": 0,
     "displayName": "물",
     "description": "물 한 블록입니다. 바다에서 떠 왔다가 다시 바다로 던져지는, 세상에서 가장 짧고 무의미한 여행을 하는 중입니다.",
-    "unlockHint": "빈 양동이로 수면의 구멍에서 물을 채워 보세요."
+    "unlockHint": "빈 양동이로 좋음 이상을 3번 성공하세요."
   },
   "board": {
     "spawnWeight": 0.2,
@@ -166,7 +166,7 @@
     "spawnWeight": 0.1,
     "displayName": "화산",
     "description": "작은 화산입니다. 용암 대신 공을 뿜는 화산은 이 녀석뿐입니다.",
-    "unlockHint": "울릉도 동남쪽 뱃길따라 200리~"
+    "unlockHint": "바다 어딘가에 존재하는 화산섬에 도착하세요"
   },
   "w02ball": {
     "requiresSeaRegistration": true,
@@ -192,7 +192,7 @@
     "spawnWeight": 2,
     "displayName": "부관짱",
     "description": "다정한 조언으로 함장님을 보좌하던 부관입니다. 함장님은 그녀를 날려 보내는 게 아니라 넓은 세상을 보여 주는 거라고 굳게 믿고 있습니다.",
-    "unlockHint": "배를 침몰시키세요."
+    "unlockHint": "쇄빙선을 침몰시키세요."
   },
   "wall": {
     "requiresSeaRegistration": true,
@@ -228,12 +228,6 @@
     "description": "블랙홀 너머로 날아온 물수제비를 우주의 선물이라 믿은 외계인입니다. 던져질 때마다 혹시 고향 쪽으로 날아가지 않을까 기대합니다.",
     "unlockHint": "여정의 끝까지 가보세요."
   },
-  "alkagi": {
-    "spawnWeight": 0,
-    "displayName": "ALKAGI",
-    "description": "한때 눈에서 레이저를 쏘던 ALKAGI입니다. 납작하게 눌리고 나니 위협은 사라지고 물수제비에 딱 맞는 몸매만 남았습니다.",
-    "unlockHint": "에너지 보존 법칙에 반하는 이야기지만, 레이저는 사실 그렇게 뜨겁지 않습니다."
-  },
   "screen": {
     "spawnWeight": 0,
     "displayName": "게임 화면",
@@ -257,5 +251,11 @@
     "displayName": "메뉴",
     "description": "잠깐 쉬려고 열어 둔 메뉴를 찍어 둔 패널입니다. 계속하기 버튼을 누르는 대신 메뉴째로 던져 버렸습니다.",
     "unlockHint": "계속하려면 꼭 버튼을 눌러야 할까요?"
+  },
+  "alkagi": {
+    "spawnWeight": 0,
+    "displayName": "ALKAGI",
+    "description": "한때 눈에서 레이저를 쏘던 ALKAGI입니다. 납작하게 눌리고 나니 위협은 사라지고 물수제비에 딱 맞는 몸매만 남았습니다.",
+    "unlockHint": "에너지 보존 법칙에 반하는 이야기지만, 레이저는 사실 그렇게 뜨겁지 않습니다. 눈 감고 딱 한 번만 맞아볼까요?"
   }
 }

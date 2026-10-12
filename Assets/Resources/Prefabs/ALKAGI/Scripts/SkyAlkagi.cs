@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 using Unity.Cinemachine;
 
 // 하늘 너머에 흐릿하게 떠 있는 거대 ALKAGI. 카메라를 수평으로 따라다녀 항상 같은 방향 먼 하늘에 보이고 가까워지지 않는다.
-// 물고기 ALKAGI를 얻는 수단이다. 외계인을 얻었고 물고기 ALKAGI는 아직 얻지 못했을 때만 나타나며, 판을 시작할 때마다 다시 판단한다.
+// 물고기 ALKAGI를 얻는 수단이다. 나머지 도감을 모두 모았고 물고기 ALKAGI는 아직 얻지 못했을 때만 나타나며, 판을 시작할 때마다 다시 판단한다.
 // 던진 동안 주기적으로 눈을 충전해 레이저를 예고한 뒤 구름과 바다를 가르며, 레이저에 닿으면 물고기 ALKAGI를 획득하고 사라진다.
 public class SkyAlkagi : MonoBehaviour
 {
@@ -28,8 +28,6 @@ public class SkyAlkagi : MonoBehaviour
     [SerializeField] private Material _glowMaterial;
     [SerializeField] private Mesh _glowMesh;
     [SerializeField] private Fish _fishPrefab;
-    [Tooltip("이 물고기를 얻어야 하늘 ALKAGI가 나타난다. 외계인(MONSTER)")]
-    [SerializeField] private Fish _unlockFishPrefab;
     [SerializeField] private Transform _giant;
     [Tooltip("레이저가 나가는 기준. 매 프레임 앞쪽 눈 위치로 옮겨 조준 방향을 바라본다")]
     [SerializeField] private Transform _aim;
@@ -452,13 +450,12 @@ public class SkyAlkagi : MonoBehaviour
     }
 
     /// <summary>
-    /// 외계인을 얻었고 물고기 ALKAGI는 아직 얻지 못했을 때만 하늘에 나타나게 한다.
+    /// 나머지 도감을 모두 모았고 물고기 ALKAGI는 아직 얻지 못했을 때만 하늘에 나타나게 한다.
     /// 도감 등록 상태를 사용하며 _present, 외형 활성 상태와 주변 구름을 변경한다. 외형이 꺼지면 락온 대상에서도 빠진다.
     /// </summary>
     private void RefreshPresence()
     {
-        PlayerProgress progress = _spawner.Progress;
-        _present = progress.IsFishRegistered(_unlockFishPrefab.Type) && !progress.IsFishRegistered(_fishPrefab.Type);
+        _present = _spawner.HasCompletedCatalog() && !_spawner.Progress.IsFishRegistered(_fishPrefab.Type);
         _giant.gameObject.SetActive(_present);
         if (_present) _clouds.Show();
         else _clouds.Hide();

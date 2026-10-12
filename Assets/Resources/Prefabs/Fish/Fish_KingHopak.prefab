@@ -292,6 +292,7 @@ GameObject:
   - component: {fileID: 5212303878539073576}
   - component: {fileID: 5771402408856856336}
   - component: {fileID: 4979347758158333428}
+  - component: {fileID: 3506931323272465112}
   m_Layer: 0
   m_Name: Fish_KingHopak
   m_TagString: Untagged
@@ -355,7 +356,10 @@ MonoBehaviour:
     _displayName: KING HOPAK
     _value: 50
     _color: {r: 0.958, g: 0.958, b: 0.958, a: 1}
-    _spawnWeight: 0.3
+    _allowRepeatEjection: 1
+    _maxConcurrent: 0
+    _stopAfterCatch: 0
+    _isRevealed: 1
     _shape: 0
     _length: 12.7
     _height: 5.3
@@ -367,6 +371,17 @@ MonoBehaviour:
     _liftMultiplier: 1
     _frictionMultiplier: 0.25
     _airGravityScale: 1
+    _selectEffects:
+      _causesRain: 0
+      _causesNight: 0
+      _preventsRain: 0
+      _preventsNight: 0
+      _volumeProfile: {fileID: 0}
+    _spawnConditions:
+      _onlyInRain: 0
+      _onlyAtNight: 0
+      _requiredPlayerFish: {fileID: 0}
+      _fallsFromSky: 0
   _body: {fileID: 1111174827302016056}
 --- !u!54 &5771402408856856336
 Rigidbody:
@@ -416,6 +431,18 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 6.5
   m_Center: {x: 0, y: 2, z: 0}
+--- !u!114 &3506931323272465112
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1317808293816072310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 656946f2141eb6847abdfd476c99d43e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KingHopakAbility
 --- !u!1 &1422074474779450355
 GameObject:
   m_ObjectHideFlags: 0

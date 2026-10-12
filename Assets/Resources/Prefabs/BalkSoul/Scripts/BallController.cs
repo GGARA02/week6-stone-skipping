@@ -20,6 +20,7 @@ public class BallController : FishAbility
 
     [Header("상태")]
     private int _nextAttackIndex = 1;
+    private int _queuedAttacks;
     private TrailRenderer[] _trails;
     // 던질 때만 채워진다. 공격 중 자른 벽은 이번 투척 동안 부딪히지 않고 뚫고 지나간다.
     private PlayerController _player;
@@ -38,6 +39,12 @@ public class BallController : FishAbility
         if (_player == null || !_player.IsThrown || _player.IsGameOver || !IsAttacking()) return;
 
         CutWallsAhead();
+    }
+
+    void Update()
+    {
+        // 앞 공격이 끝난 뒤에만 쌓인 다음 공격을 재생해 연타해도 모션이 끊기지 않게 한다.
+        if (_queuedAttacks > 0 && IsAttackFinished()) PlayNextAttack();
     }
 
     void LateUpdate()
@@ -145,17 +152,48 @@ public class BallController : FishAbility
     }
 
     /// <summary>
-    /// 수면 타이밍 성공 판정마다 공격 1, 2, 3 중 다음 애니메이션 하나를 재생한다.
-    /// 입력값은 없으며, _animator로 공격을 재생하고 다음 공격 번호를 1부터 3까지 순환한다.
+    /// 던진 뒤 SPACE를 누를 때마다 판정 결과와 관계없이 공격 하나를 대기열에 쌓는다.
+    /// context는 쓰지 않으며, PlayAttackSequence로 _queuedAttacks를 늘린다.
+    /// </summary>
+    public override void OnSpacePressed(ThrowContext context)
+    {
+        PlayAttackSequence();
+    }
+
+    /// <summary>
+    /// 공격 하나를 대기열에 쌓는다. 재생은 Update에서 앞 공격이 끝난 뒤 차례로 한다.
+    /// 입력값은 없으며, _queuedAttacks를 늘린다.
     /// </summary>
     public void PlayAttackSequence()
     {
+        _queuedAttacks++;
+    }
+
+    /// <summary>
+    /// 대기한 공격 하나를 꺼내 공격 1, 2, 3 중 다음 애니메이션을 재생한다.
+    /// _nextAttackIndex를 사용하며, _animator 상태와 다음 공격 번호, _queuedAttacks를 변경한다.
+    /// </summary>
+    private void PlayNextAttack()
+    {
+        _queuedAttacks--;
         _animator.CrossFadeInFixedTime($"Attack_Light_{_nextAttackIndex}", 0.05f, 0, 0f);
         _nextAttackIndex = _nextAttackIndex % 3 + 1;
+    }
+
+    /// <summary>
+    /// 다음 공격을 재생해도 되는지 확인한다. 공격으로 넘어가는 중이거나 공격이 끝까지 재생되지 않았으면 기다린다.
+    /// _animator의 전환 상태와 현재 상태의 재생 위치를 사용하며, 재생해도 되면 true를 반환한다.
+    /// </summary>
+    private bool IsAttackFinished()
+    {
+        if (_animator.IsInTransition(0)) return !IsAttackState(_animator.GetNextAnimatorStateInfo(0));
+        AnimatorStateInfo current = _animator.GetCurrentAnimatorStateInfo(0);
+        return !IsAttackState(current) || current.normalizedTime >= 1f;
     }
 
     void OnDisable()
     {
         _nextAttackIndex = 1;
+        _queuedAttacks = 0;
     }
 }

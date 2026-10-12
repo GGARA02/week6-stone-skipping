@@ -93,15 +93,6 @@ public class InputManager
     }
 
     /// <summary>
-    /// 방향키 또는 오른쪽 스틱의 자세 입력을 반환한다.
-    /// deadZone은 게임패드에만 적용하며 입력 상태는 변경하지 않는다.
-    /// </summary>
-    public Vector2 ReadAttitude(float deadZone)
-    {
-        return Vector2.ClampMagnitude(ReadStick(PlayerMap.Attitude, deadZone), 1f);
-    }
-
-    /// <summary>
     /// key에 해당하는 실제 키보드의 누름 상태를 반환한다.
     /// 키캡 시각화용이며 키보드가 없거나 None이면 false를 반환한다.
     /// </summary>
