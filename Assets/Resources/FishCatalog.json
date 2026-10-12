@@ -32,8 +32,8 @@
   "tire": {
     "spawnWeight": 0.12,
     "displayName": "뚝배기",
-    "description": "단단하기로 소문난 뚝배기입니다. 물 위를 튀다가 누군가의 뚝배기를 깨지 않기만을 바랍니다.",
-    "unlockHint": "수면에서 나타나는 타이어를 맞혀 보세요."
+    "description": "단단하기로 소문난 뚝배기입니다. 타이어로 기획되었지만, 모두가 뚝배기로 받아들여 개명되었습니다.",
+    "unlockHint": "수면에서 나타나는 뚝배기를 맞혀 보세요."
   },
   "puffer": {
     "spawnWeight": 0.12,
