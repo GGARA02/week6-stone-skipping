@@ -56,6 +56,11 @@ public class GameFlowManager : MonoBehaviour
     private InputManager _input;
     private Rumble _rumble;
 
+    [Header("진동")]
+    [Tooltip("도감 신규 등록 진동 (x 저주파, y 고주파)")]
+    [SerializeField]
+    private Vector2 _registerRumble = new Vector2(0.03f, 0.08f);
+
     [Header("흐름")]
     private State _state;
     private GameOverReason _gameOverReason;
@@ -183,6 +188,14 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private EndingCreditUI _endingCredit;
 
     [Header("시네마틱 연출")]
+    [Tooltip("오프닝 연출에서 응시할 엔딩 블랙홀 트랜스폼")]
+    [SerializeField] private Transform _endingBlackHole;
+    [Tooltip("오프닝 시작 시 블랙홀과의 근접 거리")]
+    [SerializeField] private float _openingCloseDistance = 25f;
+    [Tooltip("오프닝 시작 후 카메라 후진 전 정지 대기 시간(초)")]
+    [SerializeField] private float _openingHoldDuration = 1.0f;
+    [Tooltip("오프닝 카메라 후진 이동 시간(초)")]
+    [SerializeField] private float _openingTravelDuration = 3.0f;
     [Tooltip("엔딩 시네마 동안 21:9 레터박스 연출을 엔딩 크레딧까지 유지할지 여부")]
     [SerializeField] private bool _maintainCinemaDuringCredits = true;
     [Tooltip("21:9 레터박스 전환 시간 (초)")]
@@ -193,6 +206,8 @@ public class GameFlowManager : MonoBehaviour
     private RectTransform _leftLetterboxBar;
     private RectTransform _rightLetterboxBar;
     private Coroutine _letterboxCoroutine;
+    private Coroutine _openingCinemaCoroutine;
+    private bool _openingCinemaRunning;
     private Rect _originalCameraRect = new Rect(0f, 0f, 1f, 1f);
 
     void Start()
@@ -270,6 +285,11 @@ public class GameFlowManager : MonoBehaviour
             _endingCredit.OnEndingCompleted -= HandleEndingCompleted;
             _endingCredit.OnEndingSkipped -= HandleEndingSkipped;
         }
+        if (_openingCinemaCoroutine != null)
+        {
+            StopCoroutine(_openingCinemaCoroutine);
+            _openingCinemaCoroutine = null;
+        }
         if (Camera.main != null)
         {
             Camera.main.rect = _originalCameraRect;
@@ -291,8 +311,8 @@ public class GameFlowManager : MonoBehaviour
             _lastRestartHintInputTime = Time.unscaledTime;
         }
         _fishSpawner.RecordDiscoveryDistance(_playerController.Distance);
-        // 엔딩 시네마 연출 중에는 플레이어 및 게임 흐름 키 입력을 전면 차단한다.
-        if (_endingCinemaRunning) return;
+        // 엔딩 시네마 및 오프닝 연출 중에는 플레이어 및 게임 흐름 키 입력을 전면 차단한다.
+        if (_endingCinemaRunning || _openingCinemaRunning) return;
 
         if (_screenThrowPending || _catalogCapturePending || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f) return;
         if (_pauseOpen)
@@ -390,11 +410,15 @@ public class GameFlowManager : MonoBehaviour
             {
                 if (fish.Id == "screen" || fish.Id == "catalog" || fish.Id == "menu") continue;
                 Fish prefab = _fishSpawner.GetFishPrefab(fish);
-                if (prefab != null) _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block");
+                if (prefab != null)
+                    _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block" || fish.Id == "week4arrow");
             }
             return;
         }
         if (!_showHud || _state != State.Ready) return;
+        // 도감에서 고른 칸이나 선택창 가운데 칸이 되면 하이라이트된 것으로 보고 "새로운!"을 지운다.
+        FishType highlighted = _catalogOpen ? _catalogSelectedFish : _pauseOpen ? null : SelectedFish();
+        if (highlighted != null) _progress.MarkFishSeen(highlighted);
         RefreshOwnedOptions();
         for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
         {
@@ -403,10 +427,11 @@ public class GameFlowManager : MonoBehaviour
                 && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)
             {
                 FishSelectionPreview previews = _progress.IsFishRegistered(fish) ? _ownedFishSelectionPreview : _fishSelectionPreview;
-                previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block");
+                previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block" || fish.Id == "week4arrow");
             }
         }
-        // 물 블록 미리보기는 선택 창과 도감이 보이는 동안 매 프레임 다시 그려 물결이 흐르게 한다.
+        // 물 블록과 Week4 화살 미리보기는 선택 창과 도감이 보이는 동안 매 프레임 다시 그린다.
+        // 물은 물결이 흐르고, 화살은 아이들 모션으로 위아래로 흔들려 트레일 형상이 보인다.
         _ownedFishSelectionPreview.RefreshAnimatedTextures();
     }
 
@@ -640,12 +665,17 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 선택한 던질 거리가 획득 상태일 때만 최대 강화 기준 능력치로 던진다.
+    /// 선택한 던질 거리가 획득 상태일 때만 최대 강화 기준 능력치로 던진다. 최초 투척 시에는 오프닝 연출을 먼저 재생한다.
     /// _projectileIndex와 진행 상황을 사용하며, _state와 _hasThrown을 변경한다.
     /// </summary>
     private void Throw()
     {
         if (!CanThrowSelectedFish()) return;
+        if (!_hasThrown)
+        {
+            StartOpeningCinema();
+            return;
+        }
         FishType fish = SelectedFish();
         ThrowModifiers modifiers = fish != null
             ? fish.ToThrowModifiers(_progress.PowerMultiplier, _progress.SpinMultiplier)
@@ -826,6 +856,12 @@ public class GameFlowManager : MonoBehaviour
             StopCoroutine(_endingCinemaCoroutine);
             _endingCinemaCoroutine = null;
         }
+        if (_openingCinemaCoroutine != null)
+        {
+            StopCoroutine(_openingCinemaCoroutine);
+            _openingCinemaCoroutine = null;
+        }
+        _openingCinemaRunning = false;
         if (_endingAlienInstance != null)
         {
             Destroy(_endingAlienInstance);
@@ -926,7 +962,7 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void HandleFishRegistered(FishType fish)
     {
-        _rumble.Pulse(0.4f, 0.24f);
+        _rumble.Pulse(_registerRumble, 0.24f);
         _newFish.Add(fish);
         ShowFishPopup($"{GetCatalogDisplayName(fish)}을(를) 얻은!");
     }
@@ -1209,6 +1245,10 @@ public class GameFlowManager : MonoBehaviour
                 : fish.Id == "menu" ? _fishSpawner.MenuCapture.Image
                 : _ownedFishSelectionPreview.GetTexture(_fishSpawner.FishPrefabs[index]);
             if (preview != null) GUI.DrawTexture(rect, preview, ScaleMode.ScaleToFit, true);
+            // 처음 얻은 뒤 아직 하이라이트되지 않은 종류는 칸 위에 강조 문구를 띄운다.
+            if (_progress.IsFishNew(fish))
+                ShadowLabel(new Rect(rect.x, rect.y - 34f * scale, slotWidth, 30f * scale), "새로운!", _centerSubStyle,
+                    new Color(1f, 0.75f, 0.2f));
             ShadowLabel(new Rect(rect.x, rect.yMax, slotWidth, 54f * scale), GetCatalogDisplayName(fish), _previewStyle,
                 offset == 0 ? new Color(1f, 0.92f, 0.7f) : new Color(0.75f, 0.75f, 0.75f, 0.7f));
         }
@@ -1342,6 +1382,10 @@ public class GameFlowManager : MonoBehaviour
                 : (owned ? _ownedFishSelectionPreview : _fishSelectionPreview).GetTexture(_fishSpawner.FishPrefabs[index]);
             if (revealed && texture != null) GUI.DrawTexture(image, texture, ScaleMode.ScaleToFit, true);
             else ShadowLabel(image, "?", _centerStyle, new Color(1f, 1f, 1f, 0.5f));
+            // 처음 얻은 뒤 아직 하이라이트되지 않은 종류는 칸 위쪽에 강조 문구를 띄운다.
+            if (fish != null && _progress.IsFishNew(fish))
+                ShadowLabel(new Rect(cell.x, cell.y + 6f * scale, cell.width, 30f * scale), "새로운!", _centerSubStyle,
+                    new Color(1f, 0.75f, 0.2f));
             string name = revealed ? GetCatalogDisplayName(fish) : "?";
             ShadowLabel(new Rect(cell.x, cell.y + 142f * scale, cell.width, 34f * scale), name, _previewStyle, Color.white);
             ShadowLabel(new Rect(cell.x, cell.y + 180f * scale, cell.width, 28f * scale),
@@ -2543,4 +2587,77 @@ public class GameFlowManager : MonoBehaviour
         _leftLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
         _rightLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
     }
+
+    #region 오프닝 연출
+    /// <summary>
+    /// 최초 투척 입력 시 블랙홀을 조명하고 플레이 지점으로 이동하는 오프닝 연출을 시작한다.
+    /// 입력값은 없으며, _openingCinemaRunning과 _showHud를 변경하고 오프닝 코루틴을 실행한다.
+    /// </summary>
+    private void StartOpeningCinema()
+    {
+        if (_openingCinemaRunning) return;
+        _openingCinemaRunning = true;
+        _showHud = false;
+        _openingCinemaCoroutine = StartCoroutine(PlayOpeningCinemaRoutine());
+    }
+
+    /// <summary>
+    /// 블랙홀을 응시하며 21:9 비율로 시작하여 플레이 위치로 카메라를 후진 이동시킨 후 첫 투척을 실행한다.
+    /// _endingBlackHole 위치와 시간 설정을 사용하며, 카메라 위치, 레터박스, HUD 표시 상태와 _hasThrown을 변경하고 Throw를 호출한다.
+    /// </summary>
+    private IEnumerator PlayOpeningCinemaRoutine()
+    {
+        SetCinematicLetterbox(true, immediate: true);
+        _cameraController.enabled = false;
+
+        Vector3 playCamPos = _cameraController.transform.position;
+        Quaternion playCamRot = _cameraController.transform.rotation;
+        Vector3 blackHolePos = _endingBlackHole.position;
+
+        Vector3 toPlayCam = playCamPos - blackHolePos;
+        Vector3 startCamPos = blackHolePos + toPlayCam.normalized * _openingCloseDistance;
+        Quaternion startCamRot = Quaternion.LookRotation((blackHolePos - startCamPos).normalized, Vector3.up);
+
+        _cameraController.transform.position = startCamPos;
+        _cameraController.transform.rotation = startCamRot;
+
+        // 1. 블랙홀을 클로즈업 상태로 응시하며 정지 대기
+        float elapsed = 0f;
+        while (elapsed < _openingHoldDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        // 2. 블랙홀을 바라보며 플레이 시작 위치로 부드럽게 후진 이동
+        elapsed = 0f;
+        while (elapsed < _openingTravelDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / _openingTravelDuration);
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+            Vector3 currentPos = Vector3.Lerp(startCamPos, playCamPos, smoothT);
+            Quaternion lookAtHole = Quaternion.LookRotation((blackHolePos - currentPos).normalized, Vector3.up);
+            Quaternion currentRot = Quaternion.Slerp(lookAtHole, playCamRot, smoothT);
+
+            _cameraController.transform.position = currentPos;
+            _cameraController.transform.rotation = currentRot;
+            yield return null;
+        }
+
+        _cameraController.transform.position = playCamPos;
+        _cameraController.transform.rotation = playCamRot;
+        _cameraController.enabled = true;
+        _cameraController.SnapBehindTarget();
+
+        // 3. 21:9 레터박스 해제 및 최초 투척 실행
+        SetCinematicLetterbox(false);
+        _showHud = true;
+        _openingCinemaRunning = false;
+        _openingCinemaCoroutine = null;
+        _hasThrown = true;
+        Throw();
+    }
+    #endregion
 }

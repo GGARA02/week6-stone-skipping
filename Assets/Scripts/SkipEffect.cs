@@ -63,6 +63,38 @@ public class SkipEffect : MonoBehaviour
     private Color _flashColor;
     private float _flashTime = -10f;
 
+    [Header("진동 (x 저주파, y 고주파)")]
+    [Tooltip("슬라이딩 중 속도 0일 때 지속 진동")]
+    [SerializeField]
+    private Vector2 _slideRumbleMin = new Vector2(0f, 0.02f);
+    [Tooltip("슬라이딩 중 _splashFullSpeed일 때 지속 진동")]
+    [SerializeField]
+    private Vector2 _slideRumbleMax = new Vector2(0.02f, 0.06f);
+    [Tooltip("자동 튕김 속도 0일 때 진동")]
+    [SerializeField]
+    private Vector2 _skipRumbleMin = new Vector2(0.03f, 0.15f);
+    [Tooltip("자동 튕김 _splashFullSpeed일 때 진동")]
+    [SerializeField]
+    private Vector2 _skipRumbleMax = new Vector2(0.15f, 0.6f);
+    [SerializeField]
+    private Vector2 _missRumble = new Vector2(0.03f, 0.45f);
+    [SerializeField]
+    private Vector2 _goodRumble = new Vector2(0.05f, 0.75f);
+    [SerializeField]
+    private Vector2 _perfectRumble = new Vector2(0.08f, 1f);
+    [Tooltip("슬라이드 푸시 SlidePower 0일 때 진동")]
+    [SerializeField]
+    private Vector2 _slidePushRumbleMin = new Vector2(0.02f, 0.08f);
+    [Tooltip("슬라이드 푸시 SlidePower 1일 때 진동")]
+    [SerializeField]
+    private Vector2 _slidePushRumbleMax = new Vector2(0.04f, 0.15f);
+    [Tooltip("벽·기둥 충돌 속도 0일 때 진동")]
+    [SerializeField]
+    private Vector2 _obstacleRumbleMin = new Vector2(0.02f, 0.1f);
+    [Tooltip("벽·기둥 충돌 속도 _obstacleFullSpeed일 때 진동")]
+    [SerializeField]
+    private Vector2 _obstacleRumbleMax = new Vector2(0.4f, 1f);
+
     void Awake()
     {
         _splash = CreateSplash();
@@ -96,7 +128,7 @@ public class SkipEffect : MonoBehaviour
     {
         _rumble.SetContinuous(_player.isActiveAndEnabled && _player.IsThrown && _player.IsSliding
             && !_player.IsGameOver && Time.timeScale > 0f
-            ? Mathf.Lerp(0.12f, 0.3f, Mathf.Clamp01(_player.Speed / _splashFullSpeed)) : 0f);
+            ? Vector2.Lerp(_slideRumbleMin, _slideRumbleMax, Mathf.Clamp01(_player.Speed / _splashFullSpeed)) : Vector2.zero);
         if (_player.IsGameOver || !_player.InContact)
         {
             _sprayAccumulator = 0f;
@@ -235,13 +267,13 @@ public class SkipEffect : MonoBehaviour
 
     /// <summary>
     /// 카메라 FOV 펀치, 화면 번쩍임, 게임패드 진동을 시작한다. 튕김, 충돌, 물고기 포획에 쓴다.
-    /// strength(0~1), color와 rumbleScale을 사용하며, FOV와 화면 효과, 배율이 적용된 진동을 변경한다.
+    /// strength(0~1), color와 rumble(x 저주파, y 고주파)을 사용하며, FOV와 화면 효과, 진동을 변경한다.
     /// </summary>
-    public void PlayImpact(float strength, Color color, float rumbleScale = 1f)
+    public void PlayImpact(float strength, Color color, Vector2 rumble)
     {
         if (_player.IsGameOver) return;
         _cameraController.Punch(strength);
-        _rumble.Pulse(strength * rumbleScale, Mathf.Lerp(0.08f, 0.3f, strength));
+        _rumble.Pulse(rumble, Mathf.Lerp(0.08f, 0.3f, strength));
         _flashColor = color;
         _flashTime = Time.unscaledTime;
     }
@@ -253,10 +285,12 @@ public class SkipEffect : MonoBehaviour
     private void HandleSkip(int count, SkipJudge judge)
     {
         if (_player.IsGameOver) return;
-        float strength = Mathf.Lerp(0.2f, 1f, Mathf.Clamp01(_player.Speed / Mathf.Max(_splashFullSpeed, 0.01f)));
+        float speedRatio = Mathf.Clamp01(_player.Speed / Mathf.Max(_splashFullSpeed, 0.01f));
+        float strength = Mathf.Lerp(0.2f, 1f, speedRatio);
         if (judge != SkipJudge.Perfect && judge != SkipJudge.Good)
         {
-            if (judge == SkipJudge.None) _rumble.Pulse(strength * 0.5f, Mathf.Lerp(0.08f, 0.3f, strength));
+            if (judge == SkipJudge.None)
+                _rumble.Pulse(Vector2.Lerp(_skipRumbleMin, _skipRumbleMax, speedRatio), Mathf.Lerp(0.08f, 0.3f, strength));
             return;
         }
         _cameraController.Punch(strength);
@@ -273,9 +307,9 @@ public class SkipEffect : MonoBehaviour
         if (_player.IsGameOver) return;
         switch (judge)
         {
-            case SkipJudge.Miss: _rumble.Pulse(0.125f, 0.08f); break;
-            case SkipJudge.Good: _rumble.Pulse(0.275f, 0.16f); break;
-            case SkipJudge.Perfect: _rumble.Pulse(0.5f, 0.28f); break;
+            case SkipJudge.Miss: _rumble.Pulse(_missRumble, 0.08f); break;
+            case SkipJudge.Good: _rumble.Pulse(_goodRumble, 0.16f); break;
+            case SkipJudge.Perfect: _rumble.Pulse(_perfectRumble, 0.28f); break;
         }
     }
 
@@ -286,7 +320,7 @@ public class SkipEffect : MonoBehaviour
     private void HandleSlidePush()
     {
         if (_player.IsGameOver) return;
-        _rumble.Pulse(Mathf.Lerp(0.2f, 0.5f, _player.SlidePower), 0.09f);
+        _rumble.Pulse(Vector2.Lerp(_slidePushRumbleMin, _slidePushRumbleMax, _player.SlidePower), 0.09f);
     }
 
     /// <summary>
@@ -297,7 +331,7 @@ public class SkipEffect : MonoBehaviour
     {
         float strength = Mathf.Clamp01(impactSpeed / Mathf.Max(_obstacleFullSpeed, 0.01f));
         if (strength < 0.05f) return;
-        PlayImpact(strength, _obstacleFlashColor);
+        PlayImpact(strength, _obstacleFlashColor, Vector2.Lerp(_obstacleRumbleMin, _obstacleRumbleMax, strength));
     }
 
     /// <summary>

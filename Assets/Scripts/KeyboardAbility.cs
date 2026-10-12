@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 
 // 키보드 물고기의 특수 동작. 실제 키보드(Keyboard.current)에서 누르고 있는 키와 짝인 키캡이 눌려 내려간다.
 // 던진 뒤 물이나 벽에 닿을 때마다 아직 붙어 있는 키캡 몇 개가 떨어져 나가 강하게 튀어 날아간다.
+// SPACE를 누를 때마다 키캡 하나가 떨어져 나가 튀어 날아간다.
 // 모델은 정점이 많아 던질 물고기를 만들 때 잠시 떼어 두고, 생성기는 꺼진 물리 상자 하나로만 수면 판정을 만든다.
 public class KeyboardAbility : FishAbility
 {
@@ -250,6 +251,15 @@ public class KeyboardAbility : FishAbility
         _player = context.Player;
         _player.OnWaterContact += HandleWaterContact;
         _player.OnObstacleHit += HandleObstacleHit;
+    }
+
+    /// <summary>
+    /// 던진 상태에서 SPACE를 누를 때마다 붙어 있는 키캡 하나를 떼어 날린다.
+    /// context는 쓰지 않으며, 붙어 있는 키캡 목록을 변경한다.
+    /// </summary>
+    public override void OnSpacePressed(ThrowContext context)
+    {
+        Burst(Vector2Int.one);
     }
 
     /// <summary>

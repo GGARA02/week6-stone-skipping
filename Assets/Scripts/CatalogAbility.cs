@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 using UnityEngine;
 
-// 도감 투척물의 특수 동작. SPACE 판정 및 벽 충돌 시 지금까지 해금된 물고기들을 정규화된 크기로 흩뿌린다.
+// 도감 투척물의 특수 동작. SPACE 입력 및 벽 충돌 시 지금까지 해금된 물고기들을 정규화된 크기로 흩뿌린다.
 public class CatalogAbility : FishAbility
 {
     [Header("충돌 분출 설정")]
@@ -20,7 +20,7 @@ public class CatalogAbility : FishAbility
     [SerializeField] private float _debrisLifetime = 3.5f;
 
     [Header("판정 설정")]
-    [Tooltip("SPACE 판정 성공 시 생성할 수량")]
+    [Tooltip("SPACE 입력 시 생성할 수량")]
     [SerializeField] private int _judgeScatterCount = 1;
 
     /// <summary>
@@ -37,12 +37,12 @@ public class CatalogAbility : FishAbility
     }
 
     /// <summary>
-    /// 던진 상태에서 SPACE 판정에 성공했을 때 해금된 물고기 중 하나를 팝업 연출로 생성한다.
-    /// context와 judge를 사용하며, 플레이어 위치에서 물고기 파편을 사출한다.
+    /// 던진 상태에서 SPACE를 누를 때마다 판정 성공 때와 같이 해금된 물고기 중 하나를 팝업 연출로 생성한다.
+    /// context를 사용하며, 플레이어 위치에서 물고기 파편을 사출한다.
     /// </summary>
-    public override void OnJudgeSuccess(ThrowContext context, SkipJudge judge)
+    public override void OnSpacePressed(ThrowContext context)
     {
-        ScatterItems(context, judge, _judgeScatterCount);
+        ScatterItems(context, _judgeScatterCount);
     }
 
     /// <summary>
@@ -57,10 +57,10 @@ public class CatalogAbility : FishAbility
     }
 
     /// <summary>
-    /// SPACE 판정 시 지정된 수량만큼 해금된 물고기를 팝업 사출한다.
-    /// context, judge, count를 사용하며, SpawnDebrisFish를 호출한다.
+    /// SPACE 입력 시 지정된 수량만큼 해금된 물고기를 팝업 사출한다.
+    /// context, count를 사용하며, SpawnDebrisFish를 호출한다.
     /// </summary>
-    private void ScatterItems(ThrowContext context, SkipJudge judge, int count)
+    private void ScatterItems(ThrowContext context, int count)
     {
         List<Fish> unlockedPrefabs = GetUnlockedFishPrefabs(context);
         if (unlockedPrefabs.Count == 0) return;

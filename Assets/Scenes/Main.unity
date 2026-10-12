@@ -15175,16 +15175,22 @@ MonoBehaviour:
   _progress: {fileID: 403970199}
   _fishSpawner: {fileID: 403970198}
   _environmentController: {fileID: 189473996}
+  _registerRumble: {x: 0.03, y: 0.08}
   _showHud: 1
   _showDebug: 1
   _spaceHintLeadTime: 0.6
   _popupHeight: 0.13
   _spaceHintHeight: 0.8
+  _notePosition: {x: 0.3, y: 0.5}
   _noteRadius: 64
   _approachStartScale: 3
   _noteHitDuration: 0.25
   _panelShrinkDuration: 0.65
   _endingCredit: {fileID: 1774445642}
+  _endingBlackHole: {fileID: 1131671915}
+  _openingCloseDistance: 25
+  _openingHoldDuration: 1
+  _openingTravelDuration: 3
   _maintainCinemaDuringCredits: 1
   _cinemaTransitionDuration: 0.6
 --- !u!4 &403970196
@@ -15230,6 +15236,17 @@ MonoBehaviour:
   _perfectFlashColor: {r: 1, g: 0.85, b: 0.3, a: 0.32}
   _obstacleFlashColor: {r: 1, g: 0.35, b: 0.25, a: 0.3}
   _obstacleFullSpeed: 30
+  _slideRumbleMin: {x: 0, y: 0.02}
+  _slideRumbleMax: {x: 0.02, y: 0.06}
+  _skipRumbleMin: {x: 0.03, y: 0.15}
+  _skipRumbleMax: {x: 0.15, y: 0.6}
+  _missRumble: {x: 0.03, y: 0.45}
+  _goodRumble: {x: 0.05, y: 0.75}
+  _perfectRumble: {x: 0.08, y: 1}
+  _slidePushRumbleMin: {x: 0.02, y: 0.08}
+  _slidePushRumbleMax: {x: 0.04, y: 0.15}
+  _obstacleRumbleMin: {x: 0.02, y: 0.1}
+  _obstacleRumbleMax: {x: 0.4, y: 1}
 --- !u!114 &403970198
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15296,6 +15313,7 @@ MonoBehaviour:
   _maxFish: 16
   _minFishSpeed: 10
   _catchFlashColor: {r: 1, g: 0.85, b: 0.3, a: 0.3}
+  _catchRumble: {x: 0.02, y: 0.06}
   _skyFallHeight: 30
   _skyFallSpeed: 8
   _fishRippleScale: 2.5
@@ -15323,8 +15341,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f2a67a97e7c1bf4ba387a29667854d2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Rumble
-  _maxLowFrequency: 0.8
-  _maxHighFrequency: 1
 --- !u!114 &403970202
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21196,6 +21212,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 875a6a2fd5ced524984d00154eaefec3, type: 3}
+--- !u!4 &1131671915 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 69755025683854722, guid: 875a6a2fd5ced524984d00154eaefec3, type: 3}
+  m_PrefabInstance: {fileID: 1131671914}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1177377270
 PrefabInstance:
   m_ObjectHideFlags: 0

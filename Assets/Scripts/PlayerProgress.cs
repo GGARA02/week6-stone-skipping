@@ -6,6 +6,7 @@ using UnityEngine;
 public class PlayerProgress : MonoBehaviour
 {
     private const string FISH_KEY_PREFIX = "SkipStoneV2.Fish.";
+    private const string NEW_FISH_KEY_PREFIX = "SkipStoneV2.NewFish.";
     private const string WALL_MESH_KEY = "SkipStoneV2.WallMesh";
     private const string ICE_MESH_KEY = "SkipStoneV2.IceMesh";
     private const string SEA_MESH_KEY_PREFIX = "SkipStoneV2.SeaMesh.";
@@ -57,15 +58,37 @@ public class PlayerProgress : MonoBehaviour
     }
 
     /// <summary>
-    /// fish의 누적 획득 수를 올려 영구 저장하고 최초 획득일 때만 등록 이벤트를 보낸다.
+    /// fish의 누적 획득 수를 올려 영구 저장하고 최초 획득일 때만 신규 표시를 남기고 등록 이벤트를 보낸다.
     /// 기존 획득 수를 사용하며 PlayerPrefs와 도감 등록 상태를 변경한다.
     /// </summary>
     public void AddFish(FishType fish)
     {
         int count = GetFishCount(fish);
         PlayerPrefs.SetInt(FISH_KEY_PREFIX + fish.Id, count + 1);
+        // 처음 얻은 종류는 도감이나 선택창에서 하이라이트될 때까지 "새로운!"을 띄운다.
+        if (count == 0) PlayerPrefs.SetInt(NEW_FISH_KEY_PREFIX + fish.Id, 1);
         PlayerPrefs.Save();
         if (count == 0) OnFishRegistered?.Invoke(fish);
+    }
+
+    /// <summary>
+    /// fish를 처음 얻은 뒤 도감이나 선택창에서 아직 하이라이트하지 않았는지 확인한다.
+    /// fish의 ID에 저장된 신규 표시를 사용하며, "새로운!"을 띄워야 하면 true를 반환한다.
+    /// </summary>
+    public bool IsFishNew(FishType fish)
+    {
+        return PlayerPrefs.GetInt(NEW_FISH_KEY_PREFIX + fish.Id, 0) > 0;
+    }
+
+    /// <summary>
+    /// 하이라이트된 fish의 신규 표시를 지워 "새로운!"을 다시 띄우지 않게 한다.
+    /// fish의 ID를 사용하며, 신규 표시가 남아 있을 때만 PlayerPrefs를 변경한다.
+    /// </summary>
+    public void MarkFishSeen(FishType fish)
+    {
+        if (!IsFishNew(fish)) return;
+        PlayerPrefs.DeleteKey(NEW_FISH_KEY_PREFIX + fish.Id);
+        PlayerPrefs.Save();
     }
 
     /// <summary>

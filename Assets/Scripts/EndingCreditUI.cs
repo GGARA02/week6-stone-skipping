@@ -12,7 +12,7 @@ public class EndingCreditUI : MonoBehaviour
     private const float PULSE_SPEED = 4f;
     private const float MIN_SCALE = 0.92f;
     private const float MAX_SCALE = 1.12f;
-    private const string SKIP_PROMPT_TEXT = "<b>누르는 <color=#FFD700>[ SPACE ]</color> <color=#FFFFFF>제작 명단을 건너뛰기 위하여 ▼▼</color></b>";
+    private const string SKIP_PROMPT_TEXT = "<font=\"NotoSerifKR-SemiBold SDF\"><b>▼ 누르는 <color=#FFD700>[ {Jump} ]</color> <color=#FFFFFF>제작 명단을 건너뛰기 위하여 ▼</color></b></font>";
 
     [Header("Settings")]
     private float _timer;
@@ -25,6 +25,7 @@ public class EndingCreditUI : MonoBehaviour
     private RectTransform _promptRect;
     private Coroutine _showPromptCoroutine;
     private bool _canSkip;
+    private bool _lastUsingGamepad;
     private float _pulseTimer;
 
     public event Action OnEndingCompleted;
@@ -48,6 +49,7 @@ public class EndingCreditUI : MonoBehaviour
         _skipRequested = false;
         _canSkip = false;
         _pulseTimer = 0f;
+        _lastUsingGamepad = !Managers.Input.IsUsingGamepad;
 
         if (_promptRect != null)
         {
@@ -78,6 +80,7 @@ public class EndingCreditUI : MonoBehaviour
         UpdateTimer();
         if (_canSkip)
         {
+            UpdateSkipPromptText();
             UpdatePulseEffect();
         }
     }
@@ -213,14 +216,29 @@ public class EndingCreditUI : MonoBehaviour
         textRect.sizeDelta = Vector2.zero;
 
         _skipMessage = textObj.GetComponent<TextMeshProUGUI>();
-        _skipMessage.font = _font;
-        _skipMessage.text = SKIP_PROMPT_TEXT;
+        if (_font == null)
+            _font = Resources.Load<TMP_FontAsset>("Fonts & Materials/NotoSerifKR-SemiBold SDF");
+        _skipMessage.text = Managers.Input.ReplaceBindingName(SKIP_PROMPT_TEXT);
         _skipMessage.fontSize = 20f;
         _skipMessage.alignment = TextAlignmentOptions.Center;
         _skipMessage.raycastTarget = false;
 
         // 초기에는 스킵 대기 시간 동안 보이지 않도록 비활성화한다.
         rootObj.SetActive(false);
+    }
+
+    /// <summary>
+    /// 마지막 입력 장치에 맞춰 스킵 안내 문구의 키 표시를 동적으로 갱신한다.
+    /// Managers.Input의 IsUsingGamepad와 SKIP_PROMPT_TEXT를 사용하며, _skipMessage의 text를 변경한다.
+    /// </summary>
+    private void UpdateSkipPromptText()
+    {
+        if (_skipMessage == null) return;
+        bool isUsingGamepad = Managers.Input.IsUsingGamepad;
+        if (_skipMessage.text != null && isUsingGamepad == _lastUsingGamepad) return;
+
+        _lastUsingGamepad = isUsingGamepad;
+        _skipMessage.text = Managers.Input.ReplaceBindingName(SKIP_PROMPT_TEXT);
     }
 
     /// <summary>

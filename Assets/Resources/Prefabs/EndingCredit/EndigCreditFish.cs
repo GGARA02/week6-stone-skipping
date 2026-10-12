@@ -15,7 +15,7 @@ public class EndigCreditFish : FishAbility
     [SerializeField] private GameObject _namePrefab;
 
     [Header("수량 설정")]
-    [Tooltip("SPACE 판정 성공 시 소환할 이름 개수")]
+    [Tooltip("SPACE 입력 시 소환할 이름 개수")]
     private const int JUDGESCATTERCOUNT = 1;
     [Tooltip("장애물(벽) 충돌 시 소환할 이름 개수")]
     private int _collisionScatterCount = 5;
@@ -35,14 +35,13 @@ public class EndigCreditFish : FishAbility
     private float _lifeTime = 1.5F;
 
     /// <summary>
-    /// 던진 상태에서 SPACE 판정에 성공했을 때 기여자 목록에서 무작위 이름을 선택해 월드에 흩뿌린다.
-    /// context와 judge를 사용하며, 소환 위치와 속도를 계산해 이름 오브젝트를 생성한다.
+    /// 던진 상태에서 SPACE를 누를 때마다 판정 성공 때와 같이 기여자 목록에서 무작위 이름을 선택해 월드에 흩뿌린다.
+    /// context를 사용하며, 소환 위치와 속도를 계산해 이름 오브젝트를 생성한다.
     /// </summary>
-    public override void OnJudgeSuccess(ThrowContext context, SkipJudge judge)
+    public override void OnSpacePressed(ThrowContext context)
     {
-        Color color = judge == SkipJudge.Perfect
-            ? new Color(1f, 0.85f, 0.3f, 1f)
-            : Color.white;
+        // 판정 등급이 없으므로 GOOD 성공 때와 같은 흰색으로 띄운다.
+        Color color = Color.white;
 
         Vector3 spawnPosition = context.Player != null
             ? context.Player.transform.position + Vector3.up * 0.5f

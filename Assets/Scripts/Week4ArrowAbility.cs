@@ -2,9 +2,11 @@ using System.Collections;
 using UnityEngine;
 
 // Week4 화살의 특수 동작. 던질 거리로 고른 동안에는 위아래로 천천히 흔들리고,
-// 던진 뒤 SPACE 판정에 성공하면 불씨 파티클이 터져 나왔다가 화살로 빨려 들어간다.
+// 던진 뒤 SPACE를 누르면 불씨 파티클 4개가 터져 나왔다가 화살로 빨려 들어간다.
 public class Week4ArrowAbility : FishAbility
 {
+    private const int SPACE_EMBER_COUNT = 4;
+
     [Header("고르기")]
     [Tooltip("위아래로 흔들리는 높이")]
     [SerializeField]
@@ -12,9 +14,10 @@ public class Week4ArrowAbility : FishAbility
     [Tooltip("초당 흔들리는 횟수")]
     [SerializeField]
     private float _bobFrequency = 0.5f;
+    public float BobHeight => _bobHeight;
 
     [Header("불씨")]
-    [Tooltip("판정 성공 때 화살 위치에 만드는 불씨 파티클")]
+    [Tooltip("SPACE 입력과 벽 충돌 때 화살 위치에 만드는 불씨 파티클")]
     [SerializeField]
     private Week4ArrowGainEffect _gainEffectPrefab;
 
@@ -48,9 +51,18 @@ public class Week4ArrowAbility : FishAbility
     {
         if (!_held || _thrown) return;
 
-        float offset = Mathf.Sin(Time.time * _bobFrequency * Mathf.PI * 2f) * _bobHeight;
+        float offset = GetBobOffset(Time.time);
         // 조준 자세로 물고기가 기울어도 화면 기준 위아래로 흔들리게 월드 위쪽을 부모 로컬로 바꾼다.
         transform.localPosition = transform.parent.InverseTransformVector(Vector3.up * offset);
+    }
+
+    /// <summary>
+    /// time 시각의 위아래 흔들림 높이를 계산한다. 고르기 상태와 선택 미리보기가 같은 아이들 모션을 쓴다.
+    /// time과 _bobFrequency, _bobHeight를 사용하며, 월드 위쪽 기준 높이를 반환한다.
+    /// </summary>
+    public float GetBobOffset(float time)
+    {
+        return Mathf.Sin(time * _bobFrequency * Mathf.PI * 2f) * _bobHeight;
     }
 
     /// <summary>
@@ -77,12 +89,13 @@ public class Week4ArrowAbility : FishAbility
     }
 
     /// <summary>
-    /// SPACE 판정 성공 또는 미끄러짐 입력에서 불씨 파티클을 만들고 화살로 빨려 들어오게 한다.
-    /// _gainEffectPrefab과 현재 위치를 사용하며, context와 judge는 쓰지 않는다. 새 불씨 파티클을 만든다.
+    /// SPACE를 누를 때마다 불씨 파티클 SPACE_EMBER_COUNT개를 터뜨리고 화살로 빨려 들어오게 한다.
+    /// _gainEffectPrefab과 현재 위치를 사용하며, context는 쓰지 않는다. 새 불씨 파티클을 만든다.
     /// </summary>
-    public override void OnJudgeSuccess(ThrowContext context, SkipJudge judge)
+    public override void OnSpacePressed(ThrowContext context)
     {
         Week4ArrowGainEffect effect = Instantiate(_gainEffectPrefab, transform.position, Quaternion.identity);
+        effect.SetBurstCount(SPACE_EMBER_COUNT);
         effect.SetTarget(transform);
     }
 
