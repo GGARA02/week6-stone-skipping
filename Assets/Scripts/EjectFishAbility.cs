@@ -31,10 +31,10 @@ public class EjectFishAbility : FishAbility
     public Fish FishPrefab => _fishPrefab;
 
     /// <summary>
-    /// 성공 판정과 사출 횟수 조건을 만족하면 기준 위치에서 물고기를 사출한다.
-    /// context와 judge, Inspector 속도를 사용하며, 진행 방향 수평 속도와 수직 속도를 조합해 사출한다.
+    /// SPACE를 누를 때마다 판정 성공 때와 같은 방식으로 사출 횟수 조건을 만족하면 기준 위치에서 물고기를 사출한다.
+    /// context와 Inspector 속도를 사용하며, 진행 방향 수평 속도와 수직 속도를 조합해 사출한다.
     /// </summary>
-    public override void OnJudgeSuccess(ThrowContext context, SkipJudge judge)
+    public override void OnSpacePressed(ThrowContext context)
     {
         Transform origin = _origin != null ? _origin : transform;
 
@@ -61,7 +61,8 @@ public class EjectFishAbility : FishAbility
             + origin.TransformDirection(new Vector3(_localVelocity.x, 0f, _localVelocity.z))
             + Vector3.up * _localVelocity.y;
 
-        TryEjectFrom(context, judge, origin, velocity, origin.lossyScale);
+        // 판정 없이 누를 때마다 사출하므로 사출 통과용 성공 등급을 넘긴다.
+        TryEjectFrom(context, SkipJudge.Good, origin, velocity, origin.lossyScale);
     }
 
     /// <summary>
