@@ -485,6 +485,16 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
+    /// velocity만큼 현재 속도에 더해 특수 능력의 방향성 추진력을 반영한다.
+    /// 내부 속도와 Rigidbody 속도를 함께 갱신하며 회전 및 각속도는 유지한다.
+    /// </summary>
+    public void AddVelocity(Vector3 velocity)
+    {
+        _velocity += velocity;
+        _playerRB.linearVelocity = _velocity;
+    }
+
+    /// <summary>
     /// 비행 중 공중 중력 배율을 바꾼다. 다음에 던질 때는 던지는 물체의 원래 배율로 돌아간다.
     /// scale을 사용하며, _modifiers의 공중 중력 배율을 변경한다.
     /// </summary>
