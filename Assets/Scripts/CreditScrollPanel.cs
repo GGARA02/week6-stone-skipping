@@ -19,6 +19,7 @@ public class CreditScrollPanel : MonoBehaviour
     private string[] _creditTitles = new string[]
     {
         "마무리 문구",
+        "",
         "개발팀",
         "개발진",
         "특별한 감사들"
@@ -27,6 +28,7 @@ public class CreditScrollPanel : MonoBehaviour
     private string[] _creditContents = new string[]
     {
         "놀아줘서 고맙다!",
+        "──  Space to Skip  ──",
         "B팀 2조",
         "김철환   전효상   박상현   황병부",
         ""
@@ -44,6 +46,10 @@ public class CreditScrollPanel : MonoBehaviour
     [Header("Display Mode (Text Size)")]
     [Tooltip("3D 월드 아이템(Fish) 모드 여부. 체크 시 3D 공간에서 잘 보이도록 폰트 크기를 확대합니다.")]
     [SerializeField] private bool _is3DMode;
+    [Tooltip("2D UI 모드 패널 가로 너비(px)")]
+    [SerializeField] private float _panelWidth2D = 1600f;
+    [Tooltip("3D 월드 모드 패널 가로 너비(px)")]
+    [SerializeField] private float _panelWidth3D = 1800f;
     [Tooltip("2D UI 모드 폰트 크기")]
     private const float UIFONTSIZE = 30f;
     [Tooltip("3D 월드 모드 폰트 크기")]
@@ -188,7 +194,7 @@ public class CreditScrollPanel : MonoBehaviour
             string content = _creditContents[i];
 
             // 특별한 감사들 섹션
-            if (i == 3)
+            if (title == "특별한 감사들")
             {
                 builder.Append(centerMarginOpen);
                 builder.Append("<align=center>");
@@ -200,6 +206,16 @@ public class CreditScrollPanel : MonoBehaviour
                 continue;
             }
 
+            // 타이틀 헤더가 없는 항목 (게임 타이틀)
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                builder.Append(centerMarginOpen);
+                builder.Append("<align=center>");
+                builder.Append($"<size=140%><b>{content}</b></size>\n\n\n");
+                builder.Append("</align>");
+                builder.Append(centerMarginClose);
+                continue;
+            }
 
             // 일반 섹션
             builder.Append(centerMarginOpen);
@@ -267,7 +283,7 @@ public class CreditScrollPanel : MonoBehaviour
 
         float contentHeight = GetContentHeight();
         float panelHeight = Mathf.Max(1200f, contentHeight + 400f);
-        float panelWidth = _is3DMode ? 1800f : 1000f;
+        float panelWidth = _is3DMode ? _panelWidth3D : _panelWidth2D;
         _creditPanel.sizeDelta = new Vector2(panelWidth, panelHeight);
 
         _creditPanel.localRotation = Quaternion.identity;
