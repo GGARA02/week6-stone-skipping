@@ -12,7 +12,7 @@ public class EndingCreditUI : MonoBehaviour
     private const float PULSE_SPEED = 4f;
     private const float MIN_SCALE = 0.92f;
     private const float MAX_SCALE = 1.12f;
-    private const string SKIP_PROMPT_TEXT = "<font=\"NotoSerifKR-SemiBold SDF\"><b>▼ 누르는 <color=#FFD700>[ {Jump} ]</color> <color=#FFFFFF>제작 명단을 건너뛰기 위하여 ▼</color></b></font>";
+    private const string SKIP_PROMPT_TEXT = "<font=\"NotoSerifKR-SemiBold SDF\"><b>▼ <color=#FFD700>[ {Jump} ]</color> <color=#FFFFFF>크레딧 건너뛰기 ▼</color></b></font>";
 
     [Header("Settings")]
     private float _timer;

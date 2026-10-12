@@ -483,9 +483,9 @@ public class GameFlowManager : MonoBehaviour
             return;
         }
 
-        ShadowLabel(new Rect(24f * s, 16f * s, 600f * s, 64f * s), $"건너뛰기  {_playerController.SkipCount}", _bigStyle, Color.white);
+        ShadowLabel(new Rect(24f * s, 16f * s, 600f * s, 64f * s), $"물수제비  {_playerController.SkipCount}", _bigStyle, Color.white);
         ShadowLabel(new Rect(24f * s, 76f * s, 600f * s, 44f * s), $"{_playerController.Distance:0.0} m", _mediumStyle, Color.white);
-        ShadowLabel(new Rect(24f * s, 118f * s, 800f * s, 36f * s), $"최상의  {_bestSkips} 건너뛰기 / {_bestDistance:0.0} m", _smallStyle, new Color(1f, 1f, 1f, 0.75f));
+        ShadowLabel(new Rect(24f * s, 118f * s, 800f * s, 36f * s), $"최고 기록  물수제비 {_bestSkips}회 / {_bestDistance:0.0} m", _smallStyle, new Color(1f, 1f, 1f, 0.75f));
 
         if (_state == State.Ready)
         {
@@ -499,7 +499,7 @@ public class GameFlowManager : MonoBehaviour
         {
             // 미끄러지는 동안은 남은 밀기 힘만큼 진하게 연타 안내를 띄운다.
             Color slideColor = new Color(1f, 1f, 1f, 0.35f + 0.65f * _playerController.SlidePower);
-            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), "발열 시간!", _centerStyle, slideColor);
+            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), "피버 타임!", _centerStyle, slideColor);
         }
         else
         {
@@ -515,7 +515,7 @@ public class GameFlowManager : MonoBehaviour
             && Time.unscaledTime - Mathf.Max(_lastRestartHintInputTime, _input.LastInputTime) >= RESTART_HINT_IDLE_DELAY)
         {
             ShadowLabel(new Rect(0f, height * _restartHintHeight, width, 80f * s),
-                _input.ReplaceBindingName("재시작 {Restart}키를 눌러"), _restartHintStyle, Color.white);
+                _input.ReplaceBindingName("{Restart} 재시작"), _restartHintStyle, Color.white);
         }
 
         // 게임오버 화면에서는 제목과 겹치지 않도록 팝업을 그리지 않는다.
@@ -533,9 +533,9 @@ public class GameFlowManager : MonoBehaviour
         {
             string debug =
                 $"속력 {_playerController.Speed:0.0} m/s\n" +
-                $"기울기 {_playerController.CurrentPitch:0} / {_playerController.TargetPitch:0} 도  구르기 {_playerController.TargetRoll:0}\n" +
-                $"회전 {_playerController.SpinRate:0.0} rad/s  안정 {_playerController.Stability:0.00}\n" +
-                $"씨앗 {_playerController.FishSeed}";
+                $"기울기 {_playerController.CurrentPitch:0} / {_playerController.TargetPitch:0} 도  롤 {_playerController.TargetRoll:0}\n" +
+                $"회전 {_playerController.SpinRate:0.0} rad/s  안정성 {_playerController.Stability:0.00}\n" +
+                $"시드 {_playerController.FishSeed}";
             ShadowLabel(new Rect(width - 420f * s, 16f * s, 400f * s, 140f * s), debug, _debugStyle, new Color(1f, 1f, 1f, 0.8f));
         }
     }
@@ -984,7 +984,7 @@ public class GameFlowManager : MonoBehaviour
     {
         _rumble.Pulse(_registerRumble, 0.24f);
         _newFish.Add(fish);
-        ShowFishPopup($"{GetCatalogDisplayName(fish)}을(를) 얻은!");
+        ShowFishPopup($"{GetCatalogDisplayName(fish)} 획득!");
     }
 
     /// <summary>
@@ -1071,7 +1071,7 @@ public class GameFlowManager : MonoBehaviour
     {
         if (Time.unscaledTime - _popupTime > 0.4f)
         {
-            ShowPopup($"건너뛰기 {count}", Color.white);
+            ShowPopup($"물수제비 {count}회", Color.white);
         }
     }
 
@@ -1088,20 +1088,20 @@ public class GameFlowManager : MonoBehaviour
             _noteHitColor = JudgeColor(judge);
         }
 
-        string direction = timingError < 0f ? "이른" : "늦은";
+        string direction = timingError < 0f ? "빠름" : "늦음";
         switch (judge)
         {
             case SkipJudge.Perfect:
                 _perfectCount++;
-                ShowPopup("완벽한!", JudgeColor(judge));
+                ShowPopup("완벽!", JudgeColor(judge));
                 break;
             case SkipJudge.Good:
                 _goodCount++;
-                ShowPopup($"좋은  {direction}", JudgeColor(judge));
+                ShowPopup($"좋음 ({direction})", JudgeColor(judge));
                 break;
             case SkipJudge.Miss:
                 _missCount++;
-                ShowPopup($"놓친  너무 {direction}", JudgeColor(judge));
+                ShowPopup($"실패  너무 {direction}", JudgeColor(judge));
                 break;
         }
     }
@@ -1112,7 +1112,7 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void HandleScreenUnlocked()
     {
-        ShowFishPopup("화면을(를) 얻은!");
+        ShowFishPopup("화면 획득!");
     }
 
     /// <summary>
@@ -1166,7 +1166,7 @@ public class GameFlowManager : MonoBehaviour
         if (fish.Id == "ice") _fishSelectionPreview.InvalidateTexture(_fishSpawner.IceFish);
         if (fish.Id == "wall") _ownedFishSelectionPreview.InvalidateTexture(_fishSpawner.WallFish);
         if (fish.Id == "ice") _ownedFishSelectionPreview.InvalidateTexture(_fishSpawner.IceFish);
-        ShowFishPopup($"{GetCatalogDisplayName(fish)}을(를) 얻은!");
+        ShowFishPopup($"{GetCatalogDisplayName(fish)} 획득!");
     }
 
     /// <summary>
@@ -1231,7 +1231,7 @@ public class GameFlowManager : MonoBehaviour
 
         FishType skybox = GetFishTypeById(SKYBOX_FISH_ID);
         _progress.AddFish(skybox);
-        ShowFishPopup($"{GetCatalogDisplayName(skybox)}을(를) 얻은!");
+        ShowFishPopup($"{GetCatalogDisplayName(skybox)} 획득!");
         _environmentController.ApplyAcquiredFish(skybox);
 
         yield return new WaitForSecondsRealtime(_skyboxRestartLockAfterAcquire);
@@ -1246,15 +1246,15 @@ public class GameFlowManager : MonoBehaviour
     {
         bool canThrow = CanThrowSelectedFish();
         ShadowLabel(new Rect(0f, height * 0.18f, width, 80f * scale),
-            canThrow ? _input.ReplaceBindingName("{Jump} 던지기 위하여") : "미획득 · 획득 후 투척 가능", _centerStyle, Color.white);
+            canThrow ? _input.ReplaceBindingName("{Jump}를 눌러 던지세요!") : "획득 후 투척 가능", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 80f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.IsUsingGamepad
-                ? "{Steer} / {CurveTriggers} 굽히는    {Jump} 물 점프"
-                : "A/D 굽히는    {Jump} 물에 닿을 때"), _centerSubStyle, Color.white);
+                ? "{Steer} / {CurveTriggers} 방향 조절    {Jump} 수면에서 점프"
+                : "A/D 방향 조절    {Jump} 물에 닿을 때 누르기"), _centerSubStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 112f * scale, width, 40f * scale),
-            _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel} 차림표" : "ESC 차림표"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+            _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel} 메뉴" : "ESC 메뉴"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
         ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 40f * scale),
-            _input.ReplaceBindingName("<  {Previous}   던지는   {Next}  >    {Catalog} 도감"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
+            _input.ReplaceBindingName("<  {Previous}   물수제비   {Next}  >    {Catalog} 도감"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         DrawFishPreviews(width, height, scale);
         string fishId = SelectedFish()?.Id ?? "default";
         string details = _catalogEntries[fishId]?.Value<string>(canThrow ? "description" : "unlockHint");
@@ -1305,7 +1305,7 @@ public class GameFlowManager : MonoBehaviour
             if (preview != null) GUI.DrawTexture(rect, preview, ScaleMode.ScaleToFit, true);
             // 처음 얻은 뒤 아직 하이라이트되지 않은 종류는 칸 위에 강조 문구를 띄운다.
             if (_progress.IsFishNew(fish))
-                ShadowLabel(new Rect(rect.x, rect.y - 34f * scale, slotWidth, 30f * scale), "새로운!", _centerSubStyle,
+                ShadowLabel(new Rect(rect.x, rect.y - 34f * scale, slotWidth, 30f * scale), "신규!", _centerSubStyle,
                     new Color(1f, 0.75f, 0.2f));
             ShadowLabel(new Rect(rect.x, rect.yMax, slotWidth, 54f * scale), GetCatalogDisplayName(fish), _previewStyle,
                 offset == 0 ? new Color(1f, 0.92f, 0.7f) : new Color(0.75f, 0.75f, 0.75f, 0.7f));
@@ -1318,13 +1318,13 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void DrawShop(float width, float height, float scale)
     {
-        ShadowLabel(new Rect(0f, height * 0.12f, width, 80f * scale), "GAME 너머", _centerStyle, Color.white);
-        string result = $"{ReasonText(_gameOverReason)}    {_playerController.SkipCount} 건너뛰기 / {_playerController.Distance:0.0} m";
+        ShadowLabel(new Rect(0f, height * 0.12f, width, 80f * scale), "게임 오버", _centerStyle, Color.white);
+        string result = $"{ReasonText(_gameOverReason)}    물수제비 {_playerController.SkipCount}회 / {_playerController.Distance:0.0} m";
         ShadowLabel(new Rect(0f, height * 0.12f + 80f * scale, width, 40f * scale), result, _centerSubStyle, Color.white);
-        string timing = $"완벽한 {_perfectCount}    좋은 {_goodCount}    놓친 {_missCount}";
+        string timing = $"완벽 {_perfectCount}    좋음 {_goodCount}    실패 {_missCount}";
         ShadowLabel(new Rect(0f, height * 0.12f + 115f * scale, width, 40f * scale), timing, _centerSubStyle, new Color(1f, 0.92f, 0.7f));
 
-        ShadowLabel(new Rect(0f, height * 0.39f, width, 40f * scale), $"잠금 해제된! {_newFish.Count}", _centerSubStyle, Color.white);
+        ShadowLabel(new Rect(0f, height * 0.39f, width, 40f * scale), $"신규 획득 {_newFish.Count}개", _centerSubStyle, Color.white);
         Rect viewport = new Rect(width * 0.08f, height * 0.45f, width * 0.84f, height * 0.3f);
         int columns = Mathf.Max(1, Mathf.FloorToInt(viewport.width / (240f * scale)));
         float contentWidth = viewport.width - 24f * scale;
@@ -1334,7 +1334,7 @@ public class GameFlowManager : MonoBehaviour
         _resultScroll = GUI.BeginScrollView(viewport, _resultScroll,
             new Rect(0f, 0f, contentWidth, Mathf.Max(viewport.height, rows * cellHeight)));
         if (_newFish.Count == 0)
-            ShadowLabel(new Rect(0f, 0f, contentWidth, 38f * scale), "잠금 해제된 것 없는", _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+            ShadowLabel(new Rect(0f, 0f, contentWidth, 38f * scale), "새로 획득한 항목이 없습니다", _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
         for (int i = 0; i < _newFish.Count; i++)
         {
             FishType fish = _newFish[i];
@@ -1362,7 +1362,7 @@ public class GameFlowManager : MonoBehaviour
         float left = (width - buttonWidth) * 0.5f;
         // 물 밖으로 떨어지는 동안은 스카이박스를 얻고 잠시 뒤까지 버튼을 누를 수 없다.
         GUI.enabled = !_skyboxFallPending;
-        if (GUI.Button(new Rect(left, height * 0.8f, buttonWidth, buttonHeight), _input.ReplaceBindingName("다시 시도하는   ({Jump} / {Restart})"), _buttonStyle))
+        if (GUI.Button(new Rect(left, height * 0.8f, buttonWidth, buttonHeight), _input.ReplaceBindingName("다시하기   ({Jump} / {Restart})"), _buttonStyle))
         {
             Restart();
         }
@@ -1445,7 +1445,7 @@ public class GameFlowManager : MonoBehaviour
             else ShadowLabel(image, "?", _centerStyle, new Color(1f, 1f, 1f, 0.5f));
             // 처음 얻은 뒤 아직 하이라이트되지 않은 종류는 칸 위쪽에 강조 문구를 띄운다.
             if (fish != null && _progress.IsFishNew(fish))
-                ShadowLabel(new Rect(cell.x, cell.y + 6f * scale, cell.width, 30f * scale), "새로운!", _centerSubStyle,
+                ShadowLabel(new Rect(cell.x, cell.y + 6f * scale, cell.width, 30f * scale), "신규!", _centerSubStyle,
                     new Color(1f, 0.75f, 0.2f));
             string name = revealed ? GetCatalogDisplayName(fish) : "?";
             ShadowLabel(new Rect(cell.x, cell.y + 142f * scale, cell.width, 34f * scale), name, _previewStyle, Color.white);
@@ -1728,7 +1728,7 @@ public class GameFlowManager : MonoBehaviour
         string throwName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Jump}" : "SPACE");
         string[] labels = _resetConfirmOpen
             ? new[] { "삭제", $"취소 ({cancelName})" }
-            : new[] { $"재개하는 ({throwName})", "모든 세이브 데이터 삭제", "나가는" };
+            : new[] { $"계속하기 ({throwName})", "모든 세이브 데이터 삭제", "나가기" };
         float buttonWidth = 520f * scale;
         float buttonHeight = 60f * scale;
         float left = (width - buttonWidth) * 0.5f;
@@ -1743,7 +1743,7 @@ public class GameFlowManager : MonoBehaviour
         }
         else
         {
-            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale), "일시정지된", _centerStyle, Color.white);
+            ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale), "일시정지", _centerStyle, Color.white);
         }
 
         for (int i = 0; i < labels.Length; i++)
@@ -1767,8 +1767,8 @@ public class GameFlowManager : MonoBehaviour
         // 시작 안내와 같이 장치별 문구를 고른다. Submit은 와일드카드 바인딩이라 키보드는 ENTER, 게임패드는 같은 아래쪽 버튼인 Jump 이름을 쓴다.
         ShadowLabel(new Rect(0f, top + step * labels.Length + 20f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.IsUsingGamepad
-                ? "D-PAD select    {Jump} confirm    {Cancel} close"
-                : "ARROWS select    ENTER confirm    ESC close"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
+                ? "D-PAD 선택    {Jump} 확인    {Cancel} 닫기"
+                : "ARROWS 선택    ENTER 확인    ESC 닫기"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
     }
 
     /// <summary>
@@ -1783,7 +1783,7 @@ public class GameFlowManager : MonoBehaviour
         string throwName = _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Jump}" : "SPACE");
         string[] labels = _resetConfirmOpen
             ? new[] { "삭제", $"취소 ({cancelName})" }
-            : new[] { $"재개하는 ({throwName})", "모든 세이브 데이터 삭제", "나가는" };
+            : new[] { $"계속하기 ({throwName})", "모든 세이브 데이터 삭제", "나가기" };
         float buttonWidth = 520f * scale;
         float buttonHeight = 60f * scale;
         float left = (width - buttonWidth) * 0.5f;
@@ -1806,7 +1806,7 @@ public class GameFlowManager : MonoBehaviour
             GL.Clear(true, true, Color.clear);
             GUI.color = Color.white;
             ShadowLabel(new Rect(0f, top - 140f * scale, width, 80f * scale),
-                _resetConfirmOpen ? "세이브 데이터 삭제" : "일시정지된", _centerStyle, Color.white);
+                _resetConfirmOpen ? "세이브 데이터 삭제" : "일시정지", _centerStyle, Color.white);
             for (int i = 0; i < labels.Length; i++)
             {
                 Rect rect = new Rect(left, top + step * i, buttonWidth, buttonHeight);
@@ -1882,11 +1882,11 @@ public class GameFlowManager : MonoBehaviour
     {
         switch (reason)
         {
-            case GameOverReason.Sunk: return "가라앉은";
-            case GameOverReason.Stopped: return "멈추어진";
-            case GameOverReason.HitGround: return "땅을 때린";
-            case GameOverReason.OutOfBounds: return "경계 밖의";
-            default: return "끝나버린";
+            case GameOverReason.Sunk: return "가라앉음";
+            case GameOverReason.Stopped: return "멈춤";
+            case GameOverReason.HitGround: return "지면 충돌";
+            case GameOverReason.OutOfBounds: return "경계 이탈";
+            default: return "종료";
         }
     }
 
@@ -2118,7 +2118,7 @@ public class GameFlowManager : MonoBehaviour
             FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
             if (creditFish != null)
             {
-                ShowFishPopup($"{GetCatalogDisplayName(creditFish)}을(를) 얻은!");
+                ShowFishPopup($"{GetCatalogDisplayName(creditFish)} 획득!");
             }
         }
         finally
@@ -2178,7 +2178,7 @@ public class GameFlowManager : MonoBehaviour
         FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
         if (creditFish != null)
         {
-            ShowFishPopup($"{GetCatalogDisplayName(creditFish)}을(를) 얻은!");
+            ShowFishPopup($"{GetCatalogDisplayName(creditFish)} 획득!");
         }
 
         HandleGameOver(GameOverReason.Stopped);
@@ -2265,7 +2265,7 @@ public class GameFlowManager : MonoBehaviour
                 _newFish.Add(blackholeFish);
             }
             // 블랙홀 접촉 즉시 획득 팝업을 표시한다.
-            ShowFishPopup($"{GetCatalogDisplayName(blackholeFish)}을(를) 얻은!");
+            ShowFishPopup($"{GetCatalogDisplayName(blackholeFish)} 획득!");
         }
 
         _state = State.GameOver;
@@ -2435,7 +2435,7 @@ public class GameFlowManager : MonoBehaviour
         FishType monsterFish = GetFishTypeById(MONSTER_FISH_ID);
         if (monsterFish != null)
         {
-            ShowFishPopup($"{GetCatalogDisplayName(monsterFish)}을(를) 얻은!");
+            ShowFishPopup($"{GetCatalogDisplayName(monsterFish)} 획득!");
         }
 
         // 7. 정적 (1.5초) - 외계인을 먹은 돌만 남은 채 정적 유지

@@ -37,7 +37,7 @@ public class FisherQteView : MonoBehaviour
         _successZone.anchorMax = new Vector2(0.5f + zoneWidth * 0.5f, 1f);
         _successZone.offsetMin = Vector2.zero;
         _successZone.offsetMax = Vector2.zero;
-        _wins.text = $"빠른 시간 사건 승리들: {successes}";
+        _wins.text = $"QTE 성공 횟수: {successes}";
         SetTiming(0f, 1f);
         _readyGroup.SetActive(false);
         _timingGroup.SetActive(true);

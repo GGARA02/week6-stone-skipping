@@ -22,12 +22,12 @@ public class CreditScrollPanel : MonoBehaviour
         "",
         "개발팀",
         "개발진",
-        "특별한 감사들"
+        "도움을 주신 분들"
     };
     [Tooltip("크레딧 섹션 내용 목록 (기여자 목록은 SO에서 불러오므로 비워둠)")]
     private string[] _creditContents = new string[]
     {
-        "놀아줘서 고맙다!",
+        "플레이해 주셔서 감사합니다!",
         "──  Space to Skip  ──",
         "B팀 2조",
         "김철환   전효상   박상현   황병부",
@@ -194,7 +194,7 @@ public class CreditScrollPanel : MonoBehaviour
             string content = _creditContents[i];
 
             // 특별한 감사들 섹션
-            if (title == "특별한 감사들")
+            if (title == "도움을 주신 분들")
             {
                 builder.Append(centerMarginOpen);
                 builder.Append("<align=center>");
