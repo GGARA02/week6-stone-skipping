@@ -55,10 +55,22 @@ public class PlacedAlkagiLaser : MonoBehaviour
     }
 
     /// <summary>
-    /// playerBody와 waterHeight 및 눈 자세로 빔 접촉을 검사하고 벽을 절단한다.
+    /// 이 컴포넌트가 만든 빔 인스턴스의 두께를 width(m)로 바꾼다. 빔 프리팹 원본은 변경하지 않는다.
+    /// width를 사용하며 빔 원통의 X, Z 배율을 변경해 판정 반경과 Width도 함께 바뀐다.
+    /// </summary>
+    public void SetWidth(float width)
+    {
+        Vector3 scale = _shape.transform.localScale;
+        scale.x = width / (_shape.radius * 2f);
+        scale.z = scale.x;
+        _shape.transform.localScale = scale;
+    }
+
+    /// <summary>
+    /// playerBody와 waterHeight 및 눈 자세로 빔 접촉을 검사하고 cutWalls가 true면 벽도 절단한다.
     /// 수면 접촉점을 알리고 플레이어 접촉 여부를 반환하며 이전 검사 자세를 갱신한다.
     /// </summary>
-    public bool Sweep(Rigidbody playerBody, float waterHeight)
+    public bool Sweep(Rigidbody playerBody, float waterHeight, bool cutWalls = true)
     {
         Vector3 position = _eye.position;
         Quaternion rotation = _eye.rotation;
@@ -72,7 +84,7 @@ public class PlacedAlkagiLaser : MonoBehaviour
             Quaternion previousRotation = _beam.transform.rotation;
             _beam.transform.SetPositionAndRotation(Vector3.Lerp(_previousPosition, position, ratio),
                 Quaternion.Slerp(_previousRotation, rotation, ratio));
-            hitPlayer |= CheckContacts(playerBody, cutNormal);
+            hitPlayer |= CheckContacts(playerBody, cutNormal, cutWalls);
             CheckWaterContact(waterHeight, previousPosition, previousRotation);
         }
         _previousPosition = position;
@@ -147,10 +159,10 @@ public class PlacedAlkagiLaser : MonoBehaviour
     }
 
     /// <summary>
-    /// CapsuleCollider 형상과 cutNormal로 벽을 절단하고 playerBody 충돌체의 접촉 여부를 반환한다.
+    /// CapsuleCollider 형상으로 playerBody 충돌체의 접촉 여부를 반환하고 cutWalls가 true면 cutNormal로 벽을 절단한다.
     /// 같은 벽은 공격당 한 번만 절단하며 플레이어의 Trigger도 검사한다.
     /// </summary>
-    private bool CheckContacts(Rigidbody playerBody, Vector3 cutNormal)
+    private bool CheckContacts(Rigidbody playerBody, Vector3 cutNormal, bool cutWalls)
     {
         Transform shapeTransform = _shape.transform;
         Vector3 scale = shapeTransform.lossyScale;
@@ -163,7 +175,7 @@ public class PlacedAlkagiLaser : MonoBehaviour
                      ~0, QueryTriggerInteraction.Collide))
         {
             if (collider.attachedRigidbody == playerBody) hitPlayer = true;
-            if (collider.isTrigger || !collider.TryGetComponent(out CuttableWall wall) || _cutWalls.Contains(wall)) continue;
+            if (!cutWalls || collider.isTrigger || !collider.TryGetComponent(out CuttableWall wall) || _cutWalls.Contains(wall)) continue;
             Vector3 contact = collider.ClosestPoint(_beam.transform.position + _beam.transform.forward
                 * Vector3.Dot(collider.bounds.center - _beam.transform.position, _beam.transform.forward));
             if (wall.Cut(contact, cutNormal)) _cutWalls.Add(wall);

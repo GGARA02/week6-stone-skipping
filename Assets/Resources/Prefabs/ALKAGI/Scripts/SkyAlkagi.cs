@@ -10,6 +10,9 @@ using Unity.Cinemachine;
 // 던진 동안 주기적으로 눈을 충전해 레이저를 예고한 뒤 구름과 바다를 가르며, 레이저에 닿으면 물고기 ALKAGI를 획득하고 사라진다.
 public class SkyAlkagi : MonoBehaviour
 {
+    // 수면 갈라짐과 겹치는 장애물을 고르는 판의 수면 위아래 반높이(m).
+    private const float CUT_HALF_HEIGHT = 1f;
+
     private static readonly int BASE_COLOR_ID = Shader.PropertyToID("_BaseColor");
     private static readonly int EMISSION_ID = Shader.PropertyToID("_Emission");
     private static readonly int WATER_Y_ID = Shader.PropertyToID("_WaterY");
@@ -81,6 +84,8 @@ public class SkyAlkagi : MonoBehaviour
     [SerializeField, Min(0f)] private float _sweepHeight = 400f;
     [Tooltip("빔 길이. 길수록 바다가 멀리까지 베인다")]
     [SerializeField, Min(1f)] private float _beamLength = 1500f;
+    [Tooltip("빔 두께(m). 두꺼울수록 플레이어 판정과 수면 갈라짐이 넓어지고 갈라짐 안에서 사라지는 장애물 폭도 넓어진다. 공유 빔 프리팹은 그대로 두고 이 ALKAGI의 빔에만 적용한다")]
+    [SerializeField, Min(0.01f)] private float _beamWidth = 2f;
     [Tooltip("비 오는 날 레이저 발사 중 빔에서 이 반경(m) 안의 빗방울을 없앤다")]
     [SerializeField, Min(0f)] private float _rainClearRadius = 12f;
     private AttackPhase _phase;
@@ -95,6 +100,7 @@ public class SkyAlkagi : MonoBehaviour
     [SerializeField, Min(1f)] private float _holeDepth = 200f;
     private AlkagiWaterHole _activeHole;
     private readonly List<AlkagiWaterHole> _holes = new List<AlkagiWaterHole>();
+    private readonly HashSet<CuttableWall> _cutWalls = new HashSet<CuttableWall>();
 
     void Awake()
     {
@@ -331,10 +337,11 @@ public class SkyAlkagi : MonoBehaviour
 
     /// <summary>
     /// 눈 바로 아래 수면에서 플레이어 위 하늘까지 이어지는 조준선을 월드에 고정하고 레이저를 켠다.
-    /// 눈과 플레이어 수면 위치를 사용하며 조준선, 물 구멍 방향, 구름 걷힘, 빔 길이와 공격 단계, 빔 주변 빗방울을 변경하고 카메라 흔들림을 보낸다.
+    /// 눈과 플레이어 수면 위치를 사용하며 조준선, 물 구멍 방향, 절단 기록, 구름 걷힘, 빔 길이와 두께, 공격 단계, 빔 주변 빗방울을 변경하고 카메라 흔들림을 보낸다.
     /// </summary>
     private void BeginFire()
     {
+        _cutWalls.Clear();
         // ALKAGI 발밑에서 플레이어 쪽으로 한 번 쳐올려 그 사이 바다를 모두 가른다.
         // 조준선을 월드에 고정해 옆으로 비켜 난 플레이어는 피할 수 있게 한다.
         Vector3 player = _player.WaterContactPoint;
@@ -347,6 +354,7 @@ public class SkyAlkagi : MonoBehaviour
         _clouds.BeginCut();
         AimAt(_sweepStart);
         ClearRainAroundBeam();
+        _laser.SetWidth(_beamWidth);
         _laser.BeginFire(_beamLength);
         _impulse.GenerateImpulse();
         SetPhase(AttackPhase.Firing);
@@ -372,14 +380,37 @@ public class SkyAlkagi : MonoBehaviour
     }
 
     /// <summary>
-    /// 빔이 플레이어 몸에 닿았는지 검사하고 닿으면 포획 처리한다.
+    /// 빔으로 플레이어 접촉만 검사해 수면 갈라짐을 늘리고, 갈라짐 직선에 걸친 장애물을 자른 뒤 닿았으면 포획 처리한다.
     /// 플레이어 몸과 수면 높이를 사용하며 포획했으면 true를 반환한다.
     /// </summary>
     private bool CheckLaser()
     {
-        if (!_laser.Sweep(_spawner.PlayerBody, _player.WaterContactPoint.y)) return false;
+        // 빔은 눈을 따라 움직여 경로가 휘므로 장애물은 직선으로 그려지는 수면 갈라짐 기준으로 자른다.
+        bool hitPlayer = _laser.Sweep(_spawner.PlayerBody, _player.WaterContactPoint.y, false);
+        CutAlongHole();
+        if (!hitPlayer) return false;
         Capture();
         return true;
+    }
+
+    /// <summary>
+    /// 이번 공격의 수면 갈라짐에 걸친 벽과 유빙을 갈라짐의 왼쪽, 오른쪽 경계에서 자르고 갈라짐 안 조각은 없앤다.
+    /// _activeHole의 위치, 방향, 너비와 길이를 사용하며 잘린 장애물을 _cutWalls에 기록해 공격당 한 번만 자른다.
+    /// </summary>
+    private void CutAlongHole()
+    {
+        if (_activeHole == null) return;
+        Transform hole = _activeHole.transform;
+        Vector3 size = hole.localScale;
+        float halfWidth = size.x * 0.5f;
+        foreach (Collider collider in Physics.OverlapBox(hole.position,
+                     new Vector3(halfWidth, CUT_HALF_HEIGHT, size.z * 0.5f), hole.rotation, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (!collider.TryGetComponent(out CuttableWall wall) || _cutWalls.Contains(wall)) continue;
+            // 갈라짐 중심선 위의 점을 띠 중심으로 넘긴다. 경계면은 중심선에서 양옆으로 갈라짐 반폭만큼 떨어진다.
+            Vector3 center = hole.position + hole.forward * Vector3.Dot(collider.bounds.center - hole.position, hole.forward);
+            if (wall.CutBand(center, hole.right, halfWidth)) _cutWalls.Add(wall);
+        }
     }
 
     /// <summary>
