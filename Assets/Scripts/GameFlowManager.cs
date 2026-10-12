@@ -171,10 +171,15 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private float _openingHoldDuration = 1.0f;
     [Tooltip("오프닝 카메라 후진 이동 시간(초)")]
     [SerializeField] private float _openingTravelDuration = 3.0f;
+    [Tooltip("블랙홀 흡수 연출 시간(초)")]
+    [SerializeField] private float _blackHoleSuctionDuration = 1.7f;
     [Tooltip("엔딩 시네마 동안 21:9 레터박스 연출을 엔딩 크레딧까지 유지할지 여부")]
     [SerializeField] private bool _maintainCinemaDuringCredits = true;
     [Tooltip("21:9 레터박스 전환 시간 (초)")]
     [SerializeField] private float _cinemaTransitionDuration = 0.6f;
+    private GameObject _suctionOverlay;
+    private RenderTexture _suctionFrame;
+    private Material _suctionMaterial;
     private GameObject _letterboxOverlay;
     private RectTransform _topLetterboxBar;
     private RectTransform _bottomLetterboxBar;
@@ -264,6 +269,7 @@ public class GameFlowManager : MonoBehaviour
         {
             Destroy(_letterboxOverlay);
         }
+        ReleaseScreenSuction();
         _fishSelectionPreview.Dispose();
         _ownedFishSelectionPreview.Dispose();
     }
@@ -676,6 +682,7 @@ public class GameFlowManager : MonoBehaviour
         }
         _endingCinemaRunning = false;
         SetCinematicLetterbox(false, immediate: true);
+        ReleaseScreenSuction();
         if (_fishSpawner != null)
         {
             _fishSpawner.enabled = true;
@@ -2032,14 +2039,15 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 미지의 행성 컷신을 순차적으로 재생하고 외계인 획득 및 엔딩 크레딧을 연결한다.
-    /// 시간 경과에 따라 카메라 구도, 돌 낙하, 외계인 반응 및 돌에 의한 흡수를 연출하고 정적 후 크레딧을 연다.
+    /// 블랙홀 화면 흡수 연출과 미지의 행성 컷신을 순차적으로 재생하고 외계인 획득 및 엔딩 크레딧을 연결한다.
+    /// ScreenSuction 연출 후 우주 환경 전환, 카메라 구도, 외계인 반응 및 크레딧 상태를 순차적으로 변경한다.
     /// </summary>
     private IEnumerator PlayEndingCinemaRoutine()
     {
-        // 0. 블랙홀 흡입 및 획득 안내 여운 대기 후 시네마틱 레터박스 시작
-        yield return new WaitForSeconds(1f);
-        SetCinematicLetterbox(true);
+        // 0. 블랙홀 화면 흡수 연출: 화면 전체가 검은 배경 위에서 블랙홀 중심으로 일그러지며 흡수된다.
+        yield return StartCoroutine(PlayScreenSuctionRoutine());
+        // 21:9 비율은 유지하고 줌아웃 전환 연출은 제거하여 즉시 적용한다.
+        SetCinematicLetterbox(true, immediate: true);
 
         // 1. 우주 환경 전환 및 시네머신 카메라 제어권 확보
         if (_environmentController != null)
@@ -2393,6 +2401,145 @@ public class GameFlowManager : MonoBehaviour
         _leftLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
         _rightLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
     }
+
+    #region 흡수 연출
+    /// <summary>
+    /// 블랙홀 접촉 시 화면 전체를 캡처하여 검은 배경 위에서 블랙홀 중심으로 일그러지며 흡수되는 연출을 실행한다.
+    /// _endingBlackHole과 ScreenSuction 셰이더를 사용하며, 화면 캡처 오버레이 생성, 흡수 진행도 갱신 및 리소스 해제를 수행한다.
+    /// </summary>
+    private IEnumerator PlayScreenSuctionRoutine()
+    {
+        try
+        {
+            // 접촉 프레임 렌더가 완료되기를 기다려 전체 화면을 캡처한다.
+            yield return new WaitForEndOfFrame();
+
+            _suctionFrame = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGB32)
+            {
+                name = "Ending Screen Suction Capture",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear
+            };
+            _suctionFrame.Create();
+
+            RenderTexture rawFrame = RenderTexture.GetTemporary(_suctionFrame.width, _suctionFrame.height, 0, RenderTextureFormat.ARGB32);
+            try
+            {
+                UnityEngine.ScreenCapture.CaptureScreenshotIntoRenderTexture(rawFrame);
+                Vector2 scale = SystemInfo.graphicsUVStartsAtTop ? new Vector2(1f, -1f) : Vector2.one;
+                Vector2 offset = SystemInfo.graphicsUVStartsAtTop ? Vector2.up : Vector2.zero;
+                Graphics.Blit(rawFrame, _suctionFrame, scale, offset);
+            }
+            finally
+            {
+                RenderTexture.ReleaseTemporary(rawFrame);
+            }
+
+            // 카메라 기준으로 블랙홀의 뷰포트 좌표를 계산한다.
+            Camera cam = Camera.main;
+            Vector2 holePosition = new Vector2(0.5f, 0.5f);
+            if (cam != null)
+            {
+                Vector3 viewport = cam.WorldToViewportPoint(_endingBlackHole.position);
+                holePosition = viewport.z > 0f
+                    ? new Vector2(Mathf.Clamp01(viewport.x), Mathf.Clamp01(viewport.y))
+                    : new Vector2(0.5f, 0.5f);
+            }
+
+            // 오버레이 캔버스를 최상단에 생성한다.
+            _suctionOverlay = new GameObject("Ending Screen Suction Overlay", typeof(Canvas));
+            Canvas canvas = _suctionOverlay.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = short.MaxValue;
+
+            // 검은색 배경: 화면이 일그러지며 흡수되는 동안 드러나는 바탕을 검은색으로 처리한다.
+            GameObject background = new GameObject("Black Background", typeof(RectTransform), typeof(Image));
+            background.transform.SetParent(_suctionOverlay.transform, false);
+            StretchSuctionRect(background.GetComponent<RectTransform>());
+            Image bgImg = background.GetComponent<Image>();
+            bgImg.color = Color.black;
+            bgImg.raycastTarget = false;
+
+            // 흡수되는 천 메시(Captured Cloth)를 생성하고 ScreenSuction 셰이더를 연결한다.
+            GameObject cloth = new GameObject("Captured Cloth", typeof(RectTransform), typeof(CanvasRenderer), typeof(ScreenSuctionGraphic));
+            cloth.transform.SetParent(_suctionOverlay.transform, false);
+            StretchSuctionRect(cloth.GetComponent<RectTransform>());
+
+            Shader suctionShader = Resources.Load<Shader>("Shader/ScreenSuction");
+            _suctionMaterial = new Material(suctionShader);
+            _suctionMaterial.SetTexture("_MainTex", _suctionFrame);
+            _suctionMaterial.SetVector("_SuctionCenter", new Vector4(holePosition.x, holePosition.y, 0f, 0f));
+            _suctionMaterial.SetFloat("_Aspect", (float)_suctionFrame.width / _suctionFrame.height);
+            _suctionMaterial.SetFloat("_SuctionStrength", 2.4f);
+            _suctionMaterial.SetFloat("_SuctionRadius", 0.65f);
+            _suctionMaterial.SetFloat("_Falloff", 1.8f);
+            _suctionMaterial.SetFloat("_StretchStrength", 1.6f);
+            _suctionMaterial.SetFloat("_WrinkleStrength", 0.065f);
+            _suctionMaterial.SetFloat("_TwistStrength", 0.045f);
+            _suctionMaterial.SetFloat("_FinalCollapseSpeed", 3.5f);
+
+            ScreenSuctionGraphic graphic = cloth.GetComponent<ScreenSuctionGraphic>();
+            graphic.material = _suctionMaterial;
+            graphic.raycastTarget = false;
+            graphic.SetTexture(_suctionFrame);
+
+            // 흡수 진행도를 0에서 1까지 보간하여 화면이 블랙홀로 빨려 들어가게 한다.
+            float duration = _blackHoleSuctionDuration;
+            float start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - start < duration)
+            {
+                float progress = Mathf.Clamp01((Time.realtimeSinceStartup - start) / duration);
+                _suctionMaterial.SetFloat("_Progress", progress);
+                yield return null;
+            }
+
+            _suctionMaterial.SetFloat("_Progress", 1f);
+
+            // 완전 흡수 후 정적(검은 화면)을 잠시 유지한다.
+            yield return new WaitForSecondsRealtime(0.2f);
+        }
+        finally
+        {
+            ReleaseScreenSuction();
+        }
+    }
+
+    /// <summary>
+    /// RectTransform의 앵커와 여백을 부모 전체 화면 크기로 맞춘다.
+    /// rect를 사용하며, anchorMin, anchorMax, offsetMin, offsetMax를 변경한다.
+    /// </summary>
+    private void StretchSuctionRect(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+    }
+
+    /// <summary>
+    /// 화면 흡수 연출에 사용된 오버레이 캔버스, 머티리얼 및 렌더 텍스처를 안전하게 해제한다.
+    /// 입력값은 없으며, _suctionOverlay, _suctionMaterial, _suctionFrame을 정리한다.
+    /// </summary>
+    private void ReleaseScreenSuction()
+    {
+        if (_suctionOverlay != null)
+        {
+            Destroy(_suctionOverlay);
+            _suctionOverlay = null;
+        }
+        if (_suctionMaterial != null)
+        {
+            Destroy(_suctionMaterial);
+            _suctionMaterial = null;
+        }
+        if (_suctionFrame != null)
+        {
+            _suctionFrame.Release();
+            Destroy(_suctionFrame);
+            _suctionFrame = null;
+        }
+    }
+    #endregion
 
     #region 오프닝 연출
     /// <summary>
