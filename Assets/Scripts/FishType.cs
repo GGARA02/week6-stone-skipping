@@ -35,11 +35,17 @@ public class FishSelectEffects
     [SerializeField]
     private VolumeProfile _volumeProfile;
 
+    [Header("하늘")]
+    [Tooltip("고르면 페이드 없이 바로 바뀌는 하늘. 다른 것을 고르면 바로 원래 하늘로 돌아온다")]
+    [SerializeField]
+    private Material _skybox;
+
     public bool CausesRain => _causesRain;
     public bool CausesNight => _causesNight;
     public bool PreventsRain => _preventsRain;
     public bool PreventsNight => _preventsNight;
     public VolumeProfile VolumeProfile => _volumeProfile;
+    public Material Skybox => _skybox;
 }
 
 // 자연 출현에 붙는 조건과 출현 방식. 인스펙터에서 접을 수 있게 따로 묶는다.
@@ -154,6 +160,7 @@ public class FishType
     public bool SelectPreventsRain => _selectEffects.PreventsRain;
     public bool SelectPreventsNight => _selectEffects.PreventsNight;
     public VolumeProfile SelectVolumeProfile => _selectEffects.VolumeProfile;
+    public Material SelectSkybox => _selectEffects.Skybox;
     public bool SpawnOnlyInRain => _spawnConditions.OnlyInRain;
     public bool SpawnOnlyAtNight => _spawnConditions.OnlyAtNight;
     public GameObject RequiredPlayerFish => _spawnConditions.RequiredPlayerFish;

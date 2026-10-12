@@ -15193,6 +15193,8 @@ MonoBehaviour:
   _blackHoleArrowDuration: 5
   _blackHoleArrowHeight: 2
   _blackHoleArrowScale: 1.2
+  _skyboxAcquireDelay: 5
+  _skyboxRestartLockAfterAcquire: 2
   _panelShrinkDuration: 0.65
   _endingCredit: {fileID: 1774445642}
   _endingBlackHole: {fileID: 1131671915}
@@ -15366,6 +15368,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ProceduralObstacleSpawner
   _iceStartDistance: 1500
   _blackHoleStartDistance: 3000
+  _waterPositiveX: 2500
+  _waterNegativeX: 2500
+  _waterPositiveZ: 4000
+  _waterNegativeZ: 1000
+  _shipNormal: {fileID: 423885620}
+  _shipNormalZ: 1500
+  _blackHole: {fileID: 1131671915}
+  _blackHoleZ: 3100
+  _volcano: {fileID: 715666654}
+  _volcanoPosition: {x: 1000, y: 70, z: 1000}
   _cellSize: 60
   _cellRadius: 6
   _density: 0.65
@@ -15597,6 +15609,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 04f872143d526e149a89f2dbc20e18dc, type: 3}
+--- !u!4 &423885620 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1813627893957401661, guid: 04f872143d526e149a89f2dbc20e18dc, type: 3}
+  m_PrefabInstance: {fileID: 423885619}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &524649153
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -15792,6 +15809,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: b3d9acc9539a96e49bfaee6f9d1242ca, type: 3}
+--- !u!4 &715666654 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4671052477108090309, guid: b3d9acc9539a96e49bfaee6f9d1242ca, type: 3}
+  m_PrefabInstance: {fileID: 715666653}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &747180395
 GameObject:
   m_ObjectHideFlags: 0
