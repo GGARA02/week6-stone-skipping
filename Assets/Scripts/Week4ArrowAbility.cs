@@ -12,6 +12,7 @@ public class Week4ArrowAbility : FishAbility
     [Tooltip("초당 흔들리는 횟수")]
     [SerializeField]
     private float _bobFrequency = 0.5f;
+    public float BobHeight => _bobHeight;
 
     [Header("불씨")]
     [Tooltip("판정 성공 때 화살 위치에 만드는 불씨 파티클")]
@@ -48,9 +49,18 @@ public class Week4ArrowAbility : FishAbility
     {
         if (!_held || _thrown) return;
 
-        float offset = Mathf.Sin(Time.time * _bobFrequency * Mathf.PI * 2f) * _bobHeight;
+        float offset = GetBobOffset(Time.time);
         // 조준 자세로 물고기가 기울어도 화면 기준 위아래로 흔들리게 월드 위쪽을 부모 로컬로 바꾼다.
         transform.localPosition = transform.parent.InverseTransformVector(Vector3.up * offset);
+    }
+
+    /// <summary>
+    /// time 시각의 위아래 흔들림 높이를 계산한다. 고르기 상태와 선택 미리보기가 같은 아이들 모션을 쓴다.
+    /// time과 _bobFrequency, _bobHeight를 사용하며, 월드 위쪽 기준 높이를 반환한다.
+    /// </summary>
+    public float GetBobOffset(float time)
+    {
+        return Mathf.Sin(time * _bobFrequency * Mathf.PI * 2f) * _bobHeight;
     }
 
     /// <summary>
