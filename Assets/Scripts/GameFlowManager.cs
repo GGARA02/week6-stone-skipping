@@ -163,6 +163,14 @@ public class GameFlowManager : MonoBehaviour
     [SerializeField] private EndingCreditUI _endingCredit;
 
     [Header("시네마틱 연출")]
+    [Tooltip("오프닝 연출에서 응시할 엔딩 블랙홀 트랜스폼")]
+    [SerializeField] private Transform _endingBlackHole;
+    [Tooltip("오프닝 시작 시 블랙홀과의 근접 거리")]
+    [SerializeField] private float _openingCloseDistance = 25f;
+    [Tooltip("오프닝 시작 후 카메라 후진 전 정지 대기 시간(초)")]
+    [SerializeField] private float _openingHoldDuration = 1.0f;
+    [Tooltip("오프닝 카메라 후진 이동 시간(초)")]
+    [SerializeField] private float _openingTravelDuration = 3.0f;
     [Tooltip("엔딩 시네마 동안 21:9 레터박스 연출을 엔딩 크레딧까지 유지할지 여부")]
     [SerializeField] private bool _maintainCinemaDuringCredits = true;
     [Tooltip("21:9 레터박스 전환 시간 (초)")]
@@ -173,6 +181,8 @@ public class GameFlowManager : MonoBehaviour
     private RectTransform _leftLetterboxBar;
     private RectTransform _rightLetterboxBar;
     private Coroutine _letterboxCoroutine;
+    private Coroutine _openingCinemaCoroutine;
+    private bool _openingCinemaRunning;
     private Rect _originalCameraRect = new Rect(0f, 0f, 1f, 1f);
 
     void Start()
@@ -218,6 +228,10 @@ public class GameFlowManager : MonoBehaviour
         {
             _catalogOrder.Add(entry.Name, _catalogOrder.Count);
         }
+        if (!_hasThrown)
+        {
+            StartOpeningCinema();
+        }
     }
 
     void OnDestroy()
@@ -241,6 +255,11 @@ public class GameFlowManager : MonoBehaviour
             _endingCredit.OnEndingCompleted -= HandleEndingCompleted;
             _endingCredit.OnEndingSkipped -= HandleEndingSkipped;
         }
+        if (_openingCinemaCoroutine != null)
+        {
+            StopCoroutine(_openingCinemaCoroutine);
+            _openingCinemaCoroutine = null;
+        }
         if (Camera.main != null)
         {
             Camera.main.rect = _originalCameraRect;
@@ -256,8 +275,8 @@ public class GameFlowManager : MonoBehaviour
     void Update()
     {
         _fishSpawner.RecordDiscoveryDistance(_playerController.Distance);
-        // 엔딩 시네마 연출 중에는 플레이어 및 게임 흐름 키 입력을 전면 차단한다.
-        if (_endingCinemaRunning) return;
+        // 엔딩 시네마 및 오프닝 연출 중에는 플레이어 및 게임 흐름 키 입력을 전면 차단한다.
+        if (_endingCinemaRunning || _openingCinemaRunning) return;
 
         if (_screenThrowPending || _catalogCapturePending || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f) return;
         if (_pauseOpen)
@@ -638,6 +657,12 @@ public class GameFlowManager : MonoBehaviour
             StopCoroutine(_endingCinemaCoroutine);
             _endingCinemaCoroutine = null;
         }
+        if (_openingCinemaCoroutine != null)
+        {
+            StopCoroutine(_openingCinemaCoroutine);
+            _openingCinemaCoroutine = null;
+        }
+        _openingCinemaRunning = false;
         if (_endingAlienInstance != null)
         {
             Destroy(_endingAlienInstance);
@@ -2354,4 +2379,75 @@ public class GameFlowManager : MonoBehaviour
         _leftLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
         _rightLetterboxBar.sizeDelta = new Vector2(barWidth, 0f);
     }
+
+    #region 오프닝 연출
+    /// <summary>
+    /// 게임 최초 시작 시 블랙홀을 조명하고 플레이 지점으로 이동하는 오프닝 연출을 시작한다.
+    /// 입력값은 없으며, _openingCinemaRunning과 _showHud를 변경하고 오프닝 코루틴을 실행한다.
+    /// </summary>
+    private void StartOpeningCinema()
+    {
+        if (_openingCinemaRunning) return;
+        _openingCinemaRunning = true;
+        _showHud = false;
+        _openingCinemaCoroutine = StartCoroutine(PlayOpeningCinemaRoutine());
+    }
+
+    /// <summary>
+    /// 블랙홀을 응시하며 21:9 비율로 시작하여 플레이 위치로 카메라를 후진 이동시킨 후 정상 게임 플레이로 전환한다.
+    /// _endingBlackHole 위치와 시간 설정을 사용하며, 카메라 위치, 레터박스, HUD 표시 상태를 변경한다.
+    /// </summary>
+    private IEnumerator PlayOpeningCinemaRoutine()
+    {
+        SetCinematicLetterbox(true, immediate: true);
+        _cameraController.enabled = false;
+
+        Vector3 playCamPos = _cameraController.transform.position;
+        Quaternion playCamRot = _cameraController.transform.rotation;
+        Vector3 blackHolePos = _endingBlackHole.position;
+
+        Vector3 toPlayCam = playCamPos - blackHolePos;
+        Vector3 startCamPos = blackHolePos + toPlayCam.normalized * _openingCloseDistance;
+        Quaternion startCamRot = Quaternion.LookRotation((blackHolePos - startCamPos).normalized, Vector3.up);
+
+        _cameraController.transform.position = startCamPos;
+        _cameraController.transform.rotation = startCamRot;
+
+        // 1. 블랙홀을 클로즈업 상태로 응시하며 정지 대기
+        float elapsed = 0f;
+        while (elapsed < _openingHoldDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        // 2. 블랙홀을 바라보며 플레이 시작 위치로 부드럽게 후진 이동
+        elapsed = 0f;
+        while (elapsed < _openingTravelDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / _openingTravelDuration);
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+            Vector3 currentPos = Vector3.Lerp(startCamPos, playCamPos, smoothT);
+            Quaternion lookAtHole = Quaternion.LookRotation((blackHolePos - currentPos).normalized, Vector3.up);
+            Quaternion currentRot = Quaternion.Slerp(lookAtHole, playCamRot, smoothT);
+
+            _cameraController.transform.position = currentPos;
+            _cameraController.transform.rotation = currentRot;
+            yield return null;
+        }
+
+        _cameraController.transform.position = playCamPos;
+        _cameraController.transform.rotation = playCamRot;
+        _cameraController.enabled = true;
+        _cameraController.SnapBehindTarget();
+
+        // 3. 21:9 레터박스 해제 및 정상 플레이 상태 전환
+        SetCinematicLetterbox(false);
+        _showHud = true;
+        _openingCinemaRunning = false;
+        _openingCinemaCoroutine = null;
+    }
+    #endregion
 }
