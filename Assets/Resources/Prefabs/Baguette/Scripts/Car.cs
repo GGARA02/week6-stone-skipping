@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-// 자동차의 특수 동작. SPACE 성공 판정 시 창문 스포너를 통해 도둑 Fish를 공용 시스템으로 사출한다.
+// 자동차의 특수 동작. SPACE를 누를 때마다 창문 스포너를 통해 도둑 Fish를 공용 시스템으로 사출한다.
 public class Car : EjectFishAbility
 {
     [Header("스포너")]
@@ -25,13 +25,14 @@ public class Car : EjectFishAbility
     }
 
     /// <summary>
-    /// 던진 상태에서 SPACE 판정에 성공했을 때 도둑들을 소환한다.
-    /// context와 judge를 사용하며, SpawnDoduk을 호출하여 도둑을 사출한다.
+    /// 던진 상태에서 SPACE를 누를 때마다 판정 성공 때와 같은 수의 도둑들을 소환한다.
+    /// context를 사용하며, SpawnDoduk을 호출하여 도둑을 사출한다.
     /// </summary>
-    public override void OnJudgeSuccess(ThrowContext context, SkipJudge judge)
+    public override void OnSpacePressed(ThrowContext context)
     {
         _context = context;
-        _lastJudge = judge;
+        // 판정 없이 누를 때마다 사출하므로 사출 통과용 성공 등급을 넘긴다.
+        _lastJudge = SkipJudge.Good;
 
         // 소환할 도둑 수를 4~5마리 범위에서 랜덤으로 정한다.
         int count = Random.Range(3, 4);

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Week4 화살이 SPACE 판정에 성공했을 때 나오는 불씨 파티클. 터져 나온 뒤 잠시 기다렸다가 대상에게 빨려 들어간다.
+// Week4 화살이 SPACE를 누르거나 벽에 부딪혔을 때 나오는 불씨 파티클. 터져 나온 뒤 잠시 기다렸다가 대상에게 빨려 들어간다.
 // Week4ParticleAttractor를 참고했으며, ArrowController 없이 대상만 받아 동작한다.
 [RequireComponent(typeof(ParticleSystem))]
 public class Week4ArrowGainEffect : MonoBehaviour
@@ -65,5 +65,17 @@ public class Week4ArrowGainEffect : MonoBehaviour
     public void SetTarget(Transform target)
     {
         _target = target;
+    }
+
+    /// <summary>
+    /// 처음 한 번에 터져 나오는 불씨 수를 바꾼다. 생성 직후 첫 파티클 갱신 전에 호출해야 한다.
+    /// count를 사용하며, 파티클 시스템의 첫 버스트 개수를 변경한다.
+    /// </summary>
+    public void SetBurstCount(int count)
+    {
+        ParticleSystem.EmissionModule emission = _particleSystem.emission;
+        ParticleSystem.Burst burst = emission.GetBurst(0);
+        burst.count = count;
+        emission.SetBurst(0, burst);
     }
 }
