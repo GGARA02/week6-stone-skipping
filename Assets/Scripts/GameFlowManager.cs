@@ -2084,11 +2084,7 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-<<<<<<< HEAD
-    /// 엔딩 크레딧 정상 완료 이벤트를 받아 획득 처리 없이 정산 상태로 전환한다.
-=======
     /// 엔딩 크레딧 정상 완료 이벤트를 받아 크레딧 물고기 획득 없이 정산 화면으로 전환한다.
->>>>>>> main
     /// 입력값은 없으며, CompleteEndingCredit을 호출한다.
     /// </summary>
     private void HandleEndingCompleted()
@@ -2167,13 +2163,8 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-<<<<<<< HEAD
-    /// 끝까지 감상한 엔딩 크레딧을 닫고 게임오버(정산) 상태로 전환한다.
-    /// 입력값 없이 HUD와 레터박스를 복원하며 크레딧 획득 기록과 선택 항목은 변경하지 않는다.
-=======
-    /// 엔딩 크레딧을 정리하고 크레딧 물고기 획득 없이 게임오버(정산) 상태로 전환한다.
-    /// 입력값은 없으며, _endingCredit UI를 비활성화하고 HandleGameOver를 호출한다.
->>>>>>> main
+    /// 끝까지 감상한 엔딩 크레딧을 닫고 크레딧 물고기 획득 없이 게임오버(정산) 상태로 전환한다.
+    /// 입력값 없이 _endingCredit UI를 비활성화하고 HUD와 레터박스를 복원한 뒤 HandleGameOver를 호출한다.
     /// </summary>
     private void CompleteEndingCredit()
     {
