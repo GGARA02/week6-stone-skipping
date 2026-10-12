@@ -216,6 +216,14 @@
     "description": "누가 봐도 점프대인데, 부딪혀도 아무 일도 일어나지 않던 점프대입니다. 보다 못해 결국 본인이 직접 날아 보기로 했습니다.",
     "unlockHint": "바다 곳곳에 놓인 점프대에 물수제비를 닿게 해 보세요."
   },
+  "arrow": {
+    "requiresSeaRegistration": true,
+    "rearmOnCutWaterEntry": true,
+    "spawnWeight": 0.2,
+    "displayName": "화살표",
+    "description": "블랙홀을 가리키다 안내를 포기하고 바다로 떨어진 화살표입니다. 이제는 직접 길을 찾아가야 합니다.",
+    "unlockHint": "화살표의 인내심은 그리 뛰어나지 않습니다."
+  },
   "blackhole": {
     "spawnWeight": 0.05,
     "displayName": "블랙홀",

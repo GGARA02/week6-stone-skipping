@@ -15,6 +15,7 @@
     "wall",
     "ice",
     "boost",
+    "arrow",
     "blackhole",
     "monster",
     "alkagi",
@@ -53,6 +54,9 @@
     },
     "ice": {
       "distanceExceeded": 1500
+    },
+    "arrow": {
+      "always": true
     },
     "blackhole": {
       "always": true
@@ -150,6 +154,7 @@
     "boost": [
       "kinghopak"
     ],
+    "arrow": [],
     "blackhole": [],
     "monster": [],
     "alkagi": [],

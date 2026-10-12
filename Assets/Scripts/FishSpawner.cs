@@ -171,7 +171,6 @@ public class FishSpawner : MonoBehaviour
 
     void Awake()
     {
-        _fishPrefabs = Array.FindAll(_fishPrefabs, prefab => prefab.Type.Id != "arrow");
         JObject catalogEntries = JObject.Parse(Resources.Load<TextAsset>("FishCatalog").text);
         _seaSpawnRegistry = GetComponent<SeaSpawnRegistry>();
         if (_seaSpawnRegistry == null) _seaSpawnRegistry = gameObject.AddComponent<SeaSpawnRegistry>();
@@ -334,7 +333,7 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void HandleFishLanded(Fish fish)
     {
-        if (!_acquisitionEnabled)
+        if (!_acquisitionEnabled && !(fish.Type.Id == "arrow" && fish.IsCutPiece))
         {
             Remove(fish);
             return;
@@ -450,7 +449,6 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void RegisterPrefab(Fish prefab)
     {
-        if (prefab.Type.Id == "arrow") return;
         foreach (Fish registered in _fishPrefabs)
         {
             if (registered.Type.Id == prefab.Type.Id) return;
@@ -607,7 +605,6 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     private bool CanSpawn(FishType type)
     {
-        if (type.Id == "arrow") return false;
         if (!_unlockGraph.ContainsFish(type.Id)) return false;
         if (_seaSpawnRegistry.RequiresRegistration(type.Id))
         {

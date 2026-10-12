@@ -159,12 +159,19 @@ public class GameFlowManager : MonoBehaviour
     [Header("블랙홀 방향 안내")]
     [SerializeField] private BlackHoleEnding _blackHoleTarget;
     [SerializeField] private GameObject _blackHoleArrowPrefab;
+    [SerializeField] private Material _blackHoleArrowWarningMaterial;
     [SerializeField, Range(0f, 180f)] private float _blackHoleArrowMinAngle = 45f;
     [SerializeField, Min(5f)] private float _blackHoleArrowDuration = 5f;
     [SerializeField, Min(0f)] private float _blackHoleArrowHeight = 2f;
     [SerializeField, Min(0.01f)] private float _blackHoleArrowScale = 1.2f;
     private Transform _blackHoleArrow;
     private float _blackHoleArrowEndTime = float.NegativeInfinity;
+    private Renderer[] _blackHoleArrowRenderers;
+    private Material _blackHoleArrowNormalMaterial;
+    private Fish _blackHoleArrowFish;
+    private float _blackHoleArrowStateTime;
+    private bool _blackHoleArrowWarning;
+    private bool _blackHoleArrowDetached;
 
     [Header("화면 투척 전환")]
     [SerializeField, Min(0.1f)] private float _panelShrinkDuration = 0.65f;
@@ -198,6 +205,11 @@ public class GameFlowManager : MonoBehaviour
         if (_blackHoleArrowPrefab == null) _blackHoleArrowPrefab = Resources.Load<GameObject>("Prefabs/BlackHoleDirectionArrow");
         _blackHoleArrow = Instantiate(_blackHoleArrowPrefab, transform).transform;
         _blackHoleArrow.gameObject.SetActive(false);
+        _blackHoleArrowRenderers = _blackHoleArrow.GetComponentsInChildren<Renderer>(true);
+        _blackHoleArrowNormalMaterial = _blackHoleArrowRenderers[0].sharedMaterial;
+        if (_blackHoleArrowWarningMaterial == null)
+            _blackHoleArrowWarningMaterial = Resources.Load<Material>("Prefabs/BlackHoleDirectionArrowWarning");
+        _blackHoleArrowFish = Resources.Load<GameObject>("Prefabs/Fish/Fish_Arrow").GetComponent<Fish>();
 
         _playerController.Initialize(_fishSpawner);
         _playerController.OnSkip += HandleSkip;
@@ -491,10 +503,11 @@ public class GameFlowManager : MonoBehaviour
     private void UpdateBlackHoleArrow()
     {
         if (_state != State.Flying || !_playerController.IsThrown || _playerController.IsGameOver
-            || _endingCinemaRunning || _blackHoleTarget == null)
+            || _endingCinemaRunning || _blackHoleTarget == null || _blackHoleArrowDetached)
         {
             _blackHoleArrowEndTime = float.NegativeInfinity;
-            _blackHoleArrow.gameObject.SetActive(false);
+            if (!_playerController.IsThrown) _blackHoleArrowDetached = false;
+            HideBlackHoleArrow();
             return;
         }
 
@@ -516,13 +529,16 @@ public class GameFlowManager : MonoBehaviour
         bool visible = Time.time < _blackHoleArrowEndTime && _showHud && !_pauseOpen && !_catalogOpen
             && !_screenThrowPending && !(_fishSpawner.ScreenCapture.IsCapturing && _fishSpawner.ScreenCapture.HasFrame)
             && camera != null;
-        _blackHoleArrow.gameObject.SetActive(visible);
-        if (!visible) return;
+        if (!visible)
+        {
+            HideBlackHoleArrow();
+            return;
+        }
 
         Vector3 playerScreen = camera.WorldToScreenPoint(_playerController.transform.position);
         if (playerScreen.z <= 0f)
         {
-            _blackHoleArrow.gameObject.SetActive(false);
+            HideBlackHoleArrow();
             return;
         }
         Vector3 targetScreen = camera.WorldToScreenPoint(_blackHoleTarget.transform.position);
@@ -537,6 +553,90 @@ public class GameFlowManager : MonoBehaviour
         _blackHoleArrow.SetPositionAndRotation(_playerController.transform.position + Vector3.up * _blackHoleArrowHeight,
             camera.transform.rotation * Quaternion.Euler(0f, 0f, angle));
         _blackHoleArrow.localScale = _blackHoleArrowPrefab.transform.localScale * _blackHoleArrowScale;
+        bool wasVisible = _blackHoleArrow.gameObject.activeSelf;
+        _blackHoleArrow.gameObject.SetActive(true);
+        if (wasVisible) _blackHoleArrowStateTime += Time.deltaTime;
+        if (_blackHoleArrowStateTime >= 5f)
+        {
+            _blackHoleArrowStateTime = 0f;
+            if (_blackHoleArrowWarning)
+            {
+                DetachBlackHoleArrow();
+                return;
+            }
+            SetBlackHoleArrowWarning(true);
+        }
+        if (_blackHoleArrowWarning)
+        {
+            _blackHoleArrow.position += camera.transform.right * (Mathf.Sin(Time.time * 55f) * 0.06f)
+                + camera.transform.up * (Mathf.Cos(Time.time * 71f) * 0.04f);
+        }
+    }
+
+    /// <summary>
+    /// 입력값 없이 안내를 숨기고 연속 노출 시간을 초기화한다.
+    /// 경고 머티리얼을 원래 상태로 복원하며 분리 여부와 출현 등록은 유지한다.
+    /// </summary>
+    private void HideBlackHoleArrow()
+    {
+        _blackHoleArrow.gameObject.SetActive(false);
+        _blackHoleArrowStateTime = 0f;
+        SetBlackHoleArrowWarning(false);
+    }
+
+    /// <summary>
+    /// warning에 따라 큐브 세 개의 공유 머티리얼을 경고색 또는 원래 색으로 교체한다.
+    /// 새 머티리얼 인스턴스를 만들지 않으며 현재 경고 상태를 변경한다.
+    /// </summary>
+    private void SetBlackHoleArrowWarning(bool warning)
+    {
+        if (_blackHoleArrowWarning == warning) return;
+        _blackHoleArrowWarning = warning;
+        foreach (Renderer renderer in _blackHoleArrowRenderers)
+            renderer.sharedMaterial = warning ? _blackHoleArrowWarningMaterial : _blackHoleArrowNormalMaterial;
+    }
+
+    /// <summary>
+    /// 연속 경고 5초를 유지한 안내를 독립적인 낙하 조각으로 분리하고 작은 입자 폭발을 만든다.
+    /// 현재 안내 위치와 플레이어 속도를 사용하며 이번 Throw의 안내를 종료하고 실제 입수를 기다린다.
+    /// </summary>
+    private void DetachBlackHoleArrow()
+    {
+        GameObject piece = Instantiate(_blackHoleArrow.gameObject, _blackHoleArrow.position, _blackHoleArrow.rotation);
+        piece.name = "Detached Arrow";
+        Rigidbody body = piece.AddComponent<Rigidbody>();
+        Vector3 side = Camera.main.transform.right;
+        body.linearVelocity = _playerController.Velocity * 0.15f + side * 4f + Vector3.up * 2f;
+        body.angularVelocity = new Vector3(3f, 4f, 2f);
+        Fish fish = piece.AddComponent<Fish>();
+        fish.InitializeWall(_fishSpawner, _blackHoleArrowFish.Type, null);
+        _fishSpawner.RegisterCutPiece(fish);
+
+        var burst = new GameObject("Arrow Burst").AddComponent<ParticleSystem>();
+        burst.transform.position = piece.transform.position;
+        burst.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = burst.main;
+        main.loop = false;
+        main.duration = 0.3f;
+        main.startLifetime = 0.4f;
+        main.startSpeed = 3f;
+        main.startSize = 0.12f;
+        main.gravityModifier = 0.5f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.stopAction = ParticleSystemStopAction.Destroy;
+        var emission = burst.emission;
+        emission.enabled = false;
+        var shape = burst.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.1f;
+        var particles = burst.GetComponent<ParticleSystemRenderer>();
+        particles.renderMode = ParticleSystemRenderMode.Mesh;
+        particles.mesh = _blackHoleArrow.GetComponentInChildren<MeshFilter>().sharedMesh;
+        particles.sharedMaterial = _blackHoleArrowWarningMaterial;
+        burst.Play();
+        burst.Emit(12);
+        _blackHoleArrowDetached = true;
+        HideBlackHoleArrow();
     }
 
     /// <summary>
@@ -551,6 +651,9 @@ public class GameFlowManager : MonoBehaviour
             ? fish.ToThrowModifiers(_progress.PowerMultiplier, _progress.SpinMultiplier)
             : ThrowModifiers.ForFish(_progress.PowerMultiplier, _progress.SpinMultiplier);
         _state = State.Flying;
+        _blackHoleArrowDetached = false;
+        _blackHoleArrowEndTime = float.NegativeInfinity;
+        HideBlackHoleArrow();
         _hasThrown = true;
         _screenCaptureTriggered = false;
         _playerController.Throw(modifiers);
