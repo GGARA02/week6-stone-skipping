@@ -354,7 +354,8 @@ public class GameFlowManager : MonoBehaviour
             {
                 if (fish.Id == "screen" || fish.Id == "catalog" || fish.Id == "menu") continue;
                 Fish prefab = _fishSpawner.GetFishPrefab(fish);
-                if (prefab != null) _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block");
+                if (prefab != null)
+                    _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block" || fish.Id == "week4arrow");
             }
             return;
         }
@@ -367,10 +368,11 @@ public class GameFlowManager : MonoBehaviour
                 && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)
             {
                 FishSelectionPreview previews = _progress.IsFishRegistered(fish) ? _ownedFishSelectionPreview : _fishSelectionPreview;
-                previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block");
+                previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block" || fish.Id == "week4arrow");
             }
         }
-        // 물 블록 미리보기는 선택 창과 도감이 보이는 동안 매 프레임 다시 그려 물결이 흐르게 한다.
+        // 물 블록과 Week4 화살 미리보기는 선택 창과 도감이 보이는 동안 매 프레임 다시 그린다.
+        // 물은 물결이 흐르고, 화살은 아이들 모션으로 위아래로 흔들려 트레일 형상이 보인다.
         _ownedFishSelectionPreview.RefreshAnimatedTextures();
     }
 

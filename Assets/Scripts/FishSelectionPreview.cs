@@ -7,25 +7,31 @@ using UnityEngine.Rendering;
 /// <summary>
 /// 생성 메시와 물고기 프리팹의 메시와 머티리얼로 선택 미리보기 텍스처를 보관한다.
 /// 게임 동작, 충돌체와 애니메이션은 생성하지 않는다. 물처럼 셰이더가 움직이는 항목만 모델을 남겨 다시 그린다.
+/// Week4 화살처럼 트레일로 형상이 보이는 항목은 트레일을 복사해 켜 둔 채 아이들 모션으로 위아래로 흔든다.
 /// </summary>
 public sealed class FishSelectionPreview : IDisposable
 {
     private const int PREVIEW_LAYER = 2;
     private const int TEXTURE_WIDTH = 192;
     private const int TEXTURE_HEIGHT = 128;
+    private const float EFFECT_SPACING = 1000f;
+    private const float EFFECT_FRAME_MARGIN = 0.6f;
+    private const float TRAIL_BRIGHTNESS = 1f;
 
     private readonly Dictionary<Fish, RenderTexture> _textures = new Dictionary<Fish, RenderTexture>();
     private readonly Dictionary<Fish, AnimatedModel> _animatedModels = new Dictionary<Fish, AnimatedModel>();
     private readonly GameObject _root;
     private readonly Camera _camera;
     private readonly Material _material;
+    private readonly Material _trailMaterial;
     private readonly bool _useOriginalMaterials;
+    private int _effectModelCount;
 
     public RenderTexture DefaultFishTexture { get; private set; }
 
     /// <summary>
     /// useOriginalMaterials로 원본 색 사용 여부를 정하고 게임 공간에서 떨어진 미리보기 카메라를 만든다.
-    /// 생성한 카메라와 미획득 항목용 회색 머티리얼을 렌더링 상태에 저장한다.
+    /// 생성한 카메라와 미획득 항목용 회색 머티리얼, 트레일 미리보기용 머티리얼을 렌더링 상태에 저장한다.
     /// </summary>
     public FishSelectionPreview(bool useOriginalMaterials = false)
     {
@@ -53,6 +59,11 @@ public sealed class FishSelectionPreview : IDisposable
         _material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
         _material.SetOverrideTag("RenderType", "Transparent");
         _material.renderQueue = (int)RenderQueue.Transparent;
+        // 원본 트레일 셰이더는 알파를 0으로 써서 투명 배경 미리보기에서 보이지 않으므로 알파를 쓰는 URP 파티클 셰이더로 그린다.
+        _trailMaterial = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+        _trailMaterial.SetFloat("_Cull", (float)CullMode.Off);
+        // 원본의 HDR 배율은 미리보기에서 흰색으로 날아가므로 빼고, 트레일 자체의 주황 그라데이션을 밝기만 맞춰 쓴다.
+        _trailMaterial.SetColor("_BaseColor", new Color(TRAIL_BRIGHTNESS, TRAIL_BRIGHTNESS, TRAIL_BRIGHTNESS, 1f));
     }
 
     /// <summary>
@@ -80,6 +91,7 @@ public sealed class FishSelectionPreview : IDisposable
     /// prefab의 메시, 원본 머티리얼과 변환 계층을 사용해 투척 자세의 미리보기를 렌더링한다.
     /// OnGUI 밖에서 호출하며, prefab별 투명 배경 RenderTexture를 캐시에 저장한다.
     /// animated이고 원본 머티리얼을 쓰면 모델과 카메라 구도를 _animatedModels에 남겨 RefreshAnimatedTextures로 다시 그린다.
+    /// 이때 prefab에 Week4ArrowAbility가 있으면 트레일을 복사한 효과 모델로 남긴다.
     /// </summary>
     public void PrepareTexture(Fish prefab, bool animated = false)
     {
@@ -109,6 +121,14 @@ public sealed class FishSelectionPreview : IDisposable
 
         // 회색 미획득 미리보기는 움직일 것이 없으므로 원본 머티리얼일 때만 모델을 남긴다.
         bool keepModel = animated && _useOriginalMaterials;
+        Week4ArrowAbility arrow = keepModel ? prefab.GetComponent<Week4ArrowAbility>() : null;
+        if (arrow != null)
+        {
+            _textures.Add(prefab, RenderEffectModel(model, prefab, transforms, arrow.BobHeight));
+            _animatedModels.Add(prefab, new AnimatedModel(model, _camera.transform.position, _camera.orthographicSize,
+                visualRoot, arrow));
+            return;
+        }
         _textures.Add(prefab, RenderModel(model, keepModel));
         if (keepModel)
         {
@@ -118,20 +138,30 @@ public sealed class FishSelectionPreview : IDisposable
 
     /// <summary>
     /// 남겨 둔 움직이는 모델을 저장한 카메라 구도로 각자의 RenderTexture에 다시 렌더링한다.
-    /// _animatedModels와 _textures를 사용하며, 미리보기 카메라 위치와 크기, 해당 RenderTexture 내용을 변경한다.
+    /// Week4 화살 효과 모델은 켜 둔 채 Week4ArrowAbility의 아이들 모션 높이로 위아래로 흔든 뒤 렌더링한다.
+    /// _animatedModels와 _textures를 사용하며, 미리보기 카메라 위치와 크기, 효과 모델 위치, 해당 RenderTexture 내용을 변경한다.
     /// </summary>
     public void RefreshAnimatedTextures()
     {
         foreach (KeyValuePair<Fish, AnimatedModel> pair in _animatedModels)
         {
             AnimatedModel animated = pair.Value;
-            animated.Model.SetActive(true);
+            // 트레일은 끄면 기록이 끊기므로 효과 모델은 켜 둔 채 움직이기만 한다.
+            bool keepsActive = animated.Arrow != null;
+            if (keepsActive)
+            {
+                // 게임에서 고를 때와 같이 화면 기준 위아래로 흔들리게 월드 위쪽을 부모 로컬로 바꾼다.
+                Transform visualRoot = animated.VisualRoot;
+                visualRoot.localPosition = visualRoot.parent.InverseTransformVector(
+                    Vector3.up * animated.Arrow.GetBobOffset(Time.time));
+            }
+            else animated.Model.SetActive(true);
             _camera.transform.position = animated.CameraPosition;
             _camera.orthographicSize = animated.OrthographicSize;
             _camera.targetTexture = _textures[pair.Key];
             _camera.Render();
             _camera.targetTexture = null;
-            animated.Model.SetActive(false);
+            if (!keepsActive) animated.Model.SetActive(false);
         }
     }
 
@@ -201,6 +231,39 @@ public sealed class FishSelectionPreview : IDisposable
     }
 
     /// <summary>
+    /// prefab의 트레일을 transforms로 복사한 계층에 붙여 model을 크기 조정 없이 렌더링한다.
+    /// 트레일은 _trailMaterial로 그리고, 트레일 위치를 가운데에 두고 bobHeight만큼 위아래 여유를 둔 구도를 쓴다.
+    /// model을 켜 둔 채 전용 위치에 두고 투명 배경 RenderTexture를 반환한다.
+    /// </summary>
+    private RenderTexture RenderEffectModel(GameObject model, Fish prefab, Dictionary<Transform, Transform> transforms,
+        float bobHeight)
+    {
+        model.transform.localRotation = Quaternion.Euler(12f, 65f, 0f);
+        model.transform.SetParent(_root.transform, false);
+        // 켜 둔 효과 모델이 다른 미리보기 구도에 들어오지 않게 카메라 깊이 방향으로 멀리 떨어뜨린다.
+        _effectModelCount++;
+        model.transform.localPosition = Vector3.forward * (EFFECT_SPACING * _effectModelCount);
+        // 자리를 잡은 뒤 복사해야 트레일이 생성 위치에서 끌려오지 않는다. 형상은 트레일로 보이므로 트레일만 복사한다.
+        Vector3 center = model.transform.position;
+        foreach (TrailRenderer source in prefab.GetComponentsInChildren<TrailRenderer>())
+        {
+            TrailRenderer trail = UnityEngine.Object.Instantiate(source, CopyTransform(source.transform.parent, transforms), false);
+            trail.gameObject.layer = PREVIEW_LAYER;
+            trail.sharedMaterial = _trailMaterial;
+            center = trail.transform.position;
+        }
+        _camera.orthographicSize = bobHeight + EFFECT_FRAME_MARGIN;
+        // 트레일이 몸체 뒤에 붙어 있어 돌린 구도에서 옆으로 치우치므로 트레일 위치를 화면 가운데에 둔다.
+        _camera.transform.position = center - Vector3.forward * 10f;
+        RenderTexture texture = new RenderTexture(TEXTURE_WIDTH, TEXTURE_HEIGHT, 24, RenderTextureFormat.ARGB32);
+        texture.Create();
+        _camera.targetTexture = texture;
+        _camera.Render();
+        _camera.targetTexture = null;
+        return texture;
+    }
+
+    /// <summary>
     /// mesh와 originalMaterials로 parent의 로컬 원점에 렌더링 전용 자식 메시를 만든다.
     /// 보유용은 원본 머티리얼, 미획득용은 회색 머티리얼을 사용하는 렌더러를 추가한다.
     /// </summary>
@@ -238,25 +301,31 @@ public sealed class FishSelectionPreview : IDisposable
             DefaultFishTexture = null;
         }
         UnityEngine.Object.Destroy(_material);
+        UnityEngine.Object.Destroy(_trailMaterial);
         UnityEngine.Object.Destroy(_root);
     }
 
-    // 다시 그릴 미리보기 모델과 처음 렌더링할 때 맞춘 카메라 구도.
+    // 다시 그릴 미리보기 모델과 처음 렌더링할 때 맞춘 카메라 구도. Week4 화살은 흔들 대상과 아이들 모션도 둔다.
     private sealed class AnimatedModel
     {
         public GameObject Model { get; }
         public Vector3 CameraPosition { get; }
         public float OrthographicSize { get; }
+        public Transform VisualRoot { get; }
+        public Week4ArrowAbility Arrow { get; }
 
         /// <summary>
         /// model과 cameraPosition, orthographicSize를 받아 다시 그릴 때 쓸 모델과 카메라 구도를 저장한다.
-        /// 저장한 값은 바꾸지 않는다.
+        /// Week4 화살이면 흔들 visualRoot와 아이들 모션을 계산할 arrow도 저장하며, 저장한 값은 바꾸지 않는다.
         /// </summary>
-        public AnimatedModel(GameObject model, Vector3 cameraPosition, float orthographicSize)
+        public AnimatedModel(GameObject model, Vector3 cameraPosition, float orthographicSize,
+            Transform visualRoot = null, Week4ArrowAbility arrow = null)
         {
             Model = model;
             CameraPosition = cameraPosition;
             OrthographicSize = orthographicSize;
+            VisualRoot = visualRoot;
+            Arrow = arrow;
         }
     }
 }
