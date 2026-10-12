@@ -102,7 +102,8 @@ public class PlayerController : MonoBehaviour
     private float _contactBounceHeight;
     private float _contactBounceSpeed;
     private float _contactExitClearance;
-    private int _bounceCount;
+    private float _contactBaseBounceSpeed;
+    private float _remainingBounceSpeed;
     private float _skipCenterY;
     private float _skipArea;
     public event Action<Vector3, float> OnWaterContact;
@@ -357,7 +358,8 @@ public class PlayerController : MonoBehaviour
         _contactBounced = false;
         _contactBounceSpeed = 0f;
         _contactExitClearance = _exitClearance;
-        _bounceCount = 0;
+        _contactBaseBounceSpeed = 0f;
+        _remainingBounceSpeed = 0f;
         _contactStartTime = float.NegativeInfinity;
         _isSliding = false;
         _isSlideSinking = false;
@@ -420,6 +422,7 @@ public class PlayerController : MonoBehaviour
 
         _fish.SetFlopping(false);
         _modifiers = modifiers;
+        _remainingBounceSpeed = _fish.CurrentFish.SkipBounceSpeed;
         float spin = _throwSpin * modifiers.SpinMultiplier * _spinScale;
         _playerRB.maxAngularVelocity = Mathf.Max(_playerRB.maxAngularVelocity, Mathf.Abs(spin) * 2f);
         Vector3 velocity = _startRotation * _throwVelocity * (modifiers.SpeedMultiplier * _fish.CurrentFish.SkipSpeedMultiplier);
@@ -567,9 +570,27 @@ public class PlayerController : MonoBehaviour
             EndContact();
         }
 
-        // 튕겨 나가지 못하고 계속 닿아 있으면 미끄러짐으로 바꾸고, 기다리던 타이밍 입력은 버린다.
+        if (_jumpPending && !_isSliding)
+        {
+            float timingError = _jumpPressTime - _contactStartTime;
+            if (_contactJudge == SkipJudge.None && timingError >= -_goodWindow && (_inContact || timingError <= _goodWindow))
+            {
+                Judge(timingError);
+            }
+            else if (Time.time - _jumpPressTime > _goodWindow)
+            {
+                _jumpPending = false;
+                ReportJudge(SkipJudge.Miss, float.NegativeInfinity);
+            }
+        }
+
+        bool bounceExhausted = _contactBounceSpeed <= _fish.CurrentFish.FeverBounceSpeedThreshold
+            && (_contactJudge != SkipJudge.None || Time.time - _contactStartTime > _goodWindow
+                || _contactBaseBounceSpeed - _fish.CurrentFish.SkipBounceSpeedLoss <= _fish.CurrentFish.FeverBounceSpeedThreshold);
+
+        // 늦은 판정으로 유지할 수 있는 마지막 반동은 GOOD 입력 시간이 끝날 때까지 기다린다.
         if (_inContact && !_isSliding
-            && (_contactBounceSpeed <= _fish.CurrentFish.FeverBounceSpeedThreshold || ContactElapsed >= _slideEnterTime))
+            && (bounceExhausted || ContactElapsed >= _slideEnterTime))
         {
             _isSliding = true;
             _contactBounced = false;
@@ -584,25 +605,11 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        if (!_jumpPending) return;
-
-        // 접촉 중이거나, 방금 끝난 접촉이 판정 전이고 그 착수 후 GOOD 범위 안에 눌렀으면 그 접촉으로 판정한다.
-        float timingError = _jumpPressTime - _contactStartTime;
-        if (_contactJudge == SkipJudge.None && timingError >= -_goodWindow && (_inContact || timingError <= _goodWindow))
-        {
-            Judge(timingError);
-        }
-        else if (Time.time - _jumpPressTime > _goodWindow)
-        {
-            // 앞뒤 어느 착수와도 판정 범위가 맞지 않았다.
-            _jumpPending = false;
-            ReportJudge(SkipJudge.Miss, float.NegativeInfinity);
-        }
     }
 
     /// <summary>
     /// 물에 닿기 시작한 순간의 시각과 수평 속도를 기록하고 착수 이벤트를 보낸다.
-    /// _velocity와 Fish의 반동 감소량을 사용하며, 접촉별 상승 속도를 저장하고 반동 횟수를 한 번 증가시킨다.
+    /// _velocity와 남은 반동을 사용하며, 판정 전 기준값을 저장하고 입력 없는 반동 감소를 적용한다.
     /// </summary>
     private void BeginContact()
     {
@@ -611,7 +618,8 @@ public class PlayerController : MonoBehaviour
         _contactEntrySpeed = Horizontal(_velocity).magnitude;
         _contactJudge = SkipJudge.None;
         Fish settings = _fish.CurrentFish;
-        _contactBounceSpeed = Mathf.Max(0f, settings.SkipBounceSpeed - _bounceCount * settings.SkipBounceSpeedLoss);
+        _contactBaseBounceSpeed = _remainingBounceSpeed;
+        _contactBounceSpeed = _contactBaseBounceSpeed;
         _contactExitClearance = _exitClearance;
         _contactBounced = _velocity.y < 0f && _contactEntrySpeed >= settings.MinimumSkipSpeed
             && _contactBounceSpeed > settings.FeverBounceSpeedThreshold;
@@ -619,12 +627,11 @@ public class PlayerController : MonoBehaviour
         OnWaterContact?.Invoke(WaterContactPoint, _velocity.magnitude);
         if (_contactBounced)
         {
-            _bounceCount++;
             _playerRB.position -= Vector3.up * _bottomHeight;
             _skipCenterY = _playerRB.worldCenterOfMass.y;
             _contactBounceHeight = _skipCenterY;
-            ApplyContactRebound(SkipJudge.None);
         }
+        ApplyContactRebound(SkipJudge.None);
     }
 
     /// <summary>
@@ -662,7 +669,7 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 착수 속도, 소진된 접촉별 상승 속도와 judge별 유지율로 수평 및 수직 속도를 교체한다.
+    /// 착수 직전 반동에서 judge별 감소량을 빼고 남은 값을 다음 착수와 현재 수직 속도에 반영한다.
     /// 현재 기준 높이까지 소모한 위치 에너지를 반영하여 늦은 판정에도 상승 속도를 중복 추가하지 않는다.
     /// </summary>
     private void ApplyContactRebound(SkipJudge judge)
@@ -670,9 +677,13 @@ public class PlayerController : MonoBehaviour
         Fish settings = _fish.CurrentFish;
         float speedRetention = judge == SkipJudge.Perfect ? 1f
             : judge == SkipJudge.Good ? settings.GoodSpeedRetention : settings.UnjudgedSpeedRetention;
-        float bounceRetention = judge == SkipJudge.Perfect ? 1f
-            : judge == SkipJudge.Good ? settings.GoodBounceRetention : settings.UnjudgedBounceRetention;
-        float launchSpeed = _contactBounceSpeed * bounceRetention;
+        float bounceLoss = judge == SkipJudge.Perfect ? settings.SkipBounceSpeedLoss
+            : judge == SkipJudge.Good ? settings.GoodBounceSpeedLoss : settings.MissBounceSpeedLoss;
+        _contactBounceSpeed = Mathf.Max(0f, _contactBaseBounceSpeed - bounceLoss);
+        _remainingBounceSpeed = _contactBounceSpeed;
+        if (!_contactBounced) return;
+
+        float launchSpeed = _contactBounceSpeed;
         float gravity = -Physics.gravity.y * _modifiers.AirGravityScale;
         _contactExitClearance = Mathf.Min(_exitClearance, launchSpeed * launchSpeed / (8f * Mathf.Max(gravity, 0.01f)));
         float rise = Mathf.Max(0f, _skipCenterY - _contactBounceHeight);
@@ -745,14 +756,11 @@ public class PlayerController : MonoBehaviour
         else if (error <= _goodWindow) _contactJudge = SkipJudge.Good;
         else _contactJudge = SkipJudge.Miss;
 
+        ApplyContactRebound(_contactJudge);
+
         float quality = JudgeQuality(_contactJudge);
         if (quality > 0f)
         {
-            if (_contactBounced)
-            {
-                ApplyContactRebound(_contactJudge);
-            }
-
             // 스핀을 다시 살려 자세를 잡아준다.
             Vector3 up = FishUp();
             Vector3 angular = _playerRB.angularVelocity;

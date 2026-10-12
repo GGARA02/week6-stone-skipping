@@ -64,9 +64,9 @@ public class Fish : MonoBehaviour
     public float FeverBrakeAssistDuration => SkippingSettings.Value<float>("feverBrakeAssistDuration");
     public float MinimumSkipSpeed => SkippingSettings.Value<float>("minimumSkipSpeed");
     public float GoodSpeedRetention => SkippingSettings.Value<float>("goodSpeedRetention");
-    public float GoodBounceRetention => SkippingSettings.Value<float>("goodBounceRetention");
+    public float GoodBounceSpeedLoss => SkippingSettings.Value<float>("goodBounceSpeedLoss");
     public float UnjudgedSpeedRetention => SkippingSettings.Value<float>("unjudgedSpeedRetention");
-    public float UnjudgedBounceRetention => SkippingSettings.Value<float>("unjudgedBounceRetention");
+    public float MissBounceSpeedLoss => SkippingSettings.Value<float>("missBounceSpeedLoss");
     public float SkipLiftCoefficient => SkippingSettings.Value<float>("skipLiftCoefficient");
     public float SkipAttitudeStiffness => SkippingSettings.Value<float>("skipAttitudeStiffness");
     public float SkipAttitudeDamping => SkippingSettings.Value<float>("skipAttitudeDamping");
