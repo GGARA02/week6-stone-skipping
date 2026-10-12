@@ -15185,12 +15185,21 @@ MonoBehaviour:
   _noteRadius: 64
   _approachStartScale: 3
   _noteHitDuration: 0.25
+  _restartHintHeight: 0.9
+  _blackHoleTarget: {fileID: 0}
+  _blackHoleArrowPrefab: {fileID: 0}
+  _blackHoleArrowWarningMaterial: {fileID: 0}
+  _blackHoleArrowMinAngle: 45
+  _blackHoleArrowDuration: 5
+  _blackHoleArrowHeight: 2
+  _blackHoleArrowScale: 1.2
   _panelShrinkDuration: 0.65
   _endingCredit: {fileID: 1774445642}
   _endingBlackHole: {fileID: 1131671915}
   _openingCloseDistance: 25
   _openingHoldDuration: 1
   _openingTravelDuration: 3
+  _blackHoleSuctionDuration: 1.7
   _maintainCinemaDuringCredits: 1
   _cinemaTransitionDuration: 0.6
 --- !u!4 &403970196
@@ -21165,7 +21174,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 69755025683854722, guid: 875a6a2fd5ced524984d00154eaefec3, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 3100
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 69755025683854722, guid: 875a6a2fd5ced524984d00154eaefec3, type: 3}
       propertyPath: m_LocalRotation.w
@@ -21567,12 +21576,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
+  m_ReferenceResolution: {x: 1920, y: 1080}
   m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0
+  m_MatchWidthOrHeight: 0.5
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
