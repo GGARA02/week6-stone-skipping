@@ -46,6 +46,15 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
     public Material IceMaterial { get; private set; }
     public float IceStartDistance => _iceStartDistance;
 
+    /// <summary>
+    /// position이 시작점 기준 전방 유빙 구역 경계를 지났는지 반환한다.
+    /// 월드 Z 위치와 _iceStartDistance를 사용하며 생성 상태는 변경하지 않는다.
+    /// </summary>
+    public bool IsInIceRegion(Vector3 position)
+    {
+        return position.z > _startPosition.z + _iceStartDistance;
+    }
+
     void Update()
     {
         if (!_initialized || _player.IsGameOver) return;
@@ -207,7 +216,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
                 if (playerOffset.sqrMagnitude > _blackHoleStartDistance * _blackHoleStartDistance) continue;
                 if (startOffset.sqrMagnitude < _safeRadius * _safeRadius) continue;
 
-                bool ice = position.z > _startPosition.z + _iceStartDistance;
+                bool ice = IsInIceRegion(position);
                 Vector2 widths = ice ? _iceWidthRange : _wallWidthRange;
                 Vector2 heights = ice ? _iceHeightRange : _wallHeightRange;
                 Vector3 scale = new Vector3(
