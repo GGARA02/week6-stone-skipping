@@ -8,6 +8,10 @@ public class KingHopakAbility : FishAbility
     // SPACE 한 번이 절단 상태를 이어 주는 시간. 연타하면 끊기지 않고 계속 자른다.
     private const float ACTIVE_DURATION = 0.5f;
 
+    [Header("트레일")]
+    // 손 트레일은 몸 전체로 벽을 자를 수 있는 절단 상태에서만 남긴다.
+    private TrailRenderer[] _trails;
+
     [Header("상태")]
     // 던질 때만 채워진다. 절단 상태에서 자른 벽은 이번 투척 동안 부딪히지 않고 뚫고 지나간다.
     private PlayerController _player;
@@ -16,9 +20,20 @@ public class KingHopakAbility : FishAbility
     private readonly HashSet<CuttableWall> _cutWalls = new HashSet<CuttableWall>();
     private readonly List<Collider> _ignoredColliders = new List<Collider>();
 
+    void Awake()
+    {
+        _trails = GetComponentsInChildren<TrailRenderer>(true);
+    }
+
+    void Update()
+    {
+        bool cutting = IsCutting();
+        foreach (TrailRenderer trail in _trails) trail.emitting = cutting;
+    }
+
     void FixedUpdate()
     {
-        if (_player == null || !_player.IsThrown || _player.IsGameOver || Time.time > _activeUntil) return;
+        if (!IsCutting()) return;
 
         CutWallsAhead();
     }
@@ -57,6 +72,15 @@ public class KingHopakAbility : FishAbility
     public override void OnSpacePressed(ThrowContext context)
     {
         _activeUntil = Time.time + ACTIVE_DURATION;
+    }
+
+    /// <summary>
+    /// 던진 뒤 SPACE로 이어 준 절단 상태인지 확인한다.
+    /// _player의 투척·게임오버 상태와 _activeUntil을 사용하며, 몸 전체로 벽을 자를 수 있으면 true를 반환한다.
+    /// </summary>
+    private bool IsCutting()
+    {
+        return _player != null && _player.IsThrown && !_player.IsGameOver && Time.time <= _activeUntil;
     }
 
     /// <summary>
