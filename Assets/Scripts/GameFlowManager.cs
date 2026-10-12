@@ -228,10 +228,6 @@ public class GameFlowManager : MonoBehaviour
         {
             _catalogOrder.Add(entry.Name, _catalogOrder.Count);
         }
-        if (!_hasThrown)
-        {
-            StartOpeningCinema();
-        }
     }
 
     void OnDestroy()
@@ -474,12 +470,17 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 선택한 던질 거리가 획득 상태일 때만 최대 강화 기준 능력치로 던진다.
+    /// 선택한 던질 거리가 획득 상태일 때만 최대 강화 기준 능력치로 던진다. 최초 투척 시에는 오프닝 연출을 먼저 재생한다.
     /// _projectileIndex와 진행 상황을 사용하며, _state와 _hasThrown을 변경한다.
     /// </summary>
     private void Throw()
     {
         if (!CanThrowSelectedFish()) return;
+        if (!_hasThrown)
+        {
+            StartOpeningCinema();
+            return;
+        }
         FishType fish = SelectedFish();
         ThrowModifiers modifiers = fish != null
             ? fish.ToThrowModifiers(_progress.PowerMultiplier, _progress.SpinMultiplier)
@@ -2382,7 +2383,7 @@ public class GameFlowManager : MonoBehaviour
 
     #region 오프닝 연출
     /// <summary>
-    /// 게임 최초 시작 시 블랙홀을 조명하고 플레이 지점으로 이동하는 오프닝 연출을 시작한다.
+    /// 최초 투척 입력 시 블랙홀을 조명하고 플레이 지점으로 이동하는 오프닝 연출을 시작한다.
     /// 입력값은 없으며, _openingCinemaRunning과 _showHud를 변경하고 오프닝 코루틴을 실행한다.
     /// </summary>
     private void StartOpeningCinema()
@@ -2394,8 +2395,8 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 블랙홀을 응시하며 21:9 비율로 시작하여 플레이 위치로 카메라를 후진 이동시킨 후 정상 게임 플레이로 전환한다.
-    /// _endingBlackHole 위치와 시간 설정을 사용하며, 카메라 위치, 레터박스, HUD 표시 상태를 변경한다.
+    /// 블랙홀을 응시하며 21:9 비율로 시작하여 플레이 위치로 카메라를 후진 이동시킨 후 첫 투척을 실행한다.
+    /// _endingBlackHole 위치와 시간 설정을 사용하며, 카메라 위치, 레터박스, HUD 표시 상태와 _hasThrown을 변경하고 Throw를 호출한다.
     /// </summary>
     private IEnumerator PlayOpeningCinemaRoutine()
     {
@@ -2443,11 +2444,13 @@ public class GameFlowManager : MonoBehaviour
         _cameraController.enabled = true;
         _cameraController.SnapBehindTarget();
 
-        // 3. 21:9 레터박스 해제 및 정상 플레이 상태 전환
+        // 3. 21:9 레터박스 해제 및 최초 투척 실행
         SetCinematicLetterbox(false);
         _showHud = true;
         _openingCinemaRunning = false;
         _openingCinemaCoroutine = null;
+        _hasThrown = true;
+        Throw();
     }
     #endregion
 }
