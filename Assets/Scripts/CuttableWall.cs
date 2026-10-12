@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using UnityEngine;
 
 public sealed class CuttableWall : MonoBehaviour
@@ -14,11 +16,14 @@ public sealed class CuttableWall : MonoBehaviour
     private Mesh _originalMesh;
     private Collider _originalCollider;
     private Mesh _remainingMesh;
+    private readonly List<GameObject> _bandPieces = new List<GameObject>();
+    private readonly List<Mesh> _bandMeshes = new List<Mesh>();
     public FishType PieceType => _pieceType;
 
     void OnDestroy()
     {
         if (_remainingMesh != null) Destroy(_remainingMesh);
+        DestroyBandPieces();
     }
 
     /// <summary>
@@ -39,7 +44,7 @@ public sealed class CuttableWall : MonoBehaviour
 
     /// <summary>
     /// 보관한 원본 메쉬와 충돌체를 사용해 새 throw의 온전한 벽으로 복원한다.
-    /// 입력값은 없으며 밑둥 메쉬를 해제하고 재절단 가능한 상태로 되돌리되 분리된 조각은 유지한다.
+    /// 입력값은 없으며 밑둥 메쉬와 띠 절단으로 만든 별도 장애물을 해제하고 재절단 가능한 상태로 되돌리되 분리된 조각은 유지한다.
     /// </summary>
     public void ResetWall()
     {
@@ -49,6 +54,68 @@ public sealed class CuttableWall : MonoBehaviour
         _originalCollider.enabled = true;
         if (_remainingMesh != null) Destroy(_remainingMesh);
         _remainingMesh = null;
+        DestroyBandPieces();
+    }
+
+    /// <summary>
+    /// 월드 중심점 point, 법선 normal과 반폭 halfWidth로 정한 두 평행 경계면 사이의 띠를 벽에서 없앤다.
+    /// 띠 안 조각은 사라지고 바깥 조각은 제자리에 고정 장애물로 남으며, 바깥 조각이 둘이면 하나는 별도 장애물로 만든다. 벽을 바꿨으면 true를 반환한다.
+    /// </summary>
+    public bool CutBand(Vector3 point, Vector3 normal, float halfWidth)
+    {
+        normal.Normalize();
+        Mesh mesh = _meshFilter.sharedMesh;
+        Vector3 localNormal = transform.localToWorldMatrix.transpose.MultiplyVector(normal).normalized;
+        Vector3 positivePoint = transform.InverseTransformPoint(point + normal * halfWidth);
+        Vector3 negativePoint = transform.InverseTransformPoint(point - normal * halfWidth);
+        float minProjection = float.PositiveInfinity;
+        float maxProjection = float.NegativeInfinity;
+        foreach (Vector3 vertex in mesh.vertices)
+        {
+            float projection = Vector3.Dot(localNormal, vertex);
+            minProjection = Mathf.Min(minProjection, projection);
+            maxProjection = Mathf.Max(maxProjection, projection);
+        }
+
+        // 띠가 벽을 거의 덮지 않으면 자르지 않고, 경계가 벽 끝에 거의 붙어 있으면 그쪽 바깥 조각은 없는 것으로 본다.
+        float inset = (maxProjection - minProjection) * MIN_CUT_FRACTION;
+        float positiveBoundary = Vector3.Dot(localNormal, positivePoint);
+        float negativeBoundary = Vector3.Dot(localNormal, negativePoint);
+        if (positiveBoundary <= minProjection + inset || negativeBoundary >= maxProjection - inset) return false;
+
+        List<Mesh> outside = new List<Mesh>(2);
+        Mesh band = mesh;
+        if (positiveBoundary < maxProjection - inset)
+        {
+            if (!WallMeshCutter.Slice(band, new Plane(localNormal, positivePoint), out Mesh positiveOutside, out Mesh rest)) return false;
+            outside.Add(positiveOutside);
+            band = rest;
+        }
+        if (negativeBoundary > minProjection + inset)
+        {
+            if (!WallMeshCutter.Slice(band, new Plane(localNormal, negativePoint), out Mesh middle, out Mesh negativeOutside))
+            {
+                foreach (Mesh piece in outside) Destroy(piece);
+                if (band != mesh) Destroy(band);
+                return false;
+            }
+            outside.Add(negativeOutside);
+            if (band != mesh) Destroy(band);
+            band = middle;
+        }
+        // 띠 안 조각은 증발시킨다.
+        if (band != mesh) Destroy(band);
+
+        Mesh previous = _remainingMesh;
+        _remainingMesh = outside.Count > 0 ? outside[0] : null;
+        _meshFilter.sharedMesh = _remainingMesh;
+        _originalCollider.enabled = false;
+        _remainingCollider.sharedMesh = null;
+        _remainingCollider.sharedMesh = _remainingMesh;
+        _remainingCollider.enabled = _remainingMesh != null;
+        if (outside.Count > 1) CreateBandPiece(outside[1]);
+        if (previous != null) Destroy(previous);
+        return true;
     }
 
     /// <summary>
@@ -152,5 +219,47 @@ public sealed class CuttableWall : MonoBehaviour
         fish.InitializeWall(_spawner, _pieceType, mesh);
         _spawner.RegisterCutPiece(fish);
         body.AddForce(separation * EJECTION_SPEED + Vector3.up * UPWARD_SPEED, ForceMode.VelocityChange);
+    }
+
+    /// <summary>
+    /// 띠 절단으로 남은 두 번째 바깥 조각 mesh를 원본과 같은 자리의 고정 장애물로 만든다.
+    /// 원본의 변환, 레이어, 머티리얼과 조각 종류를 사용하며 만든 장애물과 메시는 ResetWall에서 함께 제거한다.
+    /// </summary>
+    private void CreateBandPiece(Mesh mesh)
+    {
+        GameObject piece = new GameObject(name) { layer = gameObject.layer };
+        piece.SetActive(false);
+        piece.transform.SetParent(transform.parent, false);
+        piece.transform.SetPositionAndRotation(transform.position, transform.rotation);
+        piece.transform.localScale = transform.localScale;
+        piece.AddComponent<MeshFilter>().sharedMesh = mesh;
+        MeshRenderer renderer = piece.AddComponent<MeshRenderer>();
+        MeshRenderer sourceRenderer = GetComponent<MeshRenderer>();
+        renderer.sharedMaterials = sourceRenderer.sharedMaterials;
+        renderer.shadowCastingMode = sourceRenderer.shadowCastingMode;
+        renderer.receiveShadows = sourceRenderer.receiveShadows;
+        MeshCollider collider = piece.AddComponent<MeshCollider>();
+        collider.convex = true;
+        collider.sharedMesh = mesh;
+        piece.AddComponent<CuttableWall>().Initialize(_spawner, _pieceType);
+        piece.SetActive(true);
+        _bandPieces.Add(piece);
+        _bandMeshes.Add(mesh);
+    }
+
+    /// <summary>
+    /// 띠 절단으로 만든 별도 장애물과 그 메시를 제거한다.
+    /// 입력값 없이 _bandPieces와 _bandMeshes를 비운다.
+    /// </summary>
+    private void DestroyBandPieces()
+    {
+        foreach (GameObject piece in _bandPieces)
+        {
+            // 씬 종료 때는 별도 장애물이 먼저 파괴되어 있을 수 있다.
+            if (piece != null) Destroy(piece);
+        }
+        foreach (Mesh mesh in _bandMeshes) Destroy(mesh);
+        _bandPieces.Clear();
+        _bandMeshes.Clear();
     }
 }
