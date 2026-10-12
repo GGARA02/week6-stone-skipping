@@ -2081,7 +2081,7 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 엔딩 크레딧 정상 완료 이벤트를 받아 크레딧 물고기를 획득하고 투척 없이 재시작 대기 상태로 전환한다.
+    /// 엔딩 크레딧 정상 완료 이벤트를 받아 크레딧 물고기 획득 없이 정산 화면으로 전환한다.
     /// 입력값은 없으며, CompleteEndingCredit을 호출한다.
     /// </summary>
     private void HandleEndingCompleted()
@@ -2160,26 +2160,17 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 엔딩 크레딧을 정리하고 크레딧 물고기를 해금 및 선택한 뒤 게임오버(정산) 상태로 전환한다.
-    /// 새로 획득한 물고기 목록을 확인할 수 있도록 GameOver 화면을 표시한다.
+    /// 엔딩 크레딧을 정리하고 크레딧 물고기 획득 없이 게임오버(정산) 상태로 전환한다.
+    /// 입력값은 없으며, _endingCredit UI를 비활성화하고 HandleGameOver를 호출한다.
     /// </summary>
     private void CompleteEndingCredit()
     {
-        UnlockCreditFish();
-        SelectCreditFish();
         if (_endingCredit != null)
         {
             _endingCredit.gameObject.SetActive(false);
         }
         _showHud = true;
         SetCinematicLetterbox(false);
-
-        // 크레딧 감상이 끝난 직후 크레딧 물고기 획득 팝업을 표시한다.
-        FishType creditFish = GetFishTypeById(CREDIT_FISH_ID);
-        if (creditFish != null)
-        {
-            ShowFishPopup($"{GetCatalogDisplayName(creditFish)} 획득!");
-        }
 
         HandleGameOver(GameOverReason.Stopped);
     }
