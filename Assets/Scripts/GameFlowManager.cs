@@ -271,6 +271,7 @@ public class GameFlowManager : MonoBehaviour
         _bestSkips = PlayerPrefs.GetInt(BEST_SKIPS_KEY, 0);
         _bestDistance = PlayerPrefs.GetFloat(BEST_DISTANCE_KEY, 0f);
         _state = State.Ready;
+        EnsureNoteTextures();
         // 게임을 켠 첫 판은 맑은 낮으로 시작한다.
         if (_environmentController != null) _environmentController.Roll(SelectedFish(), false);
         _fishSelectionPreview = new FishSelectionPreview();
@@ -294,7 +295,6 @@ public class GameFlowManager : MonoBehaviour
         _fishSpawner.OnFishCaught -= HandleFishCaught;
         _progress.OnFishRegistered -= HandleFishRegistered;
         _fishSpawner.ScreenCapture.OnUnlocked -= HandleScreenUnlocked;
-        // 노트 텍스처는 HUD를 처음 그릴 때 만들어지므로 한 번도 그리지 않았으면 없다.
         if (_noteRingTexture != null)
         {
             Destroy(_noteDiscTexture);
