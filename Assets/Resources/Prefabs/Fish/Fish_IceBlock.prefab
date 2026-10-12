@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &100100001
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 6956439739315262265, guid: 27e2bce2d84036b42a52541b7426bc32, type: 3}
+      propertyPath: m_Name
+      value: Fish_IceBlock
+      objectReference: {fileID: 0}
+    - target: {fileID: 8094421845699199751, guid: 27e2bce2d84036b42a52541b7426bc32, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8094421845699199751, guid: 27e2bce2d84036b42a52541b7426bc32, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8094421845699199751, guid: 27e2bce2d84036b42a52541b7426bc32, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 4616520642850261239, guid: 27e2bce2d84036b42a52541b7426bc32, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: 7413a9cb73184cfdb4a17f4c734d343b, type: 2}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6956439739315262265, guid: 27e2bce2d84036b42a52541b7426bc32, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 114000001}
+  m_SourcePrefab: {fileID: 100100000, guid: 27e2bce2d84036b42a52541b7426bc32, type: 3}
+--- !u!1 &100001 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6956439739315262265, guid: 27e2bce2d84036b42a52541b7426bc32, type: 3}
+  m_PrefabInstance: {fileID: 100100001}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &400001 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3492996361868557031, guid: 27e2bce2d84036b42a52541b7426bc32, type: 3}
+  m_PrefabInstance: {fileID: 100100001}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &114000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ca418f0df82ebc4f9f9dc51b589be3b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::Fish
+  _type:
+    _id: ice_block
+    _displayName: ICE BLOCK
+    _value: 50
+    _color: {r: 0.65, g: 0.9, b: 1, a: 1}
+    _isRevealed: 1
+    _shape: 0
+    _length: 1
+    _height: 1
+    _thickness: 1
+    _tailLength: 0
+    _dorsalFin: 0
+    _speedMultiplier: 1
+    _spinMultiplier: 1
+    _liftMultiplier: 1
+    _frictionMultiplier: 1
+    _airGravityScale: 1
+  _body: {fileID: 400001}

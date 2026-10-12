@@ -120,6 +120,12 @@
     "description": "물 한 블록입니다. 바다에서 떠 왔다가 다시 바다로 던져지는, 세상에서 가장 짧고 무의미한 여행을 하는 중입니다.",
     "unlockHint": "빈 양동이로 좋음 이상을 3번 성공하세요."
   },
+  "ice_block": {
+    "spawnWeight": 0,
+    "displayName": "얼음",
+    "description": "물은 마침내 새로운 삶의 방향을 찾았습니다. 유빙 친구들과 함께 드넓은 바다를 여행할 꿈에 부풀어 있습니다.",
+    "unlockHint": "물이 어떻게 어는지까지 설명해드려야 하나요?"
+  },
   "board": {
     "spawnWeight": 0.2,
     "displayName": "지침서 게시판",
@@ -215,6 +221,14 @@
     "displayName": "점프대",
     "description": "누가 봐도 점프대인데, 부딪혀도 아무 일도 일어나지 않던 점프대입니다. 보다 못해 결국 본인이 직접 날아 보기로 했습니다.",
     "unlockHint": "바다 곳곳에 놓인 점프대에 물수제비를 닿게 해 보세요."
+  },
+  "arrow": {
+    "requiresSeaRegistration": true,
+    "rearmOnCutWaterEntry": true,
+    "spawnWeight": 0.2,
+    "displayName": "화살표",
+    "description": "블랙홀을 가리키다 안내를 포기하고 바다로 떨어진 화살표입니다. 이제는 직접 길을 찾아가야 합니다.",
+    "unlockHint": "화살표의 인내심은 그리 뛰어나지 않습니다."
   },
   "blackhole": {
     "spawnWeight": 0.05,

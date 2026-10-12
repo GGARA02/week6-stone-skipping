@@ -132,15 +132,14 @@ public class W02BallAbility : FishAbility
         // 이미 획득했으면 진화 연출을 한 번 본 것이므로 공 모습을 그대로 유지한다.
         if (context.Spawner.Progress.IsFishRegistered(_evolvedPrefab.Type)) return;
         // 진화하면 이 개체가 제거되므로 연출은 플레이어에서 돌린다.
-        context.Player.StartCoroutine(PlayEvolution(context));
+        context.Player.StartCoroutine(PlayEvolution(context, _evolvedPrefab, true));
     }
 
     /// <summary>
-    /// 시간을 멈추고 카메라를 가까이 옮기며 배경만 흑백으로 바꾸고 하늘에서 빛을 비춘다. 돌면서 암전 속에 볼크소울로 진화해 잠금 해제한 뒤 원래대로 되돌리고,
-    /// 시간이 다시 흐르면 앞과 위로 튀어 나가며 공격 모션을 모두 재생한다.
-    /// context와 진화 연출 설정을 사용하며, timeScale, 메인 카메라 위치와 회전 및 카메라 스택, 임시 볼륨과 빛, 던진 외형의 레이어와 회전과 모양, 도감 등록 상태, 플레이어 속도를 변경한다.
+    /// 시간을 멈추고 카메라 접근, 흑백 배경, 빛 기둥과 회전 연출로 evolvedPrefab으로 진화하고 도감에 등록한다.
+    /// context, evolvedPrefab과 연출 설정을 사용하며 카메라, 외형과 시간 배율을 복원한다. burstAfterEvolution이 참이면 돌진과 공격 모션도 재생한다.
     /// </summary>
-    private IEnumerator PlayEvolution(ThrowContext context)
+    public IEnumerator PlayEvolution(ThrowContext context, Fish evolvedPrefab, bool burstAfterEvolution)
     {
         float previousTimeScale = Time.timeScale;
         Time.timeScale = 0f;
@@ -183,8 +182,8 @@ public class W02BallAbility : FishAbility
         FadeSkyLight(skyLight, beam, beamBlock, 1f);
 
         yield return Spin(context.Shape.transform, _spinUpDuration, true, blackout);
-        context.Spawner.HandlePlacedFishCaught(_evolvedPrefab.Type, bounds.center);
-        context.Shape.GenerateFish(_evolvedPrefab);
+        context.Spawner.HandlePlacedFishCaught(evolvedPrefab.Type, bounds.center);
+        context.Shape.GenerateFish(evolvedPrefab);
         // 이전 개체는 제거되므로 새 개체만 옮겼다가 되돌린다.
         MoveToLayer(context.Shape, layer, movedRenderers, originalLayers);
         yield return Spin(context.Shape.transform, _spinDownDuration, false, blackout);
@@ -211,6 +210,8 @@ public class W02BallAbility : FishAbility
         Destroy(beam.GetComponent<MeshFilter>().sharedMesh);
         Destroy(beam.gameObject);
         Time.timeScale = previousTimeScale;
+
+        if (!burstAfterEvolution) yield break;
 
         context.Player.Burst(_burstForwardSpeed, _burstUpSpeed);
         BallController ball = context.Shape.GetComponentInChildren<BallController>();

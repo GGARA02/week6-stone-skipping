@@ -174,7 +174,6 @@ public class FishSpawner : MonoBehaviour
 
     void Awake()
     {
-        _fishPrefabs = Array.FindAll(_fishPrefabs, prefab => prefab.Type.Id != "arrow");
         JObject catalogEntries = JObject.Parse(Resources.Load<TextAsset>("FishCatalog").text);
         _seaSpawnRegistry = GetComponent<SeaSpawnRegistry>();
         if (_seaSpawnRegistry == null) _seaSpawnRegistry = gameObject.AddComponent<SeaSpawnRegistry>();
@@ -337,7 +336,7 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void HandleFishLanded(Fish fish)
     {
-        if (!_acquisitionEnabled)
+        if (!_acquisitionEnabled && !(fish.Type.Id == "arrow" && fish.IsCutPiece))
         {
             Remove(fish);
             return;
@@ -453,7 +452,6 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     public void RegisterPrefab(Fish prefab)
     {
-        if (prefab.Type.Id == "arrow") return;
         foreach (Fish registered in _fishPrefabs)
         {
             if (registered.Type.Id == prefab.Type.Id) return;
@@ -610,14 +608,12 @@ public class FishSpawner : MonoBehaviour
     /// </summary>
     private bool CanSpawn(FishType type)
     {
-        if (type.Id == "arrow") return false;
         if (!_unlockGraph.ContainsFish(type.Id)) return false;
         if (_seaSpawnRegistry.RequiresRegistration(type.Id))
         {
             if (!_seaSpawnRegistry.IsUnlocked(type.Id)) return false;
         }
         else if (!_unlockGraph.AllowsNaturalSpawn(type)) return false;
-        if (type.Id == "ice" && _player.Distance <= _obstacles.IceStartDistance) return false;
         if (_obstacles != null && type.Id == "blackhole") return false;
         if (type.SpawnOnlyInRain && (_environment == null || !_environment.IsRaining)) return false;
         if (type.SpawnOnlyAtNight && (_environment == null || !_environment.IsNight)) return false;

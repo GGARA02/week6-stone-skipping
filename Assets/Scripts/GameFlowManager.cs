@@ -24,6 +24,7 @@ public class GameFlowManager : MonoBehaviour
     private const string BEST_SKIPS_KEY = "SkipStoneV2.BestSkips";
     private const string BEST_DISTANCE_KEY = "SkipStoneV2.BestDistance";
     private const float POPUP_DURATION = 1.1f;
+    private const float RESTART_HINT_IDLE_DELAY = 3f;
     private const int DEFAULT_FISH_INDEX = -1;
     // 게임오버 직후 SPACE 연타로 바로 재시작되지 않게 기다리는 시간(초)
     private const float RETRY_INPUT_DELAY = 0.6f;
@@ -153,6 +154,30 @@ public class GameFlowManager : MonoBehaviour
     private readonly List<Renderer> _hiddenProjectileRenderers = new List<Renderer>();
     private readonly List<Canvas> _hiddenProjectileCanvases = new List<Canvas>();
 
+    [Header("재시작 안내")]
+    [Range(0f, 1f)]
+    [SerializeField]
+    private float _restartHintHeight = 0.9f;
+    private float _lastRestartHintInputTime;
+    private GUIStyle _restartHintStyle;
+
+    [Header("블랙홀 방향 안내")]
+    [SerializeField] private BlackHoleEnding _blackHoleTarget;
+    [SerializeField] private GameObject _blackHoleArrowPrefab;
+    [SerializeField] private Material _blackHoleArrowWarningMaterial;
+    [SerializeField, Range(0f, 180f)] private float _blackHoleArrowMinAngle = 45f;
+    [SerializeField, Min(5f)] private float _blackHoleArrowDuration = 5f;
+    [SerializeField, Min(0f)] private float _blackHoleArrowHeight = 2f;
+    [SerializeField, Min(0.01f)] private float _blackHoleArrowScale = 1.2f;
+    private Transform _blackHoleArrow;
+    private float _blackHoleArrowEndTime = float.NegativeInfinity;
+    private Renderer[] _blackHoleArrowRenderers;
+    private Material _blackHoleArrowNormalMaterial;
+    private Fish _blackHoleArrowFish;
+    private float _blackHoleArrowStateTime;
+    private bool _blackHoleArrowWarning;
+    private bool _blackHoleArrowDetached;
+
     [Header("화면 투척 전환")]
     [SerializeField, Min(0.1f)] private float _panelShrinkDuration = 0.65f;
     private bool _screenThrowPending;
@@ -191,6 +216,15 @@ public class GameFlowManager : MonoBehaviour
 
         _input = Managers.Input;
         _rumble = GetComponent<Rumble>();
+        if (_blackHoleTarget == null) _blackHoleTarget = FindFirstObjectByType<BlackHoleEnding>(FindObjectsInactive.Include);
+        if (_blackHoleArrowPrefab == null) _blackHoleArrowPrefab = Resources.Load<GameObject>("Prefabs/BlackHoleDirectionArrow");
+        _blackHoleArrow = Instantiate(_blackHoleArrowPrefab, transform).transform;
+        _blackHoleArrow.gameObject.SetActive(false);
+        _blackHoleArrowRenderers = _blackHoleArrow.GetComponentsInChildren<Renderer>(true);
+        _blackHoleArrowNormalMaterial = _blackHoleArrowRenderers[0].sharedMaterial;
+        if (_blackHoleArrowWarningMaterial == null)
+            _blackHoleArrowWarningMaterial = Resources.Load<Material>("Prefabs/BlackHoleDirectionArrowWarning");
+        _blackHoleArrowFish = Resources.Load<GameObject>("Prefabs/Fish/Fish_Arrow").GetComponent<Fish>();
 
         _playerController.Initialize(_fishSpawner);
         _playerController.OnSkip += HandleSkip;
@@ -270,6 +304,12 @@ public class GameFlowManager : MonoBehaviour
 
     void Update()
     {
+        if (_state != State.Flying || _playerController.IsControlling || _pauseOpen
+            || _endingCinemaRunning || _screenThrowPending || _catalogCapturePending
+            || _fishSpawner.ScreenCapture.IsCapturing || Time.timeScale == 0f)
+        {
+            _lastRestartHintInputTime = Time.unscaledTime;
+        }
         _fishSpawner.RecordDiscoveryDistance(_playerController.Distance);
         // 엔딩 시네마 및 오프닝 연출 중에는 플레이어 및 게임 흐름 키 입력을 전면 차단한다.
         if (_endingCinemaRunning || _openingCinemaRunning) return;
@@ -363,6 +403,7 @@ public class GameFlowManager : MonoBehaviour
 
     void LateUpdate()
     {
+        UpdateBlackHoleArrow();
         if (_showHud && _state == State.GameOver)
         {
             foreach (FishType fish in _newFish)
@@ -439,7 +480,7 @@ public class GameFlowManager : MonoBehaviour
         {
             // 미끄러지는 동안은 남은 밀기 힘만큼 진하게 연타 안내를 띄운다.
             Color slideColor = new Color(1f, 1f, 1f, 0.35f + 0.65f * _playerController.SlidePower);
-            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), _input.ReplaceBindingName("{Jump}을 마구 누르는!"), _centerStyle, slideColor);
+            ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 80f * s), "발열 시간!", _centerStyle, slideColor);
         }
         else
         {
@@ -450,6 +491,12 @@ public class GameFlowManager : MonoBehaviour
                 DrawSpaceNote(noteCenter, s);
             }
             DrawSpaceNoteHit(noteCenter, s);
+        }
+        if (_state == State.Flying && !_endingCinemaRunning && !_playerController.IsControlling
+            && Time.unscaledTime - Mathf.Max(_lastRestartHintInputTime, _input.LastInputTime) >= RESTART_HINT_IDLE_DELAY)
+        {
+            ShadowLabel(new Rect(0f, height * _restartHintHeight, width, 80f * s),
+                _input.ReplaceBindingName("재시작 {Restart}키를 눌러"), _restartHintStyle, Color.white);
         }
 
         // 게임오버 화면에서는 제목과 겹치지 않도록 팝업을 그리지 않는다.
@@ -475,6 +522,149 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 투척 중 플레이어 속도와 블랙홀 방향의 각도가 설정값 이상이면 안내 시간을 갱신한다.
+    /// 현재 속도, 위치와 최소 각도를 사용하며 프리팹 표시를 갱신하고 마지막 조건 충족부터 최소 5초 유지한다.
+    /// </summary>
+    private void UpdateBlackHoleArrow()
+    {
+        if (_state != State.Flying || !_playerController.IsThrown || _playerController.IsGameOver
+            || _endingCinemaRunning || _blackHoleTarget == null || _blackHoleArrowDetached)
+        {
+            _blackHoleArrowEndTime = float.NegativeInfinity;
+            if (!_playerController.IsThrown) _blackHoleArrowDetached = false;
+            HideBlackHoleArrow();
+            return;
+        }
+
+        Vector3 direction = _blackHoleTarget.transform.position - _playerController.transform.position;
+        if (Vector3.Angle(_playerController.Velocity, direction) >= _blackHoleArrowMinAngle)
+        {
+            _blackHoleArrowEndTime = Time.time + Mathf.Max(5f, _blackHoleArrowDuration);
+        }
+        UpdateBlackHoleArrowTransform();
+    }
+
+    /// <summary>
+    /// 플레이어 위의 화살표 프리팹을 현재 화면에서 보이는 블랙홀 방향으로 회전한다.
+    /// 카메라 투영과 높이·크기 설정을 사용하며 프리팹의 위치, 회전, 크기와 활성 상태를 변경한다.
+    /// </summary>
+    private void UpdateBlackHoleArrowTransform()
+    {
+        Camera camera = Camera.main;
+        bool visible = Time.time < _blackHoleArrowEndTime && _showHud && !_pauseOpen && !_catalogOpen
+            && !_screenThrowPending && !(_fishSpawner.ScreenCapture.IsCapturing && _fishSpawner.ScreenCapture.HasFrame)
+            && camera != null;
+        if (!visible)
+        {
+            HideBlackHoleArrow();
+            return;
+        }
+
+        Vector3 playerScreen = camera.WorldToScreenPoint(_playerController.transform.position);
+        if (playerScreen.z <= 0f)
+        {
+            HideBlackHoleArrow();
+            return;
+        }
+        Vector3 targetScreen = camera.WorldToScreenPoint(_blackHoleTarget.transform.position);
+        Vector2 direction = new Vector2(targetScreen.x - playerScreen.x, targetScreen.y - playerScreen.y);
+        if (targetScreen.z <= 0f) direction = -direction;
+        if (direction.sqrMagnitude < 0.0001f)
+        {
+            direction = targetScreen.z > playerScreen.z ? Vector2.up : Vector2.down;
+        }
+
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+        _blackHoleArrow.SetPositionAndRotation(_playerController.transform.position + Vector3.up * _blackHoleArrowHeight,
+            camera.transform.rotation * Quaternion.Euler(0f, 0f, angle));
+        _blackHoleArrow.localScale = _blackHoleArrowPrefab.transform.localScale * _blackHoleArrowScale;
+        bool wasVisible = _blackHoleArrow.gameObject.activeSelf;
+        _blackHoleArrow.gameObject.SetActive(true);
+        if (wasVisible) _blackHoleArrowStateTime += Time.deltaTime;
+        if (_blackHoleArrowStateTime >= 5f)
+        {
+            _blackHoleArrowStateTime = 0f;
+            if (_blackHoleArrowWarning)
+            {
+                DetachBlackHoleArrow();
+                return;
+            }
+            SetBlackHoleArrowWarning(true);
+        }
+        if (_blackHoleArrowWarning)
+        {
+            _blackHoleArrow.position += camera.transform.right * (Mathf.Sin(Time.time * 55f) * 0.06f)
+                + camera.transform.up * (Mathf.Cos(Time.time * 71f) * 0.04f);
+        }
+    }
+
+    /// <summary>
+    /// 입력값 없이 안내를 숨기고 연속 노출 시간을 초기화한다.
+    /// 경고 머티리얼을 원래 상태로 복원하며 분리 여부와 출현 등록은 유지한다.
+    /// </summary>
+    private void HideBlackHoleArrow()
+    {
+        _blackHoleArrow.gameObject.SetActive(false);
+        _blackHoleArrowStateTime = 0f;
+        SetBlackHoleArrowWarning(false);
+    }
+
+    /// <summary>
+    /// warning에 따라 큐브 세 개의 공유 머티리얼을 경고색 또는 원래 색으로 교체한다.
+    /// 새 머티리얼 인스턴스를 만들지 않으며 현재 경고 상태를 변경한다.
+    /// </summary>
+    private void SetBlackHoleArrowWarning(bool warning)
+    {
+        if (_blackHoleArrowWarning == warning) return;
+        _blackHoleArrowWarning = warning;
+        foreach (Renderer renderer in _blackHoleArrowRenderers)
+            renderer.sharedMaterial = warning ? _blackHoleArrowWarningMaterial : _blackHoleArrowNormalMaterial;
+    }
+
+    /// <summary>
+    /// 연속 경고 5초를 유지한 안내를 독립적인 낙하 조각으로 분리하고 작은 입자 폭발을 만든다.
+    /// 현재 안내 위치와 플레이어 속도를 사용하며 이번 Throw의 안내를 종료하고 실제 입수를 기다린다.
+    /// </summary>
+    private void DetachBlackHoleArrow()
+    {
+        GameObject piece = Instantiate(_blackHoleArrow.gameObject, _blackHoleArrow.position, _blackHoleArrow.rotation);
+        piece.name = "Detached Arrow";
+        Rigidbody body = piece.AddComponent<Rigidbody>();
+        Vector3 side = Camera.main.transform.right;
+        body.linearVelocity = _playerController.Velocity * 0.15f + side * 4f + Vector3.up * 2f;
+        body.angularVelocity = new Vector3(3f, 4f, 2f);
+        Fish fish = piece.AddComponent<Fish>();
+        fish.InitializeWall(_fishSpawner, _blackHoleArrowFish.Type, null);
+        _fishSpawner.RegisterCutPiece(fish);
+
+        var burst = new GameObject("Arrow Burst").AddComponent<ParticleSystem>();
+        burst.transform.position = piece.transform.position;
+        burst.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = burst.main;
+        main.loop = false;
+        main.duration = 0.3f;
+        main.startLifetime = 0.4f;
+        main.startSpeed = 3f;
+        main.startSize = 0.12f;
+        main.gravityModifier = 0.5f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.stopAction = ParticleSystemStopAction.Destroy;
+        var emission = burst.emission;
+        emission.enabled = false;
+        var shape = burst.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.1f;
+        var particles = burst.GetComponent<ParticleSystemRenderer>();
+        particles.renderMode = ParticleSystemRenderMode.Mesh;
+        particles.mesh = _blackHoleArrow.GetComponentInChildren<MeshFilter>().sharedMesh;
+        particles.sharedMaterial = _blackHoleArrowWarningMaterial;
+        burst.Play();
+        burst.Emit(12);
+        _blackHoleArrowDetached = true;
+        HideBlackHoleArrow();
+    }
+
+    /// <summary>
     /// 선택한 던질 거리가 획득 상태일 때만 최대 강화 기준 능력치로 던진다. 최초 투척 시에는 오프닝 연출을 먼저 재생한다.
     /// _projectileIndex와 진행 상황을 사용하며, _state와 _hasThrown을 변경한다.
     /// </summary>
@@ -491,6 +681,9 @@ public class GameFlowManager : MonoBehaviour
             ? fish.ToThrowModifiers(_progress.PowerMultiplier, _progress.SpinMultiplier)
             : ThrowModifiers.ForFish(_progress.PowerMultiplier, _progress.SpinMultiplier);
         _state = State.Flying;
+        _blackHoleArrowDetached = false;
+        _blackHoleArrowEndTime = float.NegativeInfinity;
+        HideBlackHoleArrow();
         _hasThrown = true;
         _screenCaptureTriggered = false;
         _playerController.Throw(modifiers);
@@ -1661,6 +1854,7 @@ public class GameFlowManager : MonoBehaviour
             alignment = TextAnchor.UpperCenter,
         };
         _popupStyle = MakeStyle(52, TextAnchor.MiddleCenter, scale);
+        _restartHintStyle = MakeStyle(52, TextAnchor.MiddleCenter, scale);
         _noteStyle = MakeStyle(26, TextAnchor.MiddleCenter, scale);
         _debugStyle = MakeStyle(18, TextAnchor.UpperRight, scale);
         _debugStyle.fontStyle = FontStyle.Normal;

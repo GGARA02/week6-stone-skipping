@@ -189,6 +189,8 @@ public class PlayerController : MonoBehaviour
     public event Action<float> OnWallHit;
 
     public bool IsThrown => _isThrown;
+    public bool IsControlling => Managers.Input.JumpHeld
+        || Managers.Input.ReadSteer(_stickDeadZone) != 0f;
     public bool IsGameOver => _isGameOver;
     public bool InContact => _inContact;
     public int SkipCount { get; private set; }
@@ -479,6 +481,16 @@ public class PlayerController : MonoBehaviour
     public void Burst(float forwardSpeed, float upSpeed)
     {
         _velocity = Horizontal(_playerRB.linearVelocity) + _heading * forwardSpeed + Vector3.up * upSpeed;
+        _playerRB.linearVelocity = _velocity;
+    }
+
+    /// <summary>
+    /// velocity만큼 현재 속도에 더해 특수 능력의 방향성 추진력을 반영한다.
+    /// 내부 속도와 Rigidbody 속도를 함께 갱신하며 회전 및 각속도는 유지한다.
+    /// </summary>
+    public void AddVelocity(Vector3 velocity)
+    {
+        _velocity += velocity;
         _playerRB.linearVelocity = _velocity;
     }
 

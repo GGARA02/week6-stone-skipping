@@ -7,6 +7,7 @@
     "pickpocket",
     "bucket_full",
     "water_block",
+    "ice_block",
     "volcano",
     "w02ball",
     "balksoul",
@@ -15,6 +16,7 @@
     "wall",
     "ice",
     "boost",
+    "arrow",
     "blackhole",
     "monster",
     "alkagi",
@@ -32,6 +34,9 @@
     },
     "water_block": {
       "afterAcquiringFish": "bucket_empty"
+    },
+    "ice_block": {
+      "afterAcquiringFish": "water_block"
     },
     "volcano": {
       "always": true
@@ -53,6 +58,9 @@
     },
     "ice": {
       "distanceExceeded": 1500
+    },
+    "arrow": {
+      "always": true
     },
     "blackhole": {
       "always": true
@@ -124,6 +132,7 @@
     "water_block": [
       "whale_white"
     ],
+    "ice_block": [],
     "board": [
       "keyboard"
     ],
@@ -150,6 +159,7 @@
     "boost": [
       "kinghopak"
     ],
+    "arrow": [],
     "blackhole": [],
     "monster": [],
     "alkagi": [],

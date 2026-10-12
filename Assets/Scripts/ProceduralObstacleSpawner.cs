@@ -5,6 +5,7 @@ using UnityEngine;
 public sealed class ProceduralObstacleSpawner : MonoBehaviour
 {
     private const float BOOST_FREQUENCY_RATIO = 1f / 40f;
+    private const float MAX_SPAWN_Z = 3000f;
 
     [Header("거리 구역")]
     [Min(0f)][SerializeField] private float _iceStartDistance = 1500f;
@@ -44,6 +45,15 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
     public Mesh IceMesh { get; private set; }
     public Material IceMaterial { get; private set; }
     public float IceStartDistance => _iceStartDistance;
+
+    /// <summary>
+    /// position이 시작점 기준 전방 유빙 구역 경계를 지났는지 반환한다.
+    /// 월드 Z 위치와 _iceStartDistance를 사용하며 생성 상태는 변경하지 않는다.
+    /// </summary>
+    public bool IsInIceRegion(Vector3 position)
+    {
+        return position.z > _startPosition.z + _iceStartDistance;
+    }
 
     void Update()
     {
@@ -178,7 +188,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
 
     /// <summary>
     /// playerPosition과 생성 시드로 플레이어 주변 3000m의 모든 셀을 판정한다.
-    /// 시작점 +Z 1500m 경계와 밀도 조건에 맞는 벽과 유빙을 활성 목록에 저장한다.
+    /// 시작점 +Z 1500m 경계와 밀도 조건에 맞는 벽과 유빙을 월드 Z 3000m 이하에서 활성 목록에 저장한다.
     /// </summary>
     private void SpawnObstacles(Vector3 playerPosition)
     {
@@ -198,6 +208,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
                     (cell.x + 0.5f + ((float)random.NextDouble() - 0.5f) * 0.5f) * _cellSize,
                     0f,
                     (cell.y + 0.5f + ((float)random.NextDouble() - 0.5f) * 0.5f) * _cellSize);
+                if (position.z > MAX_SPAWN_Z) continue;
                 Vector3 startOffset = position - _startPosition;
                 startOffset.y = 0f;
                 Vector3 playerOffset = position - playerPosition;
@@ -205,7 +216,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
                 if (playerOffset.sqrMagnitude > _blackHoleStartDistance * _blackHoleStartDistance) continue;
                 if (startOffset.sqrMagnitude < _safeRadius * _safeRadius) continue;
 
-                bool ice = position.z > _startPosition.z + _iceStartDistance;
+                bool ice = IsInIceRegion(position);
                 Vector2 widths = ice ? _iceWidthRange : _wallWidthRange;
                 Vector2 heights = ice ? _iceHeightRange : _wallHeightRange;
                 Vector3 scale = new Vector3(
@@ -237,6 +248,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
             (cell.x + 0.5f + ((float)random.NextDouble() - 0.5f) * 0.5f) * _cellSize,
             6.5f,
             (cell.y + 0.5f + ((float)random.NextDouble() - 0.5f) * 0.5f) * _cellSize);
+        if (position.z > MAX_SPAWN_Z) return;
         Vector3 startOffset = position - _startPosition;
         startOffset.y = 0f;
         if (startOffset.magnitude > _blackHoleStartDistance) return;

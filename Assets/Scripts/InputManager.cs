@@ -13,6 +13,7 @@ public class InputManager
     public InputSystem_Actions.UIActions UIMap => _inputActions.UI;
     public bool GamePadConnected => Gamepad.all.Count > 0;
     public bool IsUsingGamepad { get; private set; }
+    public float LastInputTime { get; private set; }
     public Gamepad ActiveGamepad => _activeGamepad != null && _activeGamepad.added && _activeGamepad.enabled
         ? _activeGamepad : Gamepad.current;
 
@@ -164,11 +165,12 @@ public class InputManager
     }
 
     /// <summary>
-    /// context의 실제 수행 장치로 현재 입력 종류를 기록한다.
-    /// 게임패드 입력이면 다음 진동을 보낼 장치도 갱신한다.
+    /// context로 마지막 입력 시각과 실제 수행 장치의 입력 종류를 기록한다.
+    /// LastInputTime을 변경하며, 게임패드 입력이면 다음 진동을 보낼 장치도 갱신한다.
     /// </summary>
     private void HandleAction(InputAction.CallbackContext context)
     {
+        LastInputTime = Time.unscaledTime;
         if (!context.performed) return;
         IsUsingGamepad = context.control.device is Gamepad;
         if (context.control.device is Gamepad gamepad) _activeGamepad = gamepad;
