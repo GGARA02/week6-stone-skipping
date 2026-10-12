@@ -186,6 +186,13 @@ public class W02BallAbility : FishAbility
         context.Shape.GenerateFish(evolvedPrefab);
         // 이전 개체는 제거되므로 새 개체만 옮겼다가 되돌린다.
         MoveToLayer(context.Shape, layer, movedRenderers, originalLayers);
+        if (burstAfterEvolution)
+        {
+            // 시간이 멈춘 암전 구간에서 돌진 속도를 준비하고 경로의 장애물을 배치한다.
+            context.Player.Burst(_burstForwardSpeed, _burstUpSpeed);
+            context.Spawner.GetComponent<ProceduralObstacleSpawner>()
+                .SpawnEvolutionObstacles(context.Player.transform.position, context.Player.Velocity);
+        }
         yield return Spin(context.Shape.transform, _spinDownDuration, false, blackout);
 
         for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / _returnDuration)
@@ -213,7 +220,6 @@ public class W02BallAbility : FishAbility
 
         if (!burstAfterEvolution) yield break;
 
-        context.Player.Burst(_burstForwardSpeed, _burstUpSpeed);
         BallController ball = context.Shape.GetComponentInChildren<BallController>();
         for (int i = 0; i < ATTACK_MOTION_COUNT; i++)
         {
