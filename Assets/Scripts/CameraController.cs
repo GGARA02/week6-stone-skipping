@@ -179,7 +179,7 @@ public class CameraController : MonoBehaviour
     }
 
     /// <summary>
-    /// fisher의 외형과 플레이어 크기, duration을 사용해 대치 위치와 어깨 시점을 준비한다.
+    /// fisher의 외형과 플레이어 크기, duration을 사용해 대치 위치와 Fisher 어깨 너머에서 플레이어를 보는 시점을 준비한다.
     /// 원래 카메라와 Fisher 위치를 저장하고 정지 중에도 진행할 카메라 전환을 시작한다.
     /// </summary>
     public void BeginFisherQte(Transform fisher, float duration)
@@ -198,14 +198,15 @@ public class CameraController : MonoBehaviour
         Renderer[] renderers = fisher.GetComponentsInChildren<Renderer>();
         Bounds bounds = renderers[0].bounds;
         foreach (Renderer renderer in renderers) bounds.Encapsulate(renderer.bounds);
+        float fisherRadius = bounds.extents.magnitude;
         Vector3 playerCenter = _focalPoint.position;
-        Vector3 fisherCenter = playerCenter + direction * (_projectileRadius + bounds.extents.magnitude + _qteConfrontationGap);
+        Vector3 fisherCenter = playerCenter + direction * (_projectileRadius + fisherRadius + _qteConfrontationGap);
         fisher.position += fisherCenter - bounds.center;
-        _qteTargetPosition = playerCenter - direction * (_projectileRadius + _qteShoulderDistance)
-            + side * (_projectileRadius * 0.65f + _qteShoulderSide)
-            + Vector3.up * (_projectileRadius * 0.6f + _qteShoulderHeight);
+        _qteTargetPosition = fisherCenter + direction * (fisherRadius + _qteShoulderDistance)
+            - side * (fisherRadius * 0.65f + _qteShoulderSide)
+            + Vector3.up * (fisherRadius * 0.6f + _qteShoulderHeight);
         _qteTargetPosition.y = Mathf.Max(_qteTargetPosition.y, _waterY + _minHeightAboveWater);
-        _qteTargetRotation = Quaternion.LookRotation(fisherCenter - _qteTargetPosition, Vector3.up);
+        _qteTargetRotation = Quaternion.LookRotation(playerCenter - _qteTargetPosition, Vector3.up);
         _qteMoveDuration = Mathf.Max(0.1f, duration);
         _qteElapsed = 0f;
         _qteViewActive = true;
