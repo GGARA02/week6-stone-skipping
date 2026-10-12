@@ -211,7 +211,7 @@
   "ice": {
     "requiresSeaRegistration": true,
     "rearmOnCutWaterEntry": true,
-    "spawnWeight": 0.2,
+    "spawnWeight": 0.4,
     "displayName": "유빙",
     "description": "먼 바다의 유빙에서 떨어져 나온 조각입니다. 빙산의 일각이라는 말이 있지만, 이 조각은 일각의 일각입니다.",
     "unlockHint": "유빙을 잘라내세요"
@@ -275,7 +275,7 @@
   "alkagi": {
     "spawnWeight": 0,
     "displayName": "ALKAGI",
-    "description": "한때 눈에서 레이저를 쏘던 ALKAGI입니다. 납작하게 눌리고 나니 위협은 사라지고 물수제비에 딱 맞는 몸매만 남았습니다.",
+    "description": "도감을 다 채우셨군요. 더 이상 모을 건 없지만, 던질 건 아직 남아 있습니다.",
     "unlockHint": "에너지 보존 법칙에 반하는 이야기지만, 레이저는 사실 그렇게 뜨겁지 않습니다. 눈 감고 딱 한 번만 맞아볼까요?"
   }
 }
