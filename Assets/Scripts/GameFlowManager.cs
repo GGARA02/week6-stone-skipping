@@ -2295,7 +2295,15 @@ public class GameFlowManager : MonoBehaviour
         }
 
         Vector3 landingSpot = new Vector3(0f, 2f, 3200f);
-        Vector3 stoneStartPos = landingSpot + new Vector3(0f, 18f, 0f);
+        // 카메라가 (-17, -17) 쪽에서 비스듬히 보므로 (1, 0, -1)이 화면 오른쪽이다. 돌은 화면 왼쪽 하늘에서 떨어져 오른쪽으로 물수제비를 뜨며 착지 지점에 멈춘다.
+        Vector3 skipDirection = new Vector3(1f, 0f, -1f).normalized;
+        float[] skipDistances = { 6f, 4f, 2.5f, 1.2f };
+        float[] skipHeights = { 2.4f, 1.4f, 0.7f, 0.3f };
+        float[] skipDurations = { 0.55f, 0.42f, 0.3f, 0.2f };
+        float skipTotalDistance = 0f;
+        foreach (float distance in skipDistances) skipTotalDistance += distance;
+        Vector3 firstContact = landingSpot - skipDirection * skipTotalDistance;
+        Vector3 stoneStartPos = firstContact - skipDirection * 5f + new Vector3(0f, 18f, 0f);
         Vector3 alienStartPos = landingSpot + new Vector3(15.5f, 0f, 14.5f);
 
         if (_cameraController != null)
@@ -2330,7 +2338,7 @@ public class GameFlowManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.3f);
 
-        // 3. 하늘에서 돌 낙하 연출
+        // 3. 하늘에서 돌 낙하 후 물수제비 연출
         if (_playerController != null)
         {
             float fallDuration = 1.2f;
@@ -2343,22 +2351,27 @@ public class GameFlowManager : MonoBehaviour
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / fallDuration);
                 float fallT = t * t;
-                _playerController.transform.position = Vector3.Lerp(stoneStartPos, landingSpot, fallT);
+                _playerController.transform.position = Vector3.Lerp(stoneStartPos, firstContact, fallT);
                 _playerController.transform.rotation = Quaternion.Slerp(startRot, endRot, t);
                 yield return null;
             }
-            _playerController.transform.position = landingSpot;
+            _playerController.transform.position = firstContact;
 
-            // 착지 시 작은 바운스
-            float bounceDuration = 0.25f;
-            elapsed = 0f;
-            while (elapsed < bounceDuration)
+            // 수면에 닿을 때마다 점점 낮고 짧게 튕기며 착지 지점까지 나아간다.
+            Vector3 contact = firstContact;
+            for (int i = 0; i < skipDistances.Length; i++)
             {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / bounceDuration);
-                float yOffset = Mathf.Sin(t * Mathf.PI) * 0.35f;
-                _playerController.transform.position = landingSpot + Vector3.up * yOffset;
-                yield return null;
+                Vector3 nextContact = contact + skipDirection * skipDistances[i];
+                elapsed = 0f;
+                while (elapsed < skipDurations[i])
+                {
+                    elapsed += Time.deltaTime;
+                    float t = Mathf.Clamp01(elapsed / skipDurations[i]);
+                    float yOffset = Mathf.Sin(t * Mathf.PI) * skipHeights[i];
+                    _playerController.transform.position = Vector3.Lerp(contact, nextContact, t) + Vector3.up * yOffset;
+                    yield return null;
+                }
+                contact = nextContact;
             }
             _playerController.transform.position = landingSpot;
         }
