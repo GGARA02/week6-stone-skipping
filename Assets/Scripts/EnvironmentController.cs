@@ -35,6 +35,9 @@ public class EnvironmentController : MonoBehaviour
 
     private static readonly int RAIN_INTENSITY_ID = Shader.PropertyToID("_RainIntensity");
     private static readonly int CLOUD_COVERAGE_ID = Shader.PropertyToID("_Coverage");
+    // 빌드에서 씬을 다시 불러온 직후의 주변광은 깨진 값일 수 있어, 앱을 켠 뒤 처음 읽은 낮 주변광을 계속 쓴다.
+    private static bool _hasDayAmbientProbe;
+    private static SphericalHarmonicsL2 _dayAmbientProbe;
 
     [Header("참조")]
     [SerializeField]
@@ -143,7 +146,6 @@ public class EnvironmentController : MonoBehaviour
     private Material _cloudMaterial;
     private float _daySunIntensity;
     private Quaternion _daySunRotation;
-    private SphericalHarmonicsL2 _dayAmbientProbe;
     private bool _dayFog;
     private Color _dayFogColor;
     private float _dayFogDensity;
@@ -180,7 +182,11 @@ public class EnvironmentController : MonoBehaviour
         _daySunRotation = _sun.transform.rotation;
         Vector3 daySunAngles = _daySunRotation.eulerAngles;
         _nightSunRotation = Quaternion.Euler(_nightSunXRotation, daySunAngles.y, daySunAngles.z);
-        _dayAmbientProbe = RenderSettings.ambientProbe;
+        if (!_hasDayAmbientProbe)
+        {
+            _dayAmbientProbe = RenderSettings.ambientProbe;
+            _hasDayAmbientProbe = true;
+        }
         _dayFog = RenderSettings.fog;
         _dayFogColor = RenderSettings.fogColor;
         _dayFogDensity = RenderSettings.fogDensity;

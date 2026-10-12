@@ -21,7 +21,9 @@ public class EndingCreditUI : MonoBehaviour
     [Header("Skip UI")]
     [SerializeField] private TMP_FontAsset _font;
     [SerializeField] private TMP_Text _skipMessage;
-    private float _skipPromptDelay = 9f;
+    [Tooltip("스킵 안내 문구의 하단 기준 Y 위치 (21:9 레터박스 고려)")]
+    private float _skipPromptPositionY = 160f;
+    private float _skipPromptDelay = 4f;
     private RectTransform _promptRect;
     private Coroutine _showPromptCoroutine;
     private bool _canSkip;
@@ -53,6 +55,7 @@ public class EndingCreditUI : MonoBehaviour
 
         if (_promptRect != null)
         {
+            _promptRect.anchoredPosition = new Vector2(0f, _skipPromptPositionY);
             _promptRect.localScale = Vector3.one;
             _promptRect.gameObject.SetActive(false);
         }
@@ -162,7 +165,7 @@ public class EndingCreditUI : MonoBehaviour
 
     /// <summary>
     /// 외곽 테두리와 반투명 배경을 포함한 버튼 형태의 스킵 안내 UI를 동적으로 생성한다.
-    /// TextMeshProUGUI, Image, RectTransform, _font를 사용하며, _skipMessage와 _promptRect를 생성 및 초기화한다.
+    /// TextMeshProUGUI, Image, RectTransform, _font, _skipPromptPositionY를 사용하며, _skipMessage와 _promptRect를 생성 및 초기화한다.
     /// </summary>
     private void CreateSkipPrompt()
     {
@@ -174,7 +177,7 @@ public class EndingCreditUI : MonoBehaviour
         rootRect.anchorMin = new Vector2(0.5f, 0f);
         rootRect.anchorMax = new Vector2(0.5f, 0f);
         rootRect.pivot = new Vector2(0.5f, 0.5f);
-        rootRect.anchoredPosition = new Vector2(0f, 45f);
+        rootRect.anchoredPosition = new Vector2(0f, _skipPromptPositionY);
         rootRect.sizeDelta = new Vector2(600f, 50f);
 
         _promptRect = rootRect;

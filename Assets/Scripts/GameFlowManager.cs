@@ -1090,20 +1090,20 @@ public class GameFlowManager : MonoBehaviour
             _noteHitColor = JudgeColor(judge);
         }
 
-        string direction = timingError < 0f ? "빠름" : "늦음";
+        string direction = timingError < 0f ? "Early" : "Late";
         switch (judge)
         {
             case SkipJudge.Perfect:
                 _perfectCount++;
-                ShowPopup("완벽!", JudgeColor(judge));
+                ShowPopup("Perfect!", JudgeColor(judge));
                 break;
             case SkipJudge.Good:
                 _goodCount++;
-                ShowPopup($"좋음 ({direction})", JudgeColor(judge));
+                ShowPopup($"Good ({direction})", JudgeColor(judge));
                 break;
             case SkipJudge.Miss:
                 _missCount++;
-                ShowPopup($"실패  너무 {direction}", JudgeColor(judge));
+                ShowPopup($"Miss ({direction})", JudgeColor(judge));
                 break;
         }
     }
@@ -1323,7 +1323,7 @@ public class GameFlowManager : MonoBehaviour
         ShadowLabel(new Rect(0f, height * 0.12f, width, 80f * scale), "게임 오버", _centerStyle, Color.white);
         string result = $"{ReasonText(_gameOverReason)}    물수제비 {_playerController.SkipCount}회 / {_playerController.Distance:0.0} m";
         ShadowLabel(new Rect(0f, height * 0.12f + 80f * scale, width, 40f * scale), result, _centerSubStyle, Color.white);
-        string timing = $"완벽 {_perfectCount}    좋음 {_goodCount}    실패 {_missCount}";
+        string timing = $"Perfect {_perfectCount}    Good {_goodCount}    Miss {_missCount}";
         ShadowLabel(new Rect(0f, height * 0.12f + 115f * scale, width, 40f * scale), timing, _centerSubStyle, new Color(1f, 0.92f, 0.7f));
 
         ShadowLabel(new Rect(0f, height * 0.39f, width, 40f * scale), $"신규 획득 {_newFish.Count}개", _centerSubStyle, Color.white);
@@ -2084,7 +2084,11 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
+<<<<<<< HEAD
     /// 엔딩 크레딧 정상 완료 이벤트를 받아 획득 처리 없이 정산 상태로 전환한다.
+=======
+    /// 엔딩 크레딧 정상 완료 이벤트를 받아 크레딧 물고기 획득 없이 정산 화면으로 전환한다.
+>>>>>>> main
     /// 입력값은 없으며, CompleteEndingCredit을 호출한다.
     /// </summary>
     private void HandleEndingCompleted()
@@ -2163,8 +2167,13 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
+<<<<<<< HEAD
     /// 끝까지 감상한 엔딩 크레딧을 닫고 게임오버(정산) 상태로 전환한다.
     /// 입력값 없이 HUD와 레터박스를 복원하며 크레딧 획득 기록과 선택 항목은 변경하지 않는다.
+=======
+    /// 엔딩 크레딧을 정리하고 크레딧 물고기 획득 없이 게임오버(정산) 상태로 전환한다.
+    /// 입력값은 없으며, _endingCredit UI를 비활성화하고 HandleGameOver를 호출한다.
+>>>>>>> main
     /// </summary>
     private void CompleteEndingCredit()
     {
