@@ -426,7 +426,7 @@ public class GameFlowManager : MonoBehaviour
                 if (fish.Id == "screen" || fish.Id == "catalog" || fish.Id == "menu") continue;
                 Fish prefab = _fishSpawner.GetFishPrefab(fish);
                 if (prefab != null)
-                    _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block" || fish.Id == "week4arrow");
+                    _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block" || fish.Id == "week4arrow" || fish.Id == "blackhole");
             }
             // 획득 화면에서도 물결과 화살 아이들 모션이 보이도록 다시 그린다.
             _ownedFishSelectionPreview.RefreshAnimatedTextures();
@@ -444,11 +444,11 @@ public class GameFlowManager : MonoBehaviour
                 && _fishSpawner.GetCatalogState(fish) != FishCatalogState.Undiscovered)
             {
                 FishSelectionPreview previews = _progress.IsFishRegistered(fish) ? _ownedFishSelectionPreview : _fishSelectionPreview;
-                previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block" || fish.Id == "week4arrow");
+                previews.PrepareTexture(_fishSpawner.FishPrefabs[i], fish.Id == "water_block" || fish.Id == "week4arrow" || fish.Id == "blackhole");
             }
         }
-        // 물 블록과 Week4 화살 미리보기는 선택 창과 도감이 보이는 동안 매 프레임 다시 그린다.
-        // 물은 물결이 흐르고, 화살은 아이들 모션으로 위아래로 흔들려 트레일 형상이 보인다.
+        // 물 블록, Week4 화살과 블랙홀 미리보기는 선택 창과 도감이 보이는 동안 매 프레임 다시 그린다.
+        // 물과 블랙홀은 셰이더 효과가 흐르고, 화살은 아이들 모션으로 위아래로 흔들려 트레일 형상이 보인다.
         // 미획득 화살도 회색 트레일로 흔들어야 보이므로 미획득 미리보기도 다시 그린다.
         _ownedFishSelectionPreview.RefreshAnimatedTextures();
         _fishSelectionPreview.RefreshAnimatedTextures();
