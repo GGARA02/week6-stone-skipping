@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 // 판마다 네 가지 기본 환경 중 하나를 정하고 조명, 하늘, 구름, 주변광, 안개, 비, 후처리에 반영한다.
 // 낮 값은 시작할 때 씬 설정을 저장해 쓴다. 재시작 때는 바로 바꾸고, 고른 물고기 때문에 바뀌는 날씨는 서서히 바꾼다.
 // 스카이박스는 기본 하늘 위에 밤, 비처럼 요청받은 스카이박스를 비중만큼 먼저 요청한 순서대로 섞는다.
-// 우주 하늘은 섞지 않고 켜고 끌 때 바로 바꾼다.
+// 우주 하늘은 섞지 않고 켜고 끌 때 바로 바꾼다. 물고기가 바꾸는 하늘도 섞지 않고 바로 바꾸며, 우주 하늘이 아닐 때 보인다.
 // 후처리 볼륨은 프로필마다 비중을 요청하며, 처음 요청한 프로필은 자식 전역 볼륨을 만들어 쓴다.
 public class EnvironmentController : MonoBehaviour
 {
@@ -68,6 +68,8 @@ public class EnvironmentController : MonoBehaviour
     private readonly List<SkyboxLayer> _skyboxLayers = new List<SkyboxLayer>();
     private Material _skybox;
     private Material _skyboxScratch;
+    // 지금 고른 물고기나 던지는 중에 얻은 물고기가 바꾼 하늘. 없으면 섞은 하늘을 보인다.
+    private Material _fishSkybox;
 
     // 밤 해 값은 GameLab6 SkyManager의 해 뜨기 전 시작값을 따른다. 밤 하늘 값은 밤 스카이박스 머티리얼에 있다.
     [Header("밤")]
@@ -241,13 +243,14 @@ public class EnvironmentController : MonoBehaviour
     }
 
     /// <summary>
-    /// 우주 하늘을 끄고, 이번 판의 기본 날씨를 정하고, 고른 물고기의 날씨와 선택 시 볼륨까지 더해 바로 적용한다.
+    /// 우주 하늘을 끄고, 이번 판의 기본 날씨를 정하고, 고른 물고기의 하늘, 날씨와 선택 시 볼륨까지 더해 바로 적용한다.
     /// fish(기본 물고기면 null)와 randomWeather를 사용하며, 기본 환경을 낮 30%, 밤 30%, 비 오는 낮 20%, 비 오는 밤 20%로 정한다.
     /// randomWeather가 false면 기본 날씨를 맑은 낮으로 둔다.
-    /// 우주 하늘 여부, 기본 날씨, 목표 날씨, 현재 날씨 비중, 물고기 볼륨을 변경한다.
+    /// 우주 하늘 여부, 물고기 하늘, 기본 날씨, 목표 날씨, 현재 날씨 비중, 물고기 볼륨을 변경한다.
     /// </summary>
     public void Roll(FishType fish, bool randomWeather = true)
     {
+        _fishSkybox = GetFishSkybox(fish);
         SetSpace(false);
         float weatherRoll = randomWeather ? Random.value : 0f;
         _baseRain = weatherRoll >= CLEAR_NIGHT_THRESHOLD;
@@ -262,20 +265,29 @@ public class EnvironmentController : MonoBehaviour
 
     /// <summary>
     /// 던질 거리를 바꿨을 때 그 물고기의 선택 시 날씨와 볼륨 설정으로 목표를 다시 정한다. 실제 변화는 Update에서 서서히 진행한다.
+    /// 물고기 하늘이 바뀌면 서서히 바꾸지 않고 날씨, 볼륨까지 바로 적용하며 그친 비의 빗방울도 지운다.
     /// fish(기본 물고기면 null)를 사용하며, 목표 날씨와 물고기 볼륨의 목표 비중을 변경한다.
     /// </summary>
     public void ChangeFish(FishType fish)
     {
+        // 하늘을 바꾸는 물고기는 다른 효과와 달리 페이드 없이 바로 바꾼다.
+        if (GetFishSkybox(fish) != _fishSkybox)
+        {
+            ChangeFishInstant(fish);
+            ClearStoppedRain();
+            return;
+        }
         SetTarget(fish);
         SetFishVolume(fish, false);
     }
 
     /// <summary>
-    /// 던질 거리를 바꿨을 때 그 물고기의 선택 시 날씨와 볼륨 설정을 서서히 바꾸지 않고 바로 적용한다. 이번 판의 기본 날씨는 유지한다.
-    /// fish(기본 물고기면 null)와 기본 날씨를 사용하며, 목표 날씨, 현재 날씨 비중, 물고기 볼륨을 변경한다.
+    /// 던질 거리를 바꿨을 때 그 물고기의 선택 시 하늘, 날씨와 볼륨 설정을 서서히 바꾸지 않고 바로 적용한다. 이번 판의 기본 날씨는 유지한다.
+    /// fish(기본 물고기면 null)와 기본 날씨를 사용하며, 물고기 하늘, 목표 날씨, 현재 날씨 비중, 물고기 볼륨을 변경한다.
     /// </summary>
     public void ChangeFishInstant(FishType fish)
     {
+        SetFishSkybox(GetFishSkybox(fish));
         SetTarget(fish);
         _rainWeight = _targetRain ? 1f : 0f;
         _nightWeight = _targetNight ? 1f : 0f;
@@ -285,24 +297,39 @@ public class EnvironmentController : MonoBehaviour
 
     /// <summary>
     /// 우주 하늘을 페이드 없이 바로 켜거나 끈다. 켜져 있는 동안에는 날씨가 바뀌어도 하늘을 우주로 두고 구름층을 숨긴다.
-    /// active와 _spaceSkybox를 사용하며, 화면 스카이박스, 구름층 표시, 반사 프로브와 _isSpace를 변경한다.
+    /// 끄면 물고기 하늘이 있을 때 그 하늘을, 없으면 섞은 하늘을 보이며 물고기 하늘이 있는 동안에도 구름층을 숨긴다.
+    /// active, _spaceSkybox와 _fishSkybox를 사용하며, 화면 스카이박스, 구름층 표시, 반사 프로브와 _isSpace를 변경한다.
     /// </summary>
     public void SetSpace(bool active)
     {
         _isSpace = active;
-        RenderSettings.skybox = active ? _spaceSkybox : _skybox;
-        _cloudRenderer.enabled = !active && (_rainWeight > 0f || _cloudFocus);
+        RenderSettings.skybox = active ? _spaceSkybox : _fishSkybox != null ? _fishSkybox : _skybox;
+        _cloudRenderer.enabled = !active && _fishSkybox == null && (_rainWeight > 0f || _cloudFocus);
         _skyReflectionProbe.RenderProbe();
     }
 
     /// <summary>
     /// 하늘 ALKAGI처럼 주변에 구름을 모으는 대상이 있는지 알려 맑은 날에도 구름층을 켜 둔다.
-    /// active와 현재 비 비중, 우주 하늘 여부를 사용하며 _cloudFocus와 구름층 표시를 변경한다.
+    /// active와 현재 비 비중, 우주 하늘과 물고기 하늘 여부를 사용하며 _cloudFocus와 구름층 표시를 변경한다.
     /// </summary>
     public void SetCloudFocus(bool active)
     {
         _cloudFocus = active;
-        _cloudRenderer.enabled = !_isSpace && (_rainWeight > 0f || _cloudFocus);
+        _cloudRenderer.enabled = !_isSpace && _fishSkybox == null && (_rainWeight > 0f || _cloudFocus);
+    }
+
+    /// <summary>
+    /// 던지는 중에 얻은 물고기의 하늘과 날씨 효과를 페이드 없이 바로 적용하고 그친 비의 빗방울을 지운다. 지금 고른 물고기의 선택 시 볼륨은 그대로 둔다.
+    /// fish와 이번 판의 기본 날씨를 사용하며, 물고기 하늘, 목표 날씨, 현재 날씨 비중과 빗방울을 변경한다.
+    /// </summary>
+    public void ApplyAcquiredFish(FishType fish)
+    {
+        SetFishSkybox(fish.SelectSkybox);
+        SetTarget(fish);
+        _rainWeight = _targetRain ? 1f : 0f;
+        _nightWeight = _targetNight ? 1f : 0f;
+        ApplyWeights();
+        ClearStoppedRain();
     }
 
     /// <summary>
@@ -472,6 +499,35 @@ public class EnvironmentController : MonoBehaviour
     }
 
     /// <summary>
+    /// 고른 물고기가 바꾸는 하늘을 찾는다.
+    /// fish(기본 물고기면 null)를 사용하며, 물고기 하늘이 없으면 null을 반환한다.
+    /// </summary>
+    private static Material GetFishSkybox(FishType fish)
+    {
+        return fish != null ? fish.SelectSkybox : null;
+    }
+
+    /// <summary>
+    /// 물고기 하늘을 페이드 없이 바꾸고, 우주 하늘이 켜져 있지 않으면 화면 하늘에 바로 보인다.
+    /// skybox(없으면 null)와 _isSpace를 사용하며, _fishSkybox, 화면 스카이박스, 구름층 표시와 반사 프로브를 변경한다.
+    /// </summary>
+    private void SetFishSkybox(Material skybox)
+    {
+        _fishSkybox = skybox;
+        SetSpace(_isSpace);
+    }
+
+    /// <summary>
+    /// 비가 그치기로 정해졌으면 이미 떨어지고 있는 빗방울을 바로 지운다. 먼 비는 가까운 비의 자식이라 함께 지워진다.
+    /// _targetRain을 사용하며, 비가 그칠 때만 비 파티클을 변경한다.
+    /// </summary>
+    private void ClearStoppedRain()
+    {
+        if (_targetRain) return;
+        _rain.Clear();
+    }
+
+    /// <summary>
     /// 기본 날씨에 고른 물고기가 부르는 비와 밤을 더하고, 고른 물고기가 막는 비와 밤은 뺀 목표 날씨를 정한다.
     /// fish와 기본 날씨를 사용하며, _targetRain과 _targetNight를 변경한다.
     /// </summary>
@@ -498,7 +554,7 @@ public class EnvironmentController : MonoBehaviour
         // 비 하늘을 먼저 섞고 밤 하늘을 나중에 섞어, 비 오는 밤에는 밤 하늘이 이긴다.
         SetSkyboxWeight(_rainSkybox, rain);
         SetSkyboxWeight(_nightSkybox, night);
-        _cloudRenderer.enabled = !_isSpace && (rain > 0f || _cloudFocus);
+        _cloudRenderer.enabled = !_isSpace && _fishSkybox == null && (rain > 0f || _cloudFocus);
         _cloudMaterial.SetFloat(CLOUD_COVERAGE_ID, _rainCloudCoverage * rain);
 
         Color ambient = Color.Lerp(Color.white, _nightAmbient, night) * Color.Lerp(Color.white, _rainAmbient, rain);

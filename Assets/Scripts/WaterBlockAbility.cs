@@ -8,14 +8,14 @@ public class WaterBlockAbility : SpillAbility
     private bool _isEvolving;
 
     /// <summary>
-    /// 물로 1500m 이후 유빙 지역에 진입하면 얼음으로 진화하는 연출을 시작한다.
-    /// context의 거리와 시작점 기준 전방 위치를 사용하며, dt는 쓰지 않고 중복 연출을 막는 상태와 외형 및 도감을 변경한다.
+    /// 물로 유빙 시작 거리를 넘어 유빙 지역에 진입하면 얼음으로 진화하는 연출을 시작한다.
+    /// context의 거리와 시작점 기준 전방 위치, 생성기의 유빙 시작 거리를 사용하며, dt는 쓰지 않고 중복 연출을 막는 상태와 외형 및 도감을 변경한다.
     /// </summary>
     public override void UpdateFlight(ThrowContext context, float dt)
     {
-        if (_isEvolving || context.Player.Distance <= 1500f) return;
+        if (_isEvolving) return;
         ProceduralObstacleSpawner obstacles = context.Spawner.GetComponent<ProceduralObstacleSpawner>();
-        if (!obstacles.IsInIceRegion(context.Body.position)) return;
+        if (context.Player.Distance <= obstacles.IceStartDistance || !obstacles.IsInIceRegion(context.Body.position)) return;
 
         _isEvolving = true;
         context.Player.StartCoroutine(_evolutionEffect.PlayEvolution(context, _evolvedPrefab, false));

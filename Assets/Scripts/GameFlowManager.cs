@@ -33,6 +33,7 @@ public class GameFlowManager : MonoBehaviour
     private const string BLACKHOLE_FISH_ID = "blackhole";
     private const string CREDIT_FISH_ID = "endingcredit";
     private const string MONSTER_FISH_ID = "monster";
+    private const string SKYBOX_FISH_ID = "skybox";
     private const string FISH_KEY_PREFIX = "SkipStoneV2.Fish.";
     private const float CINEMATIC_ASPECT = 21f / 9f;
     private const int NOTE_TEXTURE_SIZE = 256;
@@ -178,6 +179,15 @@ public class GameFlowManager : MonoBehaviour
     private bool _blackHoleArrowWarning;
     private bool _blackHoleArrowDetached;
 
+    [Header("물 밖 낙하")]
+    [Tooltip("물 밖으로 나가 게임오버된 뒤 카메라가 떨어지는 플레이어를 비추다가 스카이박스를 얻기까지 기다리는 실제 시간(초). 이동안 재시작을 받지 않는다")]
+    [SerializeField, Min(0f)] private float _skyboxAcquireDelay = 5f;
+    [Tooltip("스카이박스를 얻은 뒤에도 재시작을 받지 않고 더 기다리는 실제 시간(초)")]
+    [SerializeField, Min(0f)] private float _skyboxRestartLockAfterAcquire = 2f;
+    private Bounds _waterBounds;
+    // 물 밖으로 떨어지기 시작해 스카이박스를 얻고 잠시 뒤까지 켜져 있으며, 켜져 있는 동안 재시작 입력을 받지 않는다.
+    private bool _skyboxFallPending;
+
     [Header("화면 투척 전환")]
     [SerializeField, Min(0.1f)] private float _panelShrinkDuration = 0.65f;
     private bool _screenThrowPending;
@@ -236,6 +246,7 @@ public class GameFlowManager : MonoBehaviour
         _blackHoleArrowFish = Resources.Load<GameObject>("Prefabs/Fish/Fish_Arrow").GetComponent<Fish>();
 
         _playerController.Initialize(_fishSpawner);
+        _waterBounds = _playerController.WaterBounds;
         _playerController.OnSkip += HandleSkip;
         _playerController.OnJudge += HandleJudge;
         _playerController.OnSlidePush += HandleSlidePush;
@@ -339,9 +350,10 @@ public class GameFlowManager : MonoBehaviour
             }
             return;
         }
+        if (_state == State.Flying) CheckWaterEdge();
         if (_state == State.GameOver)
         {
-            if ((_input.RestartPressed || _input.JumpPressed)
+            if ((_input.RestartPressed || _input.JumpPressed) && !_skyboxFallPending
                 && Time.unscaledTime - _gameOverTime >= RETRY_INPUT_DELAY) Restart();
             return;
         }
@@ -416,6 +428,8 @@ public class GameFlowManager : MonoBehaviour
                 if (prefab != null)
                     _ownedFishSelectionPreview.PrepareTexture(prefab, fish.Id == "water_block" || fish.Id == "week4arrow");
             }
+            // 획득 화면에서도 물결과 화살 아이들 모션이 보이도록 다시 그린다.
+            _ownedFishSelectionPreview.RefreshAnimatedTextures();
             return;
         }
         if (!_showHud || _state != State.Ready) return;
@@ -435,7 +449,9 @@ public class GameFlowManager : MonoBehaviour
         }
         // 물 블록과 Week4 화살 미리보기는 선택 창과 도감이 보이는 동안 매 프레임 다시 그린다.
         // 물은 물결이 흐르고, 화살은 아이들 모션으로 위아래로 흔들려 트레일 형상이 보인다.
+        // 미획득 화살도 회색 트레일로 흔들어야 보이므로 미획득 미리보기도 다시 그린다.
         _ownedFishSelectionPreview.RefreshAnimatedTextures();
+        _fishSelectionPreview.RefreshAnimatedTextures();
     }
 
     void OnGUI()
@@ -1180,6 +1196,49 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 던진 물고기가 물 박스 범위 밖으로 나가면 경계 밖 게임오버를 보내고, 조종을 꺼서 수면 판정 없이 물 밖으로 떨어지게 한다.
+    /// 스카이박스 획득은 떨어지기 시작하고 _skyboxAcquireDelay초 뒤로 미루며, 얻은 뒤 _skyboxRestartLockAfterAcquire초까지 재시작을 막는다.
+    /// 플레이어 위치와 _waterBounds를 사용하며, PlayerController 활성 상태, 게임 상태와 _skyboxFallPending을 변경하고 획득 코루틴을 시작한다.
+    /// </summary>
+    private void CheckWaterEdge()
+    {
+        Vector3 position = _playerController.transform.position;
+        if (position.x >= _waterBounds.min.x && position.x <= _waterBounds.max.x
+            && position.z >= _waterBounds.min.z && position.z <= _waterBounds.max.z) return;
+
+        // 게임오버 뒤에도 PlayerController는 수면 힘을 계속 주므로, 꺼서 던질 때 켠 중력만 받아 Trigger인 물 밖으로 떨어지게 한다.
+        // 던진 상태는 그대로라 카메라는 떨어지는 플레이어를 계속 따라가며 수면 높이 위에서 내려다본다.
+        _playerController.enabled = false;
+        _skyboxFallPending = true;
+        _playerController.GameOver(GameOverReason.OutOfBounds);
+        StartCoroutine(AcquireSkyboxWhileFalling());
+    }
+
+    /// <summary>
+    /// 물 밖으로 떨어지기 시작하고 _skyboxAcquireDelay초 뒤에 스카이박스를 얻게 하며 그 하늘과 날씨 효과를 바로 적용하고,
+    /// 다시 _skyboxRestartLockAfterAcquire초 뒤에 재시작 막기를 푼다. 기다리는 동안 다른 경로로 재시작해 게임오버 상태가 아니면 획득하지 않고 바로 막기를 푼다.
+    /// _state와 스카이박스 종류를 사용하며, _skyboxFallPending, 도감 등록, 획득 팝업, 하늘과 날씨를 변경한다.
+    /// </summary>
+    private IEnumerator AcquireSkyboxWhileFalling()
+    {
+        // 재시작 입력 대기처럼 실제 시간으로 기다린다.
+        yield return new WaitForSecondsRealtime(_skyboxAcquireDelay);
+        if (_state != State.GameOver)
+        {
+            _skyboxFallPending = false;
+            yield break;
+        }
+
+        FishType skybox = GetFishTypeById(SKYBOX_FISH_ID);
+        _progress.AddFish(skybox);
+        ShowFishPopup($"{GetCatalogDisplayName(skybox)}을(를) 얻은!");
+        _environmentController.ApplyAcquiredFish(skybox);
+
+        yield return new WaitForSecondsRealtime(_skyboxRestartLockAfterAcquire);
+        _skyboxFallPending = false;
+    }
+
+    /// <summary>
     /// 던지기 전 안내와 지금 던질 거리를 그린다.
     /// 화면 크기와 scale 및 획득 상태를 사용해 선택 항목의 설명 또는 힌트를 중앙 정렬로 그린다.
     /// </summary>
@@ -1255,7 +1314,7 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 게임오버 결과와 이번 판에 처음 획득한 종류의 컬러 그리드, 다시하기 버튼을 그린다.
-    /// 화면 크기, scale과 _newFish를 사용하며 버튼을 누르면 재시작한다.
+    /// 화면 크기, scale, _newFish와 _skyboxFallPending을 사용하며 버튼을 누르면 재시작하고, 물 밖으로 떨어져 재시작을 막는 동안은 버튼을 막는다.
     /// </summary>
     private void DrawShop(float width, float height, float scale)
     {
@@ -1301,10 +1360,13 @@ public class GameFlowManager : MonoBehaviour
         float buttonWidth = 620f * scale;
         float buttonHeight = 60f * scale;
         float left = (width - buttonWidth) * 0.5f;
+        // 물 밖으로 떨어지는 동안은 스카이박스를 얻고 잠시 뒤까지 버튼을 누를 수 없다.
+        GUI.enabled = !_skyboxFallPending;
         if (GUI.Button(new Rect(left, height * 0.8f, buttonWidth, buttonHeight), _input.ReplaceBindingName("다시 시도하는   ({Jump} / {Restart})"), _buttonStyle))
         {
             Restart();
         }
+        GUI.enabled = true;
     }
 
     /// <summary>

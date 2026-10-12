@@ -266,6 +266,12 @@
     "description": "잠깐 쉬려고 열어 둔 메뉴를 찍어 둔 패널입니다. 계속하기 버튼을 누르는 대신 메뉴째로 던져 버렸습니다.",
     "unlockHint": "계속하려면 꼭 버튼을 눌러야 할까요?"
   },
+  "skybox": {
+    "spawnWeight": 0,
+    "displayName": "스카이박스",
+    "description": "'나중에 교체'라고 적혀 있던 기본 하늘입니다. 결국 아무도 교체하지 않았고, 대신 물수제비가 되었습니다.",
+    "unlockHint": "블랙홀이 이 세계의 끝이라고 누가 그랬나요?"
+  },
   "alkagi": {
     "spawnWeight": 0,
     "displayName": "ALKAGI",

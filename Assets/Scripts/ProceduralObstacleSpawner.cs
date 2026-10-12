@@ -6,13 +6,36 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
 {
     private const float BOOST_FREQUENCY_RATIO = 1f / 40f;
     private const float MAX_SPAWN_Z = 3000f;
+    // 점프대 프리팹의 가장 긴 수평 반폭(m). 물 가장자리에 걸치지 않게 놓을 때 쓴다.
+    private const float BOOST_HALF_SIZE = 12f;
     private const int EVOLUTION_OBSTACLE_COUNT = 5;
     private const float EVOLUTION_FIRST_CONTACT_TIME = 0.35f;
     private const float EVOLUTION_CONTACT_INTERVAL = 0.3f;
 
     [Header("거리 구역")]
+    [Tooltip("시작 위치에서 +Z 방향으로 이만큼 가면 유빙 지역이 시작된다. 물 블록이 얼음으로 바뀌는 거리도 이 값을 따른다")]
     [Min(0f)][SerializeField] private float _iceStartDistance = 1500f;
     [Min(0f)][SerializeField] private float _blackHoleStartDistance = 3000f;
+
+    [Header("물 범위")]
+    [Tooltip("플레이어 시작 위치에서 +X 방향으로 물이 펼쳐진 거리(m). 절차적 생성은 물 범위 안에서만 한다")]
+    [Min(0f)][SerializeField] private float _waterPositiveX = 2500f;
+    [Tooltip("플레이어 시작 위치에서 -X 방향으로 물이 펼쳐진 거리(m)")]
+    [Min(0f)][SerializeField] private float _waterNegativeX = 2500f;
+    [Tooltip("플레이어 시작 위치에서 +Z 방향으로 물이 펼쳐진 거리(m)")]
+    [Min(0f)][SerializeField] private float _waterPositiveZ = 4000f;
+    [Tooltip("플레이어 시작 위치에서 -Z 방향으로 물이 펼쳐진 거리(m)")]
+    [Min(0f)][SerializeField] private float _waterNegativeZ = 1000f;
+
+    [Header("배치")]
+    [Tooltip("유빙 지역 시작 구역에 놓는 쇄빙선. X, Y는 씬에 놓인 값을 쓴다")]
+    [SerializeField] private Transform _shipNormal;
+    [SerializeField] private float _shipNormalZ = 1500f;
+    [Tooltip("여정의 끝 블랙홀. X, Y는 씬에 놓인 값을 쓴다")]
+    [SerializeField] private Transform _blackHole;
+    [SerializeField] private float _blackHoleZ = 3100f;
+    [SerializeField] private Transform _volcano;
+    [SerializeField] private Vector3 _volcanoPosition = new Vector3(1000f, 70f, 1000f);
 
     [Header("플레이어 주변 생성")]
     [Min(20f)][SerializeField] private float _cellSize = 60f;
@@ -104,7 +127,6 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
         if (!_initialized || _player.IsGameOver) return;
 
         Vector3 position = _spawner.PlayerBody.position;
-        _water.position = new Vector3(position.x, _waterStartPosition.y, position.z);
 
         Vector2Int center = new Vector2Int(Mathf.FloorToInt(position.x / _cellSize), Mathf.FloorToInt(position.z / _cellSize));
         if (_hasCenter && center == _center) return;
@@ -121,7 +143,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
 
     /// <summary>
     /// spawner, player, 수면 높이와 water, 원본 벽, 유빙 종류로 주변 생성기를 준비한다.
-    /// 벽 프리팹을 보관하고 공유 유빙 메시와 머티리얼을 만들며 풀과 셀 추적 상태를 초기화한다.
+    /// 물 범위와 배치 오브젝트 위치를 인스펙터 값으로 맞추고, 벽 프리팹을 보관하고 공유 유빙 메시와 머티리얼을 만들며 풀과 셀 추적 상태를 초기화한다.
     /// </summary>
     public void Initialize(FishSpawner spawner, PlayerController player, float waterY, Transform water, MeshFilter wall, FishType iceType)
     {
@@ -130,6 +152,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
         _startPosition = player.transform.position;
         _waterY = waterY;
         _water = water;
+        ApplyLayout();
         _waterStartPosition = water.position;
         _wallPrefab = wall.GetComponent<CuttableWall>();
         _layer = wall.gameObject.layer;
@@ -141,6 +164,46 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
         IceMaterial.SetFloat("_Smoothness", 0.65f);
         _initialized = true;
         ResetObstacles();
+    }
+
+    /// <summary>
+    /// 플레이어 시작 위치를 기준으로 물 박스를 인스펙터 물 범위에 맞추고, 쇄빙선, 블랙홀, 화산을 인스펙터 위치로 옮긴다.
+    /// 물 범위, 배치 값과 _startPosition을 사용하며, 물, 쇄빙선, 블랙홀, 화산의 Transform과 물리 위치를 변경한다.
+    /// </summary>
+    private void ApplyLayout()
+    {
+        // 물은 크기 1인 상자를 늘린 것이라 배율이 곧 범위다. 수면 높이가 바뀌지 않도록 Y 위치와 배율은 그대로 둔다.
+        Vector3 waterPosition = _water.position;
+        waterPosition.x = _startPosition.x + (_waterPositiveX - _waterNegativeX) * 0.5f;
+        waterPosition.z = _startPosition.z + (_waterPositiveZ - _waterNegativeZ) * 0.5f;
+        _water.position = waterPosition;
+        Vector3 waterScale = _water.localScale;
+        waterScale.x = _waterPositiveX + _waterNegativeX;
+        waterScale.z = _waterPositiveZ + _waterNegativeZ;
+        _water.localScale = waterScale;
+
+        Vector3 shipPosition = _shipNormal.position;
+        shipPosition.z = _shipNormalZ;
+        _shipNormal.position = shipPosition;
+        Vector3 blackHolePosition = _blackHole.position;
+        blackHolePosition.z = _blackHoleZ;
+        _blackHole.position = blackHolePosition;
+        _volcano.position = _volcanoPosition;
+
+        // 다른 컴포넌트가 Start에서 물 콜라이더 범위를 읽기 전에 물리 쪽 위치와 크기를 맞춘다.
+        Physics.SyncTransforms();
+    }
+
+    /// <summary>
+    /// position을 중심으로 반폭 halfSize인 수평 영역이 물 범위 안에 모두 들어가는지 확인한다.
+    /// 물 범위 값과 _startPosition의 X, Z를 사용하며, 들어가면 true를 반환한다.
+    /// </summary>
+    private bool IsOverWater(Vector3 position, float halfSize)
+    {
+        return position.x - halfSize >= _startPosition.x - _waterNegativeX
+            && position.x + halfSize <= _startPosition.x + _waterPositiveX
+            && position.z - halfSize >= _startPosition.z - _waterNegativeZ
+            && position.z + halfSize <= _startPosition.z + _waterPositiveZ;
     }
 
     /// <summary>
@@ -234,7 +297,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
 
     /// <summary>
     /// playerPosition과 생성 시드로 플레이어 주변 3000m의 모든 셀을 판정한다.
-    /// 시작점 +Z 1500m 경계와 밀도 조건에 맞는 벽과 유빙을 월드 Z 3000m 이하에서 활성 목록에 저장한다.
+    /// 시작점 +Z 1500m 경계와 밀도 조건에 맞고 물 범위 안에 모두 들어가는 벽과 유빙을 월드 Z 3000m 이하에서 활성 목록에 저장한다.
     /// </summary>
     private void SpawnObstacles(Vector3 playerPosition)
     {
@@ -269,6 +332,8 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
                     Mathf.Lerp(widths.x, widths.y, (float)random.NextDouble()),
                     Mathf.Lerp(heights.x, heights.y, (float)random.NextDouble()),
                     Mathf.Lerp(widths.x, widths.y, (float)random.NextDouble()));
+                // 물 가장자리에 걸치지 않도록 가장 긴 수평 반폭까지 물 범위 안에 들어와야 놓는다.
+                if (!IsOverWater(position, Mathf.Max(scale.x, scale.z) * 0.5f)) continue;
                 position.y = _waterY + scale.y * (ice ? 0.2f : 0.4f);
                 Stack<CuttableWall> pool = ice ? _icePool : _wallPool;
                 CuttableWall obstacle = pool.Count > 0 ? pool.Pop() : CreateObstacle(ice);
@@ -282,7 +347,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// cell과 playerPosition으로 안전 거리와 생성 구역을 확인해 점프대를 배치한다.
+    /// cell과 playerPosition으로 안전 거리, 생성 구역과 물 범위를 확인해 점프대를 배치한다.
     /// 벽과 유빙 밀도의 1/40 확률로 프리팹을 생성하거나 재사용하고 활성 셀에 기록한다.
     /// </summary>
     private void TrySpawnBoost(Vector2Int cell, Vector3 playerPosition)
@@ -301,6 +366,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
         Vector3 offset = position - playerPosition;
         offset.y = 0f;
         if (offset.sqrMagnitude < _safeRadius * _safeRadius) return;
+        if (!IsOverWater(position, BOOST_HALF_SIZE)) return;
 
         GameObject boost;
         if (_boostPool.Count > 0) boost = _boostPool.Pop();
