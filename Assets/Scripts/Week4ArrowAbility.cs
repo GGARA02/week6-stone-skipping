@@ -2,10 +2,11 @@ using System.Collections;
 using UnityEngine;
 
 // Week4 화살의 특수 동작. 던질 거리로 고른 동안에는 위아래로 천천히 흔들리고,
-// 던진 뒤 SPACE를 누르면 불씨 파티클 4개가 터져 나왔다가 화살로 빨려 들어간다.
+// 던진 뒤 SPACE를 누르면 불씨 파티클 4개가, 판정에 성공하면 모두 20개가 되도록 더 터져 나왔다가 화살로 빨려 들어간다.
 public class Week4ArrowAbility : FishAbility
 {
     private const int SPACE_EMBER_COUNT = 4;
+    private const int SUCCESS_EMBER_COUNT = 20;
 
     [Header("고르기")]
     [Tooltip("위아래로 흔들리는 높이")]
@@ -96,6 +97,21 @@ public class Week4ArrowAbility : FishAbility
     {
         Week4ArrowGainEffect effect = Instantiate(_gainEffectPrefab, transform.position, Quaternion.identity);
         effect.SetBurstCount(SPACE_EMBER_COUNT);
+        effect.SetTarget(transform);
+    }
+
+    /// <summary>
+    /// SPACE 판정에 성공하면 불씨 파티클을 더 터뜨려 그 입력의 불씨가 모두 SUCCESS_EMBER_COUNT개가 되게 한다.
+    /// context의 미끄러짐 상태, _gainEffectPrefab과 현재 위치를 사용하며, judge는 쓰지 않는다. 새 불씨 파티클을 만든다.
+    /// </summary>
+    public override void OnJudgeSuccess(ThrowContext context, SkipJudge judge)
+    {
+        // 미끄러지는 동안의 연타는 판정이 아니라 밀기라서 기존처럼 누를 때 나온 불씨만 둔다.
+        if (context.Player.IsSliding) return;
+
+        // 누를 때 이미 SPACE_EMBER_COUNT개를 냈으므로 나머지만 더한다.
+        Week4ArrowGainEffect effect = Instantiate(_gainEffectPrefab, transform.position, Quaternion.identity);
+        effect.SetBurstCount(SUCCESS_EMBER_COUNT - SPACE_EMBER_COUNT);
         effect.SetTarget(transform);
     }
 
