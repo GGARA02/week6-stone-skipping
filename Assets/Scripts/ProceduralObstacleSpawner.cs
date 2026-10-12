@@ -8,6 +8,9 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
     private const float MAX_SPAWN_Z = 3000f;
     // 점프대 프리팹의 가장 긴 수평 반폭(m). 물 가장자리에 걸치지 않게 놓을 때 쓴다.
     private const float BOOST_HALF_SIZE = 12f;
+    private const int EVOLUTION_OBSTACLE_COUNT = 5;
+    private const float EVOLUTION_FIRST_CONTACT_TIME = 0.35f;
+    private const float EVOLUTION_CONTACT_INTERVAL = 0.3f;
 
     [Header("거리 구역")]
     [Tooltip("시작 위치에서 +Z 방향으로 이만큼 가면 유빙 지역이 시작된다. 물 블록이 얼음으로 바뀌는 거리도 이 값을 따른다")]
@@ -65,6 +68,7 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
     private readonly List<Vector2Int> _releaseCells = new List<Vector2Int>();
     private readonly Stack<CuttableWall> _wallPool = new Stack<CuttableWall>();
     private readonly Stack<CuttableWall> _icePool = new Stack<CuttableWall>();
+    private readonly List<CuttableWall> _evolutionObstacles = new List<CuttableWall>();
     public Mesh IceMesh { get; private set; }
     public Material IceMaterial { get; private set; }
     public float IceStartDistance => _iceStartDistance;
@@ -76,6 +80,46 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
     public bool IsInIceRegion(Vector3 position)
     {
         return position.z > _startPosition.z + _iceStartDistance;
+    }
+
+    /// <summary>
+    /// origin과 변신 후 돌진 속도 velocity의 전방 경로에 절단 시연용 장애물 다섯 개를 좌우로 분산 배치한다.
+    /// 지형 구역과 예상 상승 높이를 사용하며 간격과 크기를 달리한 벽 또는 유빙을 다음 런 정리 목록에 저장한다.
+    /// </summary>
+    public void SpawnEvolutionObstacles(Vector3 origin, Vector3 velocity)
+    {
+        if (!_initialized) return;
+
+        Vector3 horizontalVelocity = Vector3.ProjectOnPlane(velocity, Vector3.up);
+        if (horizontalVelocity.sqrMagnitude < 0.0001f) return;
+
+        Vector3 forward = horizontalVelocity.normalized;
+        Vector3 right = Vector3.Cross(Vector3.up, forward);
+        Quaternion forwardRotation = Quaternion.LookRotation(forward, Vector3.up);
+        for (int i = 0; i < EVOLUTION_OBSTACLE_COUNT; i++)
+        {
+            float contactTime = EVOLUTION_FIRST_CONTACT_TIME + EVOLUTION_CONTACT_INTERVAL * i
+                + Random.Range(-0.05f, 0.05f);
+            Vector3 position = origin + horizontalVelocity * contactTime;
+            bool ice = IsInIceRegion(position);
+            Vector2 widths = ice ? _iceWidthRange : _wallWidthRange;
+            Vector2 heights = ice ? _iceHeightRange : _wallHeightRange;
+            float centerHeightRatio = ice ? 0.2f : 0.4f;
+            float predictedHeight = origin.y + Mathf.Max(0f, velocity.y) * contactTime;
+            float height = Mathf.Max(Random.Range(heights.x, heights.y),
+                (predictedHeight - _waterY + widths.y) / (0.5f + centerHeightRatio));
+            float width = Random.Range(widths.x, widths.y);
+            float side = Random.value < 0.5f ? -1f : 1f;
+            position += right * (side * width * Random.Range(0.2f, 0.4f));
+            position.y = _waterY + height * centerHeightRatio;
+
+            Stack<CuttableWall> pool = ice ? _icePool : _wallPool;
+            CuttableWall obstacle = pool.Count > 0 ? pool.Pop() : CreateObstacle(ice);
+            obstacle.transform.localScale = new Vector3(width, height, Random.Range(2.5f, 5f));
+            obstacle.transform.SetPositionAndRotation(position, forwardRotation);
+            obstacle.gameObject.SetActive(true);
+            _evolutionObstacles.Add(obstacle);
+        }
     }
 
     void Update()
@@ -185,6 +229,8 @@ public sealed class ProceduralObstacleSpawner : MonoBehaviour
     {
         foreach (CuttableWall wall in _active.Values) Release(wall);
         _active.Clear();
+        foreach (CuttableWall wall in _evolutionObstacles) Release(wall);
+        _evolutionObstacles.Clear();
         foreach (GameObject boost in _activeBoosts.Values) ReleaseBoost(boost);
         _activeBoosts.Clear();
     }

@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 // 날씨, 스카이박스, 후처리 볼륨처럼 화면 분위기를 바꾸는 환경을 한곳에서 관리한다.
-// 던지기 전마다 비와 밤을 확률로 정하고 조명, 하늘, 구름, 주변광, 안개, 비, 후처리에 반영한다.
+// 판마다 네 가지 기본 환경 중 하나를 정하고 조명, 하늘, 구름, 주변광, 안개, 비, 후처리에 반영한다.
 // 낮 값은 시작할 때 씬 설정을 저장해 쓴다. 재시작 때는 바로 바꾸고, 고른 물고기 때문에 바뀌는 날씨는 서서히 바꾼다.
 // 스카이박스는 기본 하늘 위에 밤, 비처럼 요청받은 스카이박스를 비중만큼 먼저 요청한 순서대로 섞는다.
 // 우주 하늘은 섞지 않고 켜고 끌 때 바로 바꾼다. 물고기가 바꾸는 하늘도 섞지 않고 바로 바꾸며, 우주 하늘이 아닐 때 보인다.
@@ -27,6 +27,9 @@ public class EnvironmentController : MonoBehaviour
     }
 
     private const int SH_COEFFICIENT_COUNT = 9;
+    private const float CLEAR_DAY_THRESHOLD = 0.3f;
+    private const float CLEAR_NIGHT_THRESHOLD = 0.6f;
+    private const float RAIN_DAY_THRESHOLD = 0.8f;
     // 셰이더가 다른 스카이박스는 값을 섞을 수 없어 비중이 이 값을 넘을 때 바꾼다.
     private const float SKYBOX_SWITCH_WEIGHT = 0.5f;
 
@@ -52,14 +55,6 @@ public class EnvironmentController : MonoBehaviour
     [Tooltip("카메라를 따라다니는 구름층 구. 비가 올 때 하늘을 덮고, 하늘 ALKAGI가 있으면 맑은 날에도 그 주변에 구름을 모은다")]
     [SerializeField]
     private Renderer _cloudRenderer;
-
-    [Header("확률")]
-    [Range(0f, 1f)]
-    [SerializeField]
-    private float _rainChance = 0.1f;
-    [Range(0f, 1f)]
-    [SerializeField]
-    private float _nightChance = 0.1f;
 
     [Header("전환")]
     [Tooltip("물고기를 골라 날씨가 바뀔 때 걸리는 시간(초)")]
@@ -249,15 +244,18 @@ public class EnvironmentController : MonoBehaviour
 
     /// <summary>
     /// 우주 하늘을 끄고, 이번 판의 기본 날씨를 정하고, 고른 물고기의 하늘, 날씨와 선택 시 볼륨까지 더해 바로 적용한다.
-    /// fish(기본 물고기면 null)와 randomWeather, 비, 밤 확률을 사용하며, randomWeather가 false면 기본 날씨를 맑은 낮으로 둔다.
+    /// fish(기본 물고기면 null)와 randomWeather를 사용하며, 기본 환경을 낮 30%, 밤 30%, 비 오는 낮 20%, 비 오는 밤 20%로 정한다.
+    /// randomWeather가 false면 기본 날씨를 맑은 낮으로 둔다.
     /// 우주 하늘 여부, 물고기 하늘, 기본 날씨, 목표 날씨, 현재 날씨 비중, 물고기 볼륨을 변경한다.
     /// </summary>
     public void Roll(FishType fish, bool randomWeather = true)
     {
         _fishSkybox = GetFishSkybox(fish);
         SetSpace(false);
-        _baseRain = randomWeather && RollChance(_rainChance);
-        _baseNight = randomWeather && RollChance(_nightChance);
+        float weatherRoll = randomWeather ? Random.value : 0f;
+        _baseRain = weatherRoll >= CLEAR_NIGHT_THRESHOLD;
+        _baseNight = (weatherRoll >= CLEAR_DAY_THRESHOLD && weatherRoll < CLEAR_NIGHT_THRESHOLD)
+            || weatherRoll >= RAIN_DAY_THRESHOLD;
         SetTarget(fish);
         _rainWeight = _targetRain ? 1f : 0f;
         _nightWeight = _targetNight ? 1f : 0f;
@@ -591,12 +589,4 @@ public class EnvironmentController : MonoBehaviour
         return probe;
     }
 
-    /// <summary>
-    /// 주어진 확률로 성공 여부를 뽑는다. 0이면 항상 실패하고 1이면 항상 성공한다.
-    /// chance를 사용하며, 성공 여부를 반환한다.
-    /// </summary>
-    private static bool RollChance(float chance)
-    {
-        return chance > 0f && Random.value <= chance;
-    }
 }
