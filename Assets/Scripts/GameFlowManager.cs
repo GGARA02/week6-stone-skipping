@@ -360,6 +360,9 @@ public class GameFlowManager : MonoBehaviour
             return;
         }
         if (!_showHud || _state != State.Ready) return;
+        // 도감에서 고른 칸이나 선택창 가운데 칸이 되면 하이라이트된 것으로 보고 "새로운!"을 지운다.
+        FishType highlighted = _catalogOpen ? _catalogSelectedFish : _pauseOpen ? null : SelectedFish();
+        if (highlighted != null) _progress.MarkFishSeen(highlighted);
         RefreshOwnedOptions();
         for (int i = 0; i < _fishSpawner.FishTypes.Count; i++)
         {
@@ -1023,6 +1026,10 @@ public class GameFlowManager : MonoBehaviour
                 : fish.Id == "menu" ? _fishSpawner.MenuCapture.Image
                 : _ownedFishSelectionPreview.GetTexture(_fishSpawner.FishPrefabs[index]);
             if (preview != null) GUI.DrawTexture(rect, preview, ScaleMode.ScaleToFit, true);
+            // 처음 얻은 뒤 아직 하이라이트되지 않은 종류는 칸 위에 강조 문구를 띄운다.
+            if (_progress.IsFishNew(fish))
+                ShadowLabel(new Rect(rect.x, rect.y - 34f * scale, slotWidth, 30f * scale), "새로운!", _centerSubStyle,
+                    new Color(1f, 0.75f, 0.2f));
             ShadowLabel(new Rect(rect.x, rect.yMax, slotWidth, 54f * scale), GetCatalogDisplayName(fish), _previewStyle,
                 offset == 0 ? new Color(1f, 0.92f, 0.7f) : new Color(0.75f, 0.75f, 0.75f, 0.7f));
         }
@@ -1156,6 +1163,10 @@ public class GameFlowManager : MonoBehaviour
                 : (owned ? _ownedFishSelectionPreview : _fishSelectionPreview).GetTexture(_fishSpawner.FishPrefabs[index]);
             if (revealed && texture != null) GUI.DrawTexture(image, texture, ScaleMode.ScaleToFit, true);
             else ShadowLabel(image, "?", _centerStyle, new Color(1f, 1f, 1f, 0.5f));
+            // 처음 얻은 뒤 아직 하이라이트되지 않은 종류는 칸 위쪽에 강조 문구를 띄운다.
+            if (fish != null && _progress.IsFishNew(fish))
+                ShadowLabel(new Rect(cell.x, cell.y + 6f * scale, cell.width, 30f * scale), "새로운!", _centerSubStyle,
+                    new Color(1f, 0.75f, 0.2f));
             string name = revealed ? GetCatalogDisplayName(fish) : "?";
             ShadowLabel(new Rect(cell.x, cell.y + 142f * scale, cell.width, 34f * scale), name, _previewStyle, Color.white);
             ShadowLabel(new Rect(cell.x, cell.y + 180f * scale, cell.width, 28f * scale),
