@@ -42,8 +42,9 @@ public class BlackHoleEnding : MonoBehaviour
     void OnTriggerEnter(Collider other)
     {
         if (_triggered) return;
+        if (_spawner != null && !_spawner.CanCollectFish) return;
         PlayerController player = other.GetComponentInParent<PlayerController>();
-        if (player == null)
+        if (player == null || player.IsGameOver)
             return;
         _triggered = true;
         flowManager.StartEndingCinema();
