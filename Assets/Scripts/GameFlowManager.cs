@@ -73,7 +73,7 @@ public class GameFlowManager : MonoBehaviour
     private int _goodCount;
     private int _missCount;
     private bool _screenCaptureTriggered;
-    // 게임을 켠 뒤 한 번이라도 던졌는지. 던지기 전 재시작은 날씨를 다시 뽑지 않는다.
+    // 게임을 켠 뒤 한 번이라도 던졌는지. 첫 판은 맑은 낮으로 시작한다.
     private bool _hasThrown;
     private bool _pauseOpen;
     private bool _resetConfirmOpen;
@@ -374,16 +374,9 @@ public class GameFlowManager : MonoBehaviour
             }
             LockCursor(Cursor.lockState != CursorLockMode.Locked);
         }
-        if (_input.RestartPressed)
+        if (_state == State.Flying && _input.RestartPressed)
         {
-            if (_state == State.Flying)
-            {
-                _playerController.GameOver(GameOverReason.Stopped);
-            }
-            else
-            {
-                Restart();
-            }
+            _playerController.GameOver(GameOverReason.Stopped);
             return;
         }
 
@@ -1183,8 +1176,8 @@ public class GameFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 던지기 전 안내와 지금 던질 거리를 그린다. 한 번이라도 던졌으면 재시작으로 날씨를 다시 뽑는 안내도 그린다.
-    /// 화면 크기와 scale, _hasThrown 및 획득 상태를 사용해 선택 항목의 설명 또는 힌트를 중앙 정렬로 그린다.
+    /// 던지기 전 안내와 지금 던질 거리를 그린다.
+    /// 화면 크기와 scale 및 획득 상태를 사용해 선택 항목의 설명 또는 힌트를 중앙 정렬로 그린다.
     /// </summary>
     private void DrawReady(float width, float height, float scale)
     {
@@ -1193,15 +1186,10 @@ public class GameFlowManager : MonoBehaviour
             canThrow ? _input.ReplaceBindingName("{Jump} 던지기 위하여") : "미획득 · 획득 후 투척 가능", _centerStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 80f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.IsUsingGamepad
-                ? "{Steer} / {CurveTriggers} 굽히는    {Jump} 물 점프    {Restart} 새 물고기"
-                : "A/D 굽히는    {Jump} 물에 닿을 때    {Restart} 새 물고기"), _centerSubStyle, Color.white);
+                ? "{Steer} / {CurveTriggers} 굽히는    {Jump} 물 점프"
+                : "A/D 굽히는    {Jump} 물에 닿을 때"), _centerSubStyle, Color.white);
         ShadowLabel(new Rect(0f, height * 0.18f + 112f * scale, width, 40f * scale),
             _input.ReplaceBindingName(_input.IsUsingGamepad ? "{Cancel} 차림표" : "ESC 차림표"), _centerSubStyle, new Color(1f, 1f, 1f, 0.7f));
-        if (_hasThrown)
-        {
-            ShadowLabel(new Rect(0f, height * 0.18f + 144f * scale, width, 40f * scale),
-                _input.ReplaceBindingName("{Restart}   날씨 · 시간 · 장소 재설정"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
-        }
         ShadowLabel(new Rect(0f, height * _spaceHintHeight, width, 40f * scale),
             _input.ReplaceBindingName("<  {Previous}   던지는   {Next}  >    {Catalog} 도감"), _centerSubStyle, new Color(1f, 0.92f, 0.7f));
         DrawFishPreviews(width, height, scale);

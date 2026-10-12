@@ -10082,8 +10082,6 @@ MonoBehaviour:
   _farRain: {fileID: 16973737}
   _skyReflectionProbe: {fileID: 1103095034}
   _cloudRenderer: {fileID: 154050278}
-  _rainChance: 0.1
-  _nightChance: 0.1
   _fadeDuration: 1
   _daySkybox: {fileID: 2100000, guid: 4752912f9f84f414482406688699c389, type: 2}
   _nightSkybox: {fileID: 2100000, guid: f47dc4746c018cf45981cb96f7936c6c, type: 2}
