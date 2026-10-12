@@ -8,7 +8,7 @@ using TMPro;
 
 public class EndingCreditUI : MonoBehaviour
 {
-    private const float DISPLAYDURATION = 23f;
+    private const float DISPLAYDURATION = 27f;
     private const float PULSE_SPEED = 4f;
     private const float MIN_SCALE = 0.92f;
     private const float MAX_SCALE = 1.12f;

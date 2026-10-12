@@ -59,7 +59,7 @@ public class CreditScrollPanel : MonoBehaviour
     [Tooltip("부모 패널에 RectMask2D를 자동 적용하여 보드 크기 밖으로 나가는 글자를 자를지 여부")]
     [SerializeField] private bool _autoApplyRectMask2D = true;
     [Tooltip("2D UI 모드에서 하단 스킵 문구와 겹치지 않도록 마스크를 띄울 여백(px)")]
-    private float _maskPaddingBottom = 80f;
+    private float _maskPaddingBottom = 120f;
     [Tooltip("2D UI 모드에서 상단 경계와 여백을 둘 마스크 여백(px)")]
     private float _maskPaddingTop = 50f;
     [Tooltip("마스크 상하단 경계면의 부드러운 페이드아웃 효과 크기(px)")]
