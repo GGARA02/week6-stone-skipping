@@ -177,7 +177,7 @@ public class Fish : MonoBehaviour
 
     /// <summary>
     /// spawner, type와 소유할 mesh로 절단된 벽 또는 유빙의 입수 대기 조각을 준비한다.
-    /// 점프 이동과 즉시 포획은 막고 실제 입수 시 다음 run의 모양 및 출현 등록을 허용한다.
+    /// 자식 메시를 루트 좌표로 합쳐 물수제비 기준을 만들고, 실제 입수 시 다음 run의 모양 및 출현 등록을 허용한다.
     /// </summary>
     public void InitializeWall(FishSpawner spawner, FishType type, Mesh mesh)
     {
@@ -190,7 +190,21 @@ public class Fish : MonoBehaviour
         _wallMesh = mesh;
         _waterY = spawner.WaterY;
         _previousY = transform.position.y;
-        Bounds bounds = GetComponent<MeshFilter>().sharedMesh.bounds;
+        Bounds bounds = default;
+        bool hasBounds = false;
+        foreach (MeshFilter filter in GetComponentsInChildren<MeshFilter>(true))
+        {
+            Bounds meshBounds = filter.sharedMesh.bounds;
+            Matrix4x4 toLocal = transform.worldToLocalMatrix * filter.transform.localToWorldMatrix;
+            for (int corner = 0; corner < 8; corner++)
+            {
+                Vector3 point = toLocal.MultiplyPoint3x4(meshBounds.center + Vector3.Scale(meshBounds.extents,
+                    new Vector3((corner & 1) == 0 ? -1f : 1f, (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f)));
+                if (!hasBounds) bounds = new Bounds(point, Vector3.zero);
+                else bounds.Encapsulate(point);
+                hasBounds = true;
+            }
+        }
         PrepareSkipReference(new Vector3(bounds.center.x, bounds.min.y + 0.1f, bounds.center.z));
     }
 

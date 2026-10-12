@@ -15364,18 +15364,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 44f7da2375d8b7245a520129296993c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProceduralObstacleSpawner
-  _iceStartDistance: 1500
-  _blackHoleStartDistance: 3000
+  _iceStartDistance: 1000
+  _blackHoleStartDistance: 2000
   _waterPositiveX: 2500
   _waterNegativeX: 2500
-  _waterPositiveZ: 4000
+  _waterPositiveZ: 2500
   _waterNegativeZ: 1000
   _shipNormal: {fileID: 423885620}
-  _shipNormalZ: 1500
+  _shipNormalZ: 1000
   _blackHole: {fileID: 1131671915}
-  _blackHoleZ: 3100
+  _blackHoleZ: 2100
   _volcano: {fileID: 715666654}
-  _volcanoPosition: {x: 1000, y: 70, z: 1000}
+  _volcanoPosition: {x: 700, y: 70, z: 700}
   _cellSize: 60
   _cellRadius: 6
   _density: 0.65
@@ -15663,14 +15663,6 @@ PrefabInstance:
     - target: {fileID: 2789516034199788772, guid: 10674a61155eb3a4081649a34a2cc57d, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3925478711016057601, guid: 10674a61155eb3a4081649a34a2cc57d, type: 3}
-      propertyPath: _beamWidth
-      value: 10
-      objectReference: {fileID: 0}
-    - target: {fileID: 3925478711016057601, guid: 10674a61155eb3a4081649a34a2cc57d, type: 3}
-      propertyPath: _sweepDuration
-      value: 4
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -21660,6 +21652,50 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!1 &1879068941
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1879068943}
+  - component: {fileID: 1879068942}
+  m_Layer: 0
+  m_Name: '@Managers'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1879068942
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1879068941}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81e977f9c54d6d34da6dd818e4d6cdaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Managers
+--- !u!4 &1879068943
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1879068941}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1936740314
 GameObject:
   m_ObjectHideFlags: 0
@@ -21698,27 +21734,16 @@ MonoBehaviour:
   _steerRate: 15
   _bankAngle: 12
   _stickDeadZone: 0.15
-  _attitudeStiffness: 90
-  _attitudeDamping: 15
   _impactWobble: 0.6
   _waveNormalTilt: 0.3
   _spinForFullStability: 20
   _minStability: 0.2
-  _liftCoefficient: 1
-  _skinFriction: 0.002
-  _formDrag: 0.03
-  _slideDeceleration: 5
   _liftTorqueFactor: 0.03
-  _spinWaterDamping: 1.5
   _exitClearance: 0.05
   _perfectWindow: 0.06
   _goodWindow: 0.15
-  _bonusLift: 10
-  _bonusSpeedRefund: 1
   _missCooldown: 0.5
   _slideEnterTime: 0.5
-  _slidePushSpeed: 5
-  _slideMaxPushes: 20
   _slideFloatDepth: 0.02
   _slideRiseSpeed: 2
   _slideSinkSpeed: 1
@@ -22161,3 +22186,4 @@ SceneRoots:
   - {fileID: 524649153}
   - {fileID: 637204388}
   - {fileID: 1131671914}
+  - {fileID: 1879068943}
