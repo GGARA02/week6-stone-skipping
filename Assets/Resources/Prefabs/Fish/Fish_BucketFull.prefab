@@ -1,5 +1,44 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &910000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 910000002}
+  - component: {fileID: 910000003}
+  m_Layer: 0
+  m_Name: SkipReference
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &910000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.400000036, z: 0}
+  m_LocalScale: {x: 1, y: 0.2, z: 1}
+  m_Children: []
+  m_Father: {fileID: 1241323952385231285}
+--- !u!135 &910000003
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000001}
+  m_IsTrigger: 1
+  m_Enabled: 0
+  serializedVersion: 3
+  m_Radius: 0.5
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1200551829040223371
 GameObject:
   m_ObjectHideFlags: 0
@@ -4893,6 +4932,9 @@ PrefabInstance:
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 1453450899606513219, guid: 1cf557d39ade55a4c8a22d526c9398c9, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 910000002}
+    - targetCorrespondingSourceObject: {fileID: 1453450899606513219, guid: 1cf557d39ade55a4c8a22d526c9398c9, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 9140698947076912804}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 4052327061058963068, guid: 1cf557d39ade55a4c8a22d526c9398c9, type: 3}
@@ -4943,6 +4985,7 @@ MonoBehaviour:
     _frictionMultiplier: 1
     _airGravityScale: 1
   _body: {fileID: 4643174342489230827}
+  _skipCollider: {fileID: 910000003}
 --- !u!114 &5254604937767305567
 MonoBehaviour:
   m_ObjectHideFlags: 0

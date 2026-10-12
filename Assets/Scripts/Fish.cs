@@ -1,5 +1,7 @@
 using UnityEngine;
 
+using Newtonsoft.Json.Linq;
+
 // 수면 아래에서 기다렸다가 포물선으로 튀어 오르는 물고기(또는 게) 한 마리. 물고기 프리팹의 루트에 붙는다.
 // 던진 물고기에 맞거나 다시 물에 들어가면 스포너에 알린다.
 public class Fish : MonoBehaviour
@@ -12,6 +14,8 @@ public class Fish : MonoBehaviour
     private const float FALL_SWAY_DISTANCE = 1.2f;
     private const float FALL_TILT_ANGLE = 18f;
 
+    private static JObject _skipCatalog;
+
     [Header("종류")]
     [SerializeField]
     private FishType _type;
@@ -21,7 +25,11 @@ public class Fish : MonoBehaviour
     [SerializeField]
     private Transform _body;
 
+    [Header("물수제비 기준")]
+    [SerializeField] private SphereCollider _skipCollider;
+
     [Header("상태")]
+    private JObject _skippingSettings;
     private FishSpawner _spawner;
     private Vector3 _startPosition;
     private Vector3 _position;
@@ -47,6 +55,63 @@ public class Fish : MonoBehaviour
     public Transform Body => _body;
     public bool IsEjected => _isEjected;
     public bool IsCutPiece => _isWall;
+    public SphereCollider SkipCollider => _skipCollider;
+    public float SkipSpeedMultiplier => SkippingSettings.Value<float>("skipSpeedMultiplier");
+    public float SkipBounceSpeed => SkippingSettings.Value<float>("skipBounceSpeed");
+    public float SkipBounceSpeedLoss => SkippingSettings.Value<float>("skipBounceSpeedLoss");
+    public float FeverBounceSpeedThreshold => SkippingSettings.Value<float>("feverBounceSpeedThreshold");
+    public float FeverBrakeMultiplier => SkippingSettings.Value<float>("feverBrakeMultiplier");
+    public float FeverBrakeAssistDuration => SkippingSettings.Value<float>("feverBrakeAssistDuration");
+    public float MinimumSkipSpeed => SkippingSettings.Value<float>("minimumSkipSpeed");
+    public float GoodSpeedRetention => SkippingSettings.Value<float>("goodSpeedRetention");
+    public float GoodBounceRetention => SkippingSettings.Value<float>("goodBounceRetention");
+    public float UnjudgedSpeedRetention => SkippingSettings.Value<float>("unjudgedSpeedRetention");
+    public float UnjudgedBounceRetention => SkippingSettings.Value<float>("unjudgedBounceRetention");
+    public float SkipLiftCoefficient => SkippingSettings.Value<float>("skipLiftCoefficient");
+    public float SkipAttitudeStiffness => SkippingSettings.Value<float>("skipAttitudeStiffness");
+    public float SkipAttitudeDamping => SkippingSettings.Value<float>("skipAttitudeDamping");
+    public float SkipSkinFriction => SkippingSettings.Value<float>("skipSkinFriction");
+    public float SkipFormDrag => SkippingSettings.Value<float>("skipFormDrag");
+    public float SkipSlideDeceleration => SkippingSettings.Value<float>("skipSlideDeceleration");
+    public float SkipSpinWaterDamping => SkippingSettings.Value<float>("skipSpinWaterDamping");
+
+    private JObject SkippingSettings
+    {
+        get
+        {
+            if (_skippingSettings == null) InitializeSkipping(_type.Id);
+            return _skippingSettings;
+        }
+    }
+
+    /// <summary>
+    /// 런타임 생성 물고기에 localCenter를 중심으로 납작한 물수제비 기준을 만든다.
+    /// 새 SphereCollider 참조를 저장하고 포획 및 장애물 충돌에는 사용하지 않는다.
+    /// </summary>
+    public void PrepareSkipReference(Vector3 localCenter)
+    {
+        if (_skipCollider == null)
+        {
+            GameObject reference = new GameObject("SkipReference");
+            reference.transform.SetParent(transform, false);
+            reference.transform.localScale = new Vector3(1f, 0.2f, 1f);
+            _skipCollider = reference.AddComponent<SphereCollider>();
+            _skipCollider.radius = 0.5f;
+            _skipCollider.isTrigger = true;
+            _skipCollider.enabled = false;
+        }
+        _skipCollider.transform.localPosition = localCenter;
+    }
+
+    /// <summary>
+    /// fishId로 FishCatalog의 물수제비 설정을 선택한다.
+    /// 카탈로그는 한 번 읽고, 해당 종류의 JSON 설정 참조를 현재 개체에 저장한다.
+    /// </summary>
+    public void InitializeSkipping(string fishId)
+    {
+        _skipCatalog ??= JObject.Parse(Resources.Load<TextAsset>("FishCatalog").text);
+        _skippingSettings = (JObject)_skipCatalog[fishId]["skipping"];
+    }
 
     void Update()
     {
@@ -116,6 +181,7 @@ public class Fish : MonoBehaviour
     /// </summary>
     public void InitializeWall(FishSpawner spawner, FishType type, Mesh mesh)
     {
+        InitializeSkipping(type.Id);
         _spawner = spawner;
         _type = type;
         _body = transform;
@@ -124,6 +190,8 @@ public class Fish : MonoBehaviour
         _wallMesh = mesh;
         _waterY = spawner.WaterY;
         _previousY = transform.position.y;
+        Bounds bounds = GetComponent<MeshFilter>().sharedMesh.bounds;
+        PrepareSkipReference(new Vector3(bounds.center.x, bounds.min.y + 0.1f, bounds.center.z));
     }
 
     /// <summary>
@@ -138,6 +206,7 @@ public class Fish : MonoBehaviour
         collider.convex = true;
         collider.sharedMesh = _wallMesh;
         collider.isTrigger = true;
+        PrepareSkipReference(new Vector3(sourceMesh.bounds.center.x, sourceMesh.bounds.min.y + 0.1f, sourceMesh.bounds.center.z));
     }
 
     /// <summary>
@@ -146,8 +215,11 @@ public class Fish : MonoBehaviour
     /// </summary>
     public void InitializeScreen(FishType type)
     {
+        InitializeSkipping(type.Id);
         _type = type;
         _body = transform;
+        Mesh mesh = GetComponent<MeshFilter>().sharedMesh;
+        PrepareSkipReference(new Vector3(mesh.bounds.center.x, mesh.bounds.min.y + 0.1f, mesh.bounds.center.z));
         enabled = false;
     }
 

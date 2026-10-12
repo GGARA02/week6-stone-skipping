@@ -279,32 +279,32 @@ public class SkipEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// 자동 튕김은 속도에 비례해 진동하고 GOOD 이상은 FOV 펀치와 번쩍임을 준다.
-    /// count, judge와 속도를 사용하며 판정 진동은 중복 재생하지 않고 화면 상태를 변경한다.
+    /// 판정 없는 자동 튕김에만 속도에 비례한 진동을 준다.
+    /// count는 쓰지 않고 judge와 속도를 사용하며 판정 효과는 HandleJudge에서 처리한다.
     /// </summary>
     private void HandleSkip(int count, SkipJudge judge)
     {
         if (_player.IsGameOver) return;
         float speedRatio = Mathf.Clamp01(_player.Speed / Mathf.Max(_splashFullSpeed, 0.01f));
         float strength = Mathf.Lerp(0.2f, 1f, speedRatio);
-        if (judge != SkipJudge.Perfect && judge != SkipJudge.Good)
-        {
-            if (judge == SkipJudge.None)
-                _rumble.Pulse(Vector2.Lerp(_skipRumbleMin, _skipRumbleMax, speedRatio), Mathf.Lerp(0.08f, 0.3f, strength));
-            return;
-        }
-        _cameraController.Punch(strength);
-        _flashColor = judge == SkipJudge.Perfect ? _perfectFlashColor : _skipFlashColor;
-        _flashTime = Time.unscaledTime;
+        if (judge == SkipJudge.None)
+            _rumble.Pulse(Vector2.Lerp(_skipRumbleMin, _skipRumbleMax, speedRatio), Mathf.Lerp(0.08f, 0.3f, strength));
     }
 
     /// <summary>
-    /// judge에 따라 MISS는 약하고 짧게, GOOD은 중간, PERFECT는 강하고 길게 진동한다.
-    /// timingError는 사용하지 않으며 패드의 일시 진동 상태를 변경한다.
+    /// judge별 진동을 주고 GOOD 이상이면 판정 시점에 FOV 펀치와 번쩍임을 준다.
+    /// timingError는 쓰지 않으며, Early와 Late 모두 같은 화면 및 패드 효과를 변경한다.
     /// </summary>
     private void HandleJudge(SkipJudge judge, float timingError)
     {
         if (_player.IsGameOver) return;
+        if (judge == SkipJudge.Perfect || judge == SkipJudge.Good)
+        {
+            float speedRatio = Mathf.Clamp01(_player.Speed / Mathf.Max(_splashFullSpeed, 0.01f));
+            _cameraController.Punch(Mathf.Lerp(0.2f, 1f, speedRatio));
+            _flashColor = judge == SkipJudge.Perfect ? _perfectFlashColor : _skipFlashColor;
+            _flashTime = Time.unscaledTime;
+        }
         switch (judge)
         {
             case SkipJudge.Miss: _rumble.Pulse(_missRumble, 0.08f); break;

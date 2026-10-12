@@ -69,10 +69,6 @@ public class PlayerController : MonoBehaviour
     private float _targetRoll;
 
     [Header("자세 안정 (스핀이 클수록 단단하게 유지)")]
-    [SerializeField]
-    private float _attitudeStiffness = 90f;
-    [SerializeField]
-    private float _attitudeDamping = 15f;
     [Tooltip("튕길 때 물결에 기운 수면 법선 쪽으로 물고기를 비트는 세기 (수직 충돌 속도당 rad/s)")]
     [SerializeField]
     private float _impactWobble = 0.6f;
@@ -87,25 +83,10 @@ public class PlayerController : MonoBehaviour
     private float _minStability = 0.2f;
 
     [Header("수면 반발")]
-    [Tooltip("양력 = 계수 x 속력 x (아랫면이 물을 파고드는 속도) x 잠긴 면적, 아랫면 법선 방향")]
-    [SerializeField]
-    private float _liftCoefficient = 1f;
-    [Tooltip("물고기 면을 따라 미끄러질 때의 마찰")]
-    [SerializeField]
-    private float _skinFriction = 0.002f;
-    [Tooltip("물고기가 깊이 잠길수록 커지는 저항")]
-    [SerializeField]
-    private float _formDrag = 0.03f;
-    [Tooltip("물에 닿아 있는 동안 속도와 상관없이 더하는 감속(m/s²). 느릴 때 수면을 오래 미끄러지지 않게 한다")]
-    [SerializeField]
-    private float _slideDeceleration = 5f;
     [Tooltip("양력이 무게중심에서 벗어난 곳에 걸려 생기는 회전 비율. 0이면 물고기 모양이 흔들림에 영향 없음")]
     [Range(0f, 0.2f)]
     [SerializeField]
     private float _liftTorqueFactor = 0.03f;
-    [Tooltip("물에 닿아 있는 동안 스핀 감소율 (1/s)")]
-    [SerializeField]
-    private float _spinWaterDamping = 1.5f;
     [Tooltip("수면 위로 이만큼 떠야 접촉이 끝난 것으로 판정 (떨림 방지)")]
     [SerializeField]
     private float _exitClearance = 0.05f;
@@ -117,6 +98,13 @@ public class PlayerController : MonoBehaviour
     private Vector3 _submergedCenter;
     private float _contactStartTime;
     private float _contactEntrySpeed;
+    private bool _contactBounced;
+    private float _contactBounceHeight;
+    private float _contactBounceSpeed;
+    private float _contactExitClearance;
+    private int _bounceCount;
+    private float _skipCenterY;
+    private float _skipArea;
     public event Action<Vector3, float> OnWaterContact;
     public event Action<int, SkipJudge> OnSkip;
 
@@ -125,13 +113,6 @@ public class PlayerController : MonoBehaviour
     private float _perfectWindow = 0.06f;
     [SerializeField]
     private float _goodWindow = 0.15f;
-    [Tooltip("PERFECT 시 추가 상승 속도 (GOOD은 절반)")]
-    [SerializeField]
-    private float _bonusLift = 4f;
-    [Tooltip("PERFECT 시 이번 접촉에서 잃은 수평 속도 중 돌려받는 비율 (GOOD은 절반)")]
-    [Range(0f, 1f)]
-    [SerializeField]
-    private float _bonusSpeedRefund = 0.6f;
     [Tooltip("MISS 뒤 다음 SPACE 입력을 받지 않는 시간(초). 연타로 판정 구간을 덮지 못하게 한다")]
     [SerializeField]
     private float _missCooldown = 0.5f;
@@ -145,12 +126,6 @@ public class PlayerController : MonoBehaviour
     [Tooltip("물에 이 시간(초) 이상 계속 닿아 있으면 미끄러짐으로 판정한다. GOOD 판정 범위보다 길어야 한다")]
     [SerializeField]
     private float _slideEnterTime = 0.3f;
-    [Tooltip("미끄러지는 동안 첫 SPACE에 진행 방향으로 더하는 속도(m/s). 누를 때마다 줄어든다")]
-    [SerializeField]
-    private float _slidePushSpeed = 0.8f;
-    [Tooltip("미끄러지는 동안 SPACE로 밀 수 있는 횟수. 누를 때마다 추진력이 일정하게 줄어 이 횟수에서 0이 된다")]
-    [SerializeField]
-    private int _slideMaxPushes = 20;
     [Tooltip("미끄러지는 동안 물고기 아랫면을 띄워 두는 수면 아래 깊이(m). 0보다 커야 물 마찰로 감속한다")]
     [SerializeField]
     private float _slideFloatDepth = 0.02f;
@@ -168,7 +143,7 @@ public class PlayerController : MonoBehaviour
     private float _slideBrakeDeceleration = 3f;
     private bool _isSliding;
     private bool _isSlideSinking;
-    private int _slidePushesUsed;
+    private float _slideBrakeAssistUntil;
     private int _slidePushCount;
     public event Action OnSlidePush;
 
@@ -197,7 +172,7 @@ public class PlayerController : MonoBehaviour
     public float Distance { get; private set; }
     public float Speed => _velocity.magnitude;
     public Vector3 Velocity => _velocity;
-    public Vector3 WaterContactPoint => new Vector3(_playerRB.position.x, _waterY, _playerRB.position.z);
+    public Vector3 WaterContactPoint => new Vector3(_submergedCenter.x, _waterY, _submergedCenter.z);
     public float TargetPitch => _targetPitch;
     public float TargetRoll => _targetRoll;
     public int FishSeed => _fish.CurrentSeed;
@@ -206,8 +181,8 @@ public class PlayerController : MonoBehaviour
     public float SpinRate => Vector3.Dot(_playerRB.angularVelocity, FishUp());
     public float Stability => Mathf.Lerp(_minStability, 1f, Mathf.Clamp01(Mathf.Abs(SpinRate) / Mathf.Max(_spinForFullStability, 0.01f)));
     public bool IsSliding => _isSliding;
-    // 남은 밀기 힘 (1이면 처음, 0이면 더 밀리지 않음)
-    public float SlidePower => 1f - Mathf.Clamp01((float)_slidePushesUsed / Mathf.Max(_slideMaxPushes, 1));
+    // Fever에서 감속 완화 입력을 받을 수 있는 동안 1을 유지한다.
+    public float SlidePower => _isSliding && !_isSlideSinking ? 1f : 0f;
 
     // 지금 SPACE를 판정 입력으로 받는지 (MISS 쿨타임이 아니고, 접촉 중이면 판정 전이며 GOOD 범위까지)
     public bool CanJudge => _isThrown && !_isGameOver && Time.time >= _cooldownEndTime
@@ -253,14 +228,14 @@ public class PlayerController : MonoBehaviour
             ability.OnSpacePressed(AbilityContext());
         }
 
-        // 미끄러지는 동안은 타이밍 판정 대신 누른 횟수만큼 밀어준다.
-        if (_isSliding)
+        // Fever에서는 타이밍 판정 대신 감속 완화 입력으로 받는다.
+        if (_isSliding && !_isSlideSinking)
         {
             _slidePushCount++;
             OnSlidePush?.Invoke();
         }
         // 판정을 기다리는 입력이 있거나 MISS 쿨타임 중이면 새 입력은 받지 않는다.
-        else if (!_jumpPending && Time.time >= _cooldownEndTime)
+        else if (!_jumpPending && CanJudge)
         {
             _jumpPending = true;
             _jumpPressTime = Time.time;
@@ -292,7 +267,7 @@ public class PlayerController : MonoBehaviour
                 ApplySlidePush();
             }
         }
-        if (_submersion > 0f)
+        if (_submersion > 0f && (!_contactBounced || _isGameOver || _isSliding))
         {
             ApplyWaterForces(dt);
         }
@@ -377,10 +352,14 @@ public class PlayerController : MonoBehaviour
         _jumpPending = false;
         _cooldownEndTime = 0f;
         _contactJudge = SkipJudge.None;
+        _contactBounced = false;
+        _contactBounceSpeed = 0f;
+        _contactExitClearance = _exitClearance;
+        _bounceCount = 0;
         _contactStartTime = float.NegativeInfinity;
         _isSliding = false;
         _isSlideSinking = false;
-        _slidePushesUsed = 0;
+        _slideBrakeAssistUntil = float.NegativeInfinity;
         _slidePushCount = 0;
         _stopTimer = 0f;
         _steer = 0f;
@@ -441,13 +420,15 @@ public class PlayerController : MonoBehaviour
         _modifiers = modifiers;
         float spin = _throwSpin * modifiers.SpinMultiplier * _spinScale;
         _playerRB.maxAngularVelocity = Mathf.Max(_playerRB.maxAngularVelocity, Mathf.Abs(spin) * 2f);
-        Vector3 velocity = _startRotation * _throwVelocity * modifiers.SpeedMultiplier;
+        Vector3 velocity = _startRotation * _throwVelocity * (modifiers.SpeedMultiplier * _fish.CurrentFish.SkipSpeedMultiplier);
         _heading = ThrowHeading();
 
         Quaternion fishRotation = AttitudeRotation(0f);
         Quaternion rotation = fishRotation * Quaternion.Inverse(_fishLocalRotation);
         _playerRB.rotation = rotation;
         transform.rotation = rotation;
+        _playerRB.position += _startPosition - _playerRB.worldCenterOfMass;
+        transform.position = _playerRB.position;
 
         _playerRB.useGravity = true;
         _playerRB.linearVelocity = velocity;
@@ -526,6 +507,8 @@ public class PlayerController : MonoBehaviour
         Quaternion rotation = AttitudeRotation(0f) * Quaternion.Inverse(_fishLocalRotation);
         _playerRB.rotation = rotation;
         transform.rotation = rotation;
+        _playerRB.position += _startPosition - _playerRB.worldCenterOfMass;
+        transform.position = _playerRB.position;
     }
 
     /// <summary>
@@ -539,41 +522,31 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 물리 포즈 기준으로 물고기의 최저/최고 높이와 물에 잠긴 아랫면 면적, 그 중심을 계산한다.
-    /// 물고기 외형 점과 아랫면 샘플점을 사용하며, _bottomHeight, _topHeight, _submersion, _submergedArea, _submergedCenter를 변경한다.
+    /// 물리 포즈와 기준 콜라이더의 중심, 반지름, 축별 스케일로 수면 접촉을 계산한다.
+    /// 외형 대신 납작한 기준 타원체를 사용하며, 높이와 잠긴 면적 및 중심 상태를 변경한다.
     /// </summary>
     private void SampleWater()
     {
         // 보간된 transform 대신 물리 포즈를 써야 접촉 판정이 한 스텝 늦지 않는다.
         Matrix4x4 toWorld = Matrix4x4.TRS(_playerRB.position, _playerRB.rotation, Vector3.one) * _fishLocalMatrix;
 
-        float minY = float.PositiveInfinity;
-        float maxY = float.NegativeInfinity;
-        Vector3[] hull = _fish.HullPoints;
-        for (int i = 0; i < hull.Length; i++)
-        {
-            float y = toWorld.MultiplyPoint3x4(hull[i]).y;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-        }
+        SphereCollider reference = _fish.CurrentFish.SkipCollider;
+        Vector3 center = _playerRB.worldCenterOfMass;
+        Vector3 radii = reference.transform.localScale * reference.radius;
+        Vector3 axisX = toWorld.MultiplyVector(Vector3.right * radii.x);
+        Vector3 axisY = toWorld.MultiplyVector(Vector3.up * radii.y);
+        Vector3 axisZ = toWorld.MultiplyVector(Vector3.forward * radii.z);
+        float extentY = Mathf.Sqrt(axisX.y * axisX.y + axisY.y * axisY.y + axisZ.y * axisZ.y);
+        float minY = center.y - extentY;
+        float maxY = center.y + extentY;
         _bottomHeight = minY - _waterY;
         _topHeight = maxY - _waterY;
         _submersion = Mathf.Clamp01((_waterY - minY) / Mathf.Max(maxY - minY, 0.01f));
 
-        _submergedArea = 0f;
-        Vector3 center = Vector3.zero;
-        Vector3[] samples = _fish.BottomSamples;
-        float[] areas = _fish.SampleAreas;
-        for (int i = 0; i < samples.Length; i++)
-        {
-            Vector3 point = toWorld.MultiplyPoint3x4(samples[i]);
-            if (point.y < _waterY)
-            {
-                _submergedArea += areas[i];
-                center += point * areas[i];
-            }
-        }
-        _submergedCenter = _submergedArea > 0f ? center / _submergedArea : _playerRB.worldCenterOfMass;
+        _skipCenterY = center.y;
+        _skipArea = Mathf.PI * Vector3.Cross(axisX, axisZ).magnitude;
+        _submergedArea = _skipArea * _submersion;
+        _submergedCenter = center - (axisX * axisX.y + axisY * axisY.y + axisZ * axisZ.y) / Mathf.Max(extentY, 0.0001f);
     }
 
     /// <summary>
@@ -582,20 +555,23 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     private void UpdateContact()
     {
-        if (!_inContact && _bottomHeight < 0f)
+        if (!_inContact && _bottomHeight < 0f && _velocity.y <= 0f)
         {
             BeginContact();
         }
         // 미끄러지는 중에는 자세가 바뀌어 아랫면이 살짝 떠도 접촉을 끝내지 않는다.
-        else if (_inContact && !_isSliding && _bottomHeight > _exitClearance)
+        else if (_inContact && !_isSliding && _bottomHeight > _contactExitClearance)
         {
             EndContact();
         }
 
         // 튕겨 나가지 못하고 계속 닿아 있으면 미끄러짐으로 바꾸고, 기다리던 타이밍 입력은 버린다.
-        if (_inContact && !_isSliding && ContactElapsed >= _slideEnterTime)
+        if (_inContact && !_isSliding
+            && (_contactBounceSpeed <= _fish.CurrentFish.FeverBounceSpeedThreshold || ContactElapsed >= _slideEnterTime))
         {
             _isSliding = true;
+            _contactBounced = false;
+            _velocity.y = Mathf.Min(_velocity.y, 0f);
             _jumpPending = false;
             _slidePushCount = 0;
 
@@ -624,7 +600,7 @@ public class PlayerController : MonoBehaviour
 
     /// <summary>
     /// 물에 닿기 시작한 순간의 시각과 수평 속도를 기록하고 착수 이벤트를 보낸다.
-    /// _velocity와 물고기 위치를 사용하며, _inContact, _contactStartTime, _contactEntrySpeed, _contactJudge를 변경한다.
+    /// _velocity와 Fish의 반동 감소량을 사용하며, 접촉별 상승 속도를 저장하고 반동 횟수를 한 번 증가시킨다.
     /// </summary>
     private void BeginContact()
     {
@@ -632,8 +608,21 @@ public class PlayerController : MonoBehaviour
         _contactStartTime = Time.time;
         _contactEntrySpeed = Horizontal(_velocity).magnitude;
         _contactJudge = SkipJudge.None;
+        Fish settings = _fish.CurrentFish;
+        _contactBounceSpeed = Mathf.Max(0f, settings.SkipBounceSpeed - _bounceCount * settings.SkipBounceSpeedLoss);
+        _contactExitClearance = _exitClearance;
+        _contactBounced = _velocity.y < 0f && _contactEntrySpeed >= settings.MinimumSkipSpeed
+            && _contactBounceSpeed > settings.FeverBounceSpeedThreshold;
         KickOnImpact();
         OnWaterContact?.Invoke(WaterContactPoint, _velocity.magnitude);
+        if (_contactBounced)
+        {
+            _bounceCount++;
+            _playerRB.position -= Vector3.up * _bottomHeight;
+            _skipCenterY = _playerRB.worldCenterOfMass.y;
+            _contactBounceHeight = _skipCenterY;
+            ApplyContactRebound(SkipJudge.None);
+        }
     }
 
     /// <summary>
@@ -655,7 +644,7 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 물에서 벗어난 순간 튕김으로 세고, 판정 보너스가 있으면 잃은 수평 속도 일부를 돌려준다.
+    /// 물에서 벗어난 순간 튕김으로 센다. 속도는 착수와 판정 시에만 설정한다.
     /// 판정 결과는 다음 착수 전까지 남겨, 늦은 입력이 같은 접촉을 다시 판정하지 않게 한다.
     /// _contactJudge를 사용하며, _velocity, SkipCount, 접촉 상태를 변경한다.
     /// </summary>
@@ -665,39 +654,39 @@ public class PlayerController : MonoBehaviour
 
         if (_velocity.y > 0f)
         {
-            float quality = JudgeQuality(_contactJudge);
-            if (quality > 0f)
-            {
-                RefundContactSpeed(quality);
-            }
             SkipCount++;
             OnSkip?.Invoke(SkipCount, _contactJudge);
         }
     }
 
     /// <summary>
-    /// 이번 접촉에서 잃은 수평 속도 중 판정 배율만큼을 진행 방향으로 돌려준다.
-    /// quality와 _contactEntrySpeed, _bonusSpeedRefund를 사용하며, _velocity를 변경한다.
+    /// 착수 속도, 소진된 접촉별 상승 속도와 judge별 유지율로 수평 및 수직 속도를 교체한다.
+    /// 현재 기준 높이까지 소모한 위치 에너지를 반영하여 늦은 판정에도 상승 속도를 중복 추가하지 않는다.
     /// </summary>
-    private void RefundContactSpeed(float quality)
+    private void ApplyContactRebound(SkipJudge judge)
     {
-        float lost = _contactEntrySpeed - Horizontal(_velocity).magnitude;
-        if (lost > 0f)
-        {
-            _velocity += _heading * (lost * _bonusSpeedRefund * quality);
-        }
+        Fish settings = _fish.CurrentFish;
+        float speedRetention = judge == SkipJudge.Perfect ? 1f
+            : judge == SkipJudge.Good ? settings.GoodSpeedRetention : settings.UnjudgedSpeedRetention;
+        float bounceRetention = judge == SkipJudge.Perfect ? 1f
+            : judge == SkipJudge.Good ? settings.GoodBounceRetention : settings.UnjudgedBounceRetention;
+        float launchSpeed = _contactBounceSpeed * bounceRetention;
+        float gravity = -Physics.gravity.y * _modifiers.AirGravityScale;
+        _contactExitClearance = Mathf.Min(_exitClearance, launchSpeed * launchSpeed / (8f * Mathf.Max(gravity, 0.01f)));
+        float rise = Mathf.Max(0f, _skipCenterY - _contactBounceHeight);
+        float verticalSpeed = Mathf.Sqrt(Mathf.Max(0f, launchSpeed * launchSpeed - 2f * gravity * rise));
+        _velocity = _heading * (_contactEntrySpeed * speedRetention) + Vector3.up * verticalSpeed;
     }
 
     /// <summary>
-    /// 미끄러지는 동안 쌓인 SPACE 입력마다 진행 방향으로 밀어준다. 누를 때마다 추진력이 줄어 _slideMaxPushes번째에 0이 된다.
-    /// _slidePushCount, _slidePushSpeed, SlidePower를 사용하며, _velocity, _slidePushesUsed, _slidePushCount를 변경한다.
+    /// Fever에서 쌓인 SPACE 입력으로 감속 완화 종료 시각을 갱신하고 입력을 소비한다.
+    /// _slidePushCount와 Fish의 완화 지속 시간을 사용하며 속도를 추가하지 않는다.
     /// </summary>
     private void ApplySlidePush()
     {
-        for (int i = 0; i < _slidePushCount; i++)
+        if (_slidePushCount > 0)
         {
-            _velocity += _heading * (_slidePushSpeed * SlidePower);
-            _slidePushesUsed++;
+            _slideBrakeAssistUntil = Time.time + _fish.CurrentFish.FeverBrakeAssistDuration;
         }
         _slidePushCount = 0;
     }
@@ -712,7 +701,8 @@ public class PlayerController : MonoBehaviour
         float speed = horizontal.magnitude;
         if (speed < 0.0001f) return;
 
-        float slowed = Mathf.Max(speed - _slideBrakeDeceleration * dt, 0f);
+        float brakeMultiplier = Time.time < _slideBrakeAssistUntil ? _fish.CurrentFish.FeverBrakeMultiplier : 1f;
+        float slowed = Mathf.Max(speed - _slideBrakeDeceleration * brakeMultiplier * dt, 0f);
         horizontal *= slowed / speed;
         _velocity.x = horizontal.x;
         _velocity.z = horizontal.z;
@@ -742,8 +732,7 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 착수 시각과 SPACE 입력 시각의 차이로 판정하고, 성공하면 상승 속도와 스핀을 보충한다.
-    /// 물에서 이미 벗어난 뒤의 늦은 판정이면 수평 속도 환급도 바로 준다.
+    /// 착수 시각과 SPACE 입력 시각의 차이로 판정하고, 성공하면 동일한 기준 반동 궤적과 스핀을 설정한다.
     /// timingError(초, 빠르면 음수)를 사용하며, _contactJudge, _velocity, Rigidbody 각속도를 변경하고 특수 동작과 OnJudge로 결과를 보낸다.
     /// </summary>
     private void Judge(float timingError)
@@ -757,10 +746,9 @@ public class PlayerController : MonoBehaviour
         float quality = JudgeQuality(_contactJudge);
         if (quality > 0f)
         {
-            _velocity += Vector3.up * (_bonusLift * quality);
-            if (!_inContact)
+            if (_contactBounced)
             {
-                RefundContactSpeed(quality);
+                ApplyContactRebound(_contactJudge);
             }
 
             // 스핀을 다시 살려 자세를 잡아준다.
@@ -829,6 +817,7 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     private void ApplyWaterForces(float dt)
     {
+        float brakeMultiplier = _isSliding && Time.time < _slideBrakeAssistUntil ? _fish.CurrentFish.FeverBrakeMultiplier : 1f;
         float speed = _velocity.magnitude;
         if (speed < 0.0001f) return;
 
@@ -839,7 +828,7 @@ public class PlayerController : MonoBehaviour
         float intoWater = -Vector3.Dot(_velocity, normal);
         if (intoWater > 0f && _submergedArea > 0f)
         {
-            float lift = Mathf.Min(_liftCoefficient * _modifiers.LiftMultiplier * speed * intoWater * _submergedArea * dt, intoWater);
+            float lift = Mathf.Min(_fish.CurrentFish.SkipLiftCoefficient * _modifiers.LiftMultiplier * speed * intoWater * _submergedArea * dt, intoWater);
             _velocity += normal * lift;
             Vector3 arm = _submergedCenter - _playerRB.worldCenterOfMass;
             _playerRB.AddTorque(Vector3.Cross(arm, normal * (lift * _playerRB.mass)) * _liftTorqueFactor, ForceMode.Impulse);
@@ -852,8 +841,8 @@ public class PlayerController : MonoBehaviour
             if (alongSpeed > 0.0001f)
             {
                 // 속도 제곱 마찰은 느릴 때 거의 사라지므로 일정한 미끄럼 감속을 더한다.
-                float friction = _skinFriction * _modifiers.FrictionMultiplier * speed * alongSpeed * _submergedArea * dt
-                    + _slideDeceleration * dt;
+                float friction = (_fish.CurrentFish.SkipSkinFriction * _modifiers.FrictionMultiplier * speed * alongSpeed * _submergedArea * dt
+                    + _fish.CurrentFish.SkipSlideDeceleration * dt) * brakeMultiplier;
                 friction = Mathf.Min(friction, alongSpeed);
                 _velocity -= along / alongSpeed * friction;
             }
@@ -862,14 +851,14 @@ public class PlayerController : MonoBehaviour
         float newSpeed = _velocity.magnitude;
         if (newSpeed > 0.0001f)
         {
-            float drag = Mathf.Min(_formDrag * newSpeed * newSpeed * _submersion * _submersion * dt, newSpeed);
+            float drag = Mathf.Min(_fish.CurrentFish.SkipFormDrag * newSpeed * newSpeed * _submersion * _submersion * dt * brakeMultiplier, newSpeed);
             _velocity -= _velocity / newSpeed * drag;
         }
 
-        float areaRatio = _submergedArea / _fish.TotalBottomArea;
+        float areaRatio = _submergedArea / Mathf.Max(_skipArea, 0.0001f);
         Vector3 angular = _playerRB.angularVelocity;
         float spin = Vector3.Dot(angular, up);
-        float damped = spin * Mathf.Exp(-_spinWaterDamping * areaRatio * dt);
+        float damped = spin * Mathf.Exp(-_fish.CurrentFish.SkipSpinWaterDamping * areaRatio * dt);
         _playerRB.angularVelocity = angular + up * (damped - spin);
     }
 
@@ -911,7 +900,7 @@ public class PlayerController : MonoBehaviour
         // 스핀 축 회전은 그대로 두고, 축이 기우는 흔들림만 잡는다.
         Vector3 angular = _playerRB.angularVelocity;
         Vector3 wobble = angular - Vector3.Dot(angular, up) * up;
-        Vector3 correction = (error * _attitudeStiffness - wobble * _attitudeDamping) * Stability;
+        Vector3 correction = (error * _fish.CurrentFish.SkipAttitudeStiffness - wobble * _fish.CurrentFish.SkipAttitudeDamping) * Stability;
         _playerRB.AddTorque(correction, ForceMode.Acceleration);
     }
 
@@ -921,7 +910,7 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     private void UpdateDistance()
     {
-        float forwardDistance = _playerRB.position.z - _startPosition.z;
+        float forwardDistance = _playerRB.worldCenterOfMass.z - _startPosition.z;
         Distance = Mathf.Max(Distance, forwardDistance);
     }
 
@@ -936,7 +925,7 @@ public class PlayerController : MonoBehaviour
             GameOver(GameOverReason.Sunk);
             return;
         }
-        if (_playerRB.position.y < _killY)
+        if (_playerRB.worldCenterOfMass.y < _killY)
         {
             GameOver(GameOverReason.OutOfBounds);
             return;
@@ -971,13 +960,19 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 물고기 모양이 바뀌면 무게중심과 관성을 새 모양 기준으로 다시 계산한다.
-    /// 입력값은 없으며, Rigidbody 질량 특성을 변경한다.
+    /// 기준 콜라이더의 중심과 숫자 크기로 무게중심과 관성을 설정한다.
+    /// 현재 Fish의 기준과 Rigidbody 질량을 사용하며 외형과 독립된 질량 특성을 저장한다.
     /// </summary>
     private void HandleFishGenerated()
     {
-        _playerRB.ResetCenterOfMass();
-        _playerRB.ResetInertiaTensor();
+        SphereCollider reference = _fish.CurrentFish.SkipCollider;
+        _playerRB.centerOfMass = transform.InverseTransformPoint(reference.transform.TransformPoint(reference.center));
+        Vector3 radii = Vector3.Scale(_fishTransform.localScale, reference.transform.localScale) * reference.radius;
+        _playerRB.inertiaTensor = new Vector3(
+            radii.y * radii.y + radii.z * radii.z,
+            radii.x * radii.x + radii.z * radii.z,
+            radii.x * radii.x + radii.y * radii.y) * (_playerRB.mass * 0.2f);
+        _playerRB.inertiaTensorRotation = _fishLocalRotation;
     }
 
     /// <summary>

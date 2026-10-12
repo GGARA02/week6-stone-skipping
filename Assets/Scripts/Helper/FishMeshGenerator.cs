@@ -88,6 +88,7 @@ public class FishMeshGenerator : MonoBehaviour
     private FishType _fishType;
     private float _fishInflate = 1f;
     private Fish _fishInstance;
+    private Fish _generatedFish;
     private MeshFilter _fishMeshFilter;
     private Vector3 _fishBodyScale;
 
@@ -144,6 +145,7 @@ public class FishMeshGenerator : MonoBehaviour
     public FishAbility CurrentAbility { get; private set; }
     // 던진 물고기의 몸. 물고기 모양일 때만 쓴다.
     public Transform FishBody => _fishInstance.Body;
+    public Fish CurrentFish => _fishInstance != null ? _fishInstance : _generatedFish;
 
     void Awake()
     {
@@ -153,6 +155,12 @@ public class FishMeshGenerator : MonoBehaviour
         _flatBottomCollider.sharedMaterial = _meshCollider.sharedMaterial;
         _meshRenderer = GetComponent<MeshRenderer>();
         _propertyBlock = new MaterialPropertyBlock();
+        GameObject generatedReference = new GameObject("GeneratedFishSettings");
+        generatedReference.transform.SetParent(transform, false);
+        _generatedFish = generatedReference.AddComponent<Fish>();
+        _generatedFish.enabled = false;
+        _generatedFish.InitializeSkipping("default");
+        _generatedFish.PrepareSkipReference(Vector3.zero);
         if (_generateOnAwake)
         {
             Generate();
@@ -455,6 +463,10 @@ public class FishMeshGenerator : MonoBehaviour
         float height = bounds.size.y * _flatBottomHeightRatio;
         _flatBottomCollider.center = new Vector3(bounds.center.x, bounds.min.y + height * 0.5f, bounds.center.z);
         _flatBottomCollider.size = new Vector3(bounds.size.x, height, bounds.size.z);
+        if (_shapeMode == ShapeMode.Generated)
+        {
+            _generatedFish.SkipCollider.transform.localPosition = new Vector3(bounds.center.x, bounds.min.y + 0.1f, bounds.center.z);
+        }
     }
 
     /// <summary>

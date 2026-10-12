@@ -1,5 +1,44 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &910000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 910000002}
+  - component: {fileID: 910000003}
+  m_Layer: 0
+  m_Name: SkipReference
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &910000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 0.2, z: 1}
+  m_Children: []
+  m_Father: {fileID: 441414722265526707}
+--- !u!135 &910000003
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000001}
+  m_IsTrigger: 1
+  m_Enabled: 0
+  serializedVersion: 3
+  m_Radius: 0.5
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1001 &100100001
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -74,7 +113,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 441414722189055506, guid: def03d2a8a64e62488630d799df10d95, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 910000002}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 1895014721345939429, guid: def03d2a8a64e62488630d799df10d95, type: 3}
       insertIndex: -1
@@ -131,6 +173,7 @@ MonoBehaviour:
       _requiredPlayerFish: {fileID: 0}
       _fallsFromSky: 0
   _body: {fileID: 5746957800710436250}
+  _skipCollider: {fileID: 910000003}
 --- !u!4 &5746957800710436250 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5746957800793575995, guid: def03d2a8a64e62488630d799df10d95, type: 3}
