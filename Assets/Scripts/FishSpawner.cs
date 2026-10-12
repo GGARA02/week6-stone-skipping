@@ -81,6 +81,9 @@ public class FishSpawner : MonoBehaviour
     private float _minFishSpeed = 10f;
     [SerializeField]
     private Color _catchFlashColor = new Color(1f, 0.85f, 0.3f, 0.3f);
+    [Tooltip("물고기 포획 진동 (x 저주파, y 고주파)")]
+    [SerializeField]
+    private Vector2 _catchRumble = new Vector2(0.02f, 0.06f);
     private readonly List<Fish> _activeFish = new List<Fish>();
     private readonly List<Fish> _cutPieces = new List<Fish>();
     private float _nextSpawnTime;
@@ -382,7 +385,7 @@ public class FishSpawner : MonoBehaviour
         }
         _progress.AddFish(fish.Type);
         _effect.PlaySplash(fish.transform.position, 0.6f);
-        _effect.PlayImpact(0.8f, _catchFlashColor, 0.5f);
+        _effect.PlayImpact(0.8f, _catchFlashColor, _catchRumble);
         OnFishCaught?.Invoke(fish.Type);
         Remove(fish);
         if (fish.Type.StopAfterCatch || _seaSpawnRegistry.RequiresCutToRearm(fish.Type.Id)
@@ -400,7 +403,7 @@ public class FishSpawner : MonoBehaviour
         if (!CanAcquire(type)) return;
         _progress.AddFish(type);
         _effect.PlaySplash(point, 0.6f);
-        _effect.PlayImpact(0.8f, _catchFlashColor, 0.5f);
+        _effect.PlayImpact(0.8f, _catchFlashColor, _catchRumble);
         OnFishCaught?.Invoke(type);
         if (type.StopAfterCatch || _seaSpawnRegistry.RequiresCutToRearm(type.Id))
             RemoveActiveFish(type);

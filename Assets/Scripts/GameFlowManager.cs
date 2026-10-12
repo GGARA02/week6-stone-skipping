@@ -55,6 +55,11 @@ public class GameFlowManager : MonoBehaviour
     private InputManager _input;
     private Rumble _rumble;
 
+    [Header("진동")]
+    [Tooltip("도감 신규 등록 진동 (x 저주파, y 고주파)")]
+    [SerializeField]
+    private Vector2 _registerRumble = new Vector2(0.03f, 0.08f);
+
     [Header("흐름")]
     private State _state;
     private GameOverReason _gameOverReason;
@@ -733,7 +738,7 @@ public class GameFlowManager : MonoBehaviour
     /// </summary>
     private void HandleFishRegistered(FishType fish)
     {
-        _rumble.Pulse(0.4f, 0.24f);
+        _rumble.Pulse(_registerRumble, 0.24f);
         _newFish.Add(fish);
         ShowFishPopup($"{GetCatalogDisplayName(fish)}을(를) 얻은!");
     }
