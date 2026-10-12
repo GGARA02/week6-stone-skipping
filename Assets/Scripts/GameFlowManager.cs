@@ -191,7 +191,11 @@ public class GameFlowManager : MonoBehaviour
     [Tooltip("오프닝 연출에서 응시할 엔딩 블랙홀 트랜스폼")]
     [SerializeField] private Transform _endingBlackHole;
     [Tooltip("오프닝 시작 시 블랙홀과의 근접 거리")]
-    [SerializeField] private float _openingCloseDistance = 25f;
+    [SerializeField] private float _openingCloseDistance;
+    [Tooltip("오프닝 시작 시 카메라 높이(Y축) 추가 오프셋")]
+    [SerializeField] private float _openingHeightOffset;
+    [Tooltip("오프닝 시작 시 카메라 X축 추가 회전 각도(양수일 때 아래를 내려다봄)")]
+    [SerializeField] private float _openingPitchOffset;
     [Tooltip("오프닝 시작 후 카메라 후진 전 정지 대기 시간(초)")]
     [SerializeField] private float _openingHoldDuration = 1.0f;
     [Tooltip("오프닝 카메라 후진 이동 시간(초)")]
@@ -2750,7 +2754,7 @@ public class GameFlowManager : MonoBehaviour
 
     /// <summary>
     /// 블랙홀을 응시하며 21:9 비율로 시작하여 플레이 위치로 카메라를 후진 이동시킨 후 첫 투척을 실행한다.
-    /// _endingBlackHole 위치와 시간 설정을 사용하며, 카메라 위치, 레터박스, HUD 표시 상태와 _hasThrown을 변경하고 Throw를 호출한다.
+    /// _endingBlackHole 위치, 높이 및 피치 오프셋 설정을 사용하며, 카메라 위치, 레터박스, HUD 표시 상태와 _hasThrown을 변경하고 Throw를 호출한다.
     /// </summary>
     private IEnumerator PlayOpeningCinemaRoutine()
     {
@@ -2763,7 +2767,13 @@ public class GameFlowManager : MonoBehaviour
 
         Vector3 toPlayCam = playCamPos - blackHolePos;
         Vector3 startCamPos = blackHolePos + toPlayCam.normalized * _openingCloseDistance;
+        startCamPos.y += _openingHeightOffset;
+
         Quaternion startCamRot = Quaternion.LookRotation((blackHolePos - startCamPos).normalized, Vector3.up);
+        if (_openingPitchOffset != 0f)
+        {
+            startCamRot *= Quaternion.Euler(_openingPitchOffset, 0f, 0f);
+        }
 
         _cameraController.transform.position = startCamPos;
         _cameraController.transform.rotation = startCamRot;
@@ -2786,6 +2796,10 @@ public class GameFlowManager : MonoBehaviour
 
             Vector3 currentPos = Vector3.Lerp(startCamPos, playCamPos, smoothT);
             Quaternion lookAtHole = Quaternion.LookRotation((blackHolePos - currentPos).normalized, Vector3.up);
+            if (_openingPitchOffset != 0f)
+            {
+                lookAtHole *= Quaternion.Euler(Mathf.Lerp(_openingPitchOffset, 0f, smoothT), 0f, 0f);
+            }
             Quaternion currentRot = Quaternion.Slerp(lookAtHole, playCamRot, smoothT);
 
             _cameraController.transform.position = currentPos;

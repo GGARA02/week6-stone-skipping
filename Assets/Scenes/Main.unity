@@ -15196,7 +15196,9 @@ MonoBehaviour:
   _panelShrinkDuration: 0.65
   _endingCredit: {fileID: 1774445642}
   _endingBlackHole: {fileID: 1131671915}
-  _openingCloseDistance: 25
+  _openingCloseDistance: 30
+  _openingHeightOffset: 8
+  _openingPitchOffset: 5
   _openingHoldDuration: 1
   _openingTravelDuration: 3
   _blackHoleSuctionDuration: 1.7
