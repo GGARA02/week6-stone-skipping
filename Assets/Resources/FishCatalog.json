@@ -1130,7 +1130,27 @@
     "spawnWeight": 0,
     "displayName": "스카이박스",
     "description": "'나중에 교체'라고 적혀 있던 기본 하늘입니다. 결국 아무도 교체하지 않았고, 대신 물수제비가 되었습니다.",
-    "unlockHint": "블랙홀이 이 세계의 끝이라고 누가 그랬나요?"
+    "unlockHint": "블랙홀이 이 세계의 끝이라고 누가 그랬나요?",
+    "skipping": {
+      "skipSpeedMultiplier": 1,
+      "skipBounceSpeed": 8,
+      "skipBounceSpeedLoss": 0.3,
+      "feverBounceSpeedThreshold": 0.5,
+      "feverBrakeMultiplier": 0.35,
+      "feverBrakeAssistDuration": 0.25,
+      "minimumSkipSpeed": 2,
+      "goodSpeedRetention": 0.96,
+      "goodBounceSpeedLoss": 0.4,
+      "unjudgedSpeedRetention": 0.85,
+      "missBounceSpeedLoss": 0.6,
+      "skipAttitudeStiffness": 90,
+      "skipAttitudeDamping": 15,
+      "skipLiftCoefficient": 1,
+      "skipSkinFriction": 0.002,
+      "skipFormDrag": 0.03,
+      "skipSlideDeceleration": 5,
+      "skipSpinWaterDamping": 1.5
+    }
   },
   "alkagi": {
     "spawnWeight": 0,
